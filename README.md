@@ -1,10 +1,9 @@
 # 🔬 PesquisAI — Agente de IA para Pesquisadores Científicos
 
-<p align="center">
-  <img src="https://shields.io" alt="Status">
-  <img src="https://shields.io" alt="Python">
-  <img src="https://shields.io" alt="Google Colab">
-</p>
+![Status](https://shields.io)
+![Python](https://shields.io)
+![Google Colab](https://shields.io)
+
 
 O **PesquisAI** é um ecossistema de agentes de Inteligência Artificial baseado na arquitetura **OpenCode**. Ele foi projetado especificamente para automatizar, acelerar e otimizar o fluxo de trabalho de pesquisadores, acadêmicos e cientistas brasileiros, cobrindo etapas que vão desde o levantamento bibliográfico até a estruturação e submissão de artigos científicos.
 
