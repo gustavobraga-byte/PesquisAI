@@ -14,7 +14,7 @@ O **PesquisAI** é um ecossistema de agentes de Inteligência Artificial baseado
 A forma mais rápida de testar o PesquisAI é através do Google Colab. Você não precisa instalar nada na sua máquina:
 
 1. Clique no botão abaixo para abrir o notebook oficial:
-   [![Abrir no Colab](https://google.com)](https://google.com)
+   [![Abrir no Colab](https://google.com)](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb)
 2. No menu superior do Colab, clique em **Ambiente de execução** ➡️ **Executar tudo** (ou use o atalho `Ctrl + F9`).
 3. Aguarde cerca de **2 minutos** para o download do ambiente.
 4. Role até a última célula do notebook e clique no botão azul **🤖 Abrir o PesquisAI**.
