@@ -13,6 +13,7 @@
 O **PesquisAI** é um agente de Inteligência Artificial construído sobre a arquitetura **OpenCode**, projetado especificamente para pesquisadores, acadêmicos e cientistas. Ele automatiza etapas que vão do levantamento bibliográfico à estruturação de artigos, integrando fontes de dados públicos do Brasil.
 
 ---
+## 🤯 PesquisAI: A ferramenta que seu orientador não te contou! (Só não esqueça de fazer o double-check 😅) 
 
 ## ✨ O que ele faz
 
@@ -121,6 +122,17 @@ Google Colab
 ```
 
 As dependências são gerenciadas pelo [uv (Astral)](https://github.com/astral-sh/uv) para instalação ultrarrápida e ambientes reproduzíveis.
+
+---
+
+## Declaração de Limitações
+
+O PesquisAI:
+- **Não substitui** a revisão por pares nem o julgamento de um pesquisador humano.
+- **Não acessa** bases de dados pagas sem integração configurada.
+- **Não realiza** coleta primária de dados (entrevistas, experimentos, surveys).
+- **Não garante** atualização em tempo real; a disponibilidade dos dados depende das APIs externas.
+- 🚨 **ATENÇÃO:** Sempre revise e confirme a precisão de todas as informações geradas por esta IA antes de utilizá-las em decisões ou projetos críticos.
 
 ---
 
