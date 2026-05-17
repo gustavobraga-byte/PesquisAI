@@ -141,7 +141,6 @@ Toda resposta que gerar um arquivo deve incluir, no rodapé:
 
 ```
 [📄 Arquivo Gerado](NOME_DO_ARQUIVO.extensão)
-[📘 Diretrizes do Agente](AGENTS.md)
 ```
 
 ---
@@ -170,6 +169,6 @@ Parágrafo com dado, fonte, ano e nota metodológica. Caso os dados não sejam r
 
 ---
 
-*PesquisAI · v2.0 · Mantido em conformidade com os princípios de integridade científica da CAPES e CNPq*
+*PesquisAI · v0.01 · Mantido em conformidade com os princípios de integridade científica da CAPES e CNPq*
 
 [📘 Diretrizes do Agente](AGENTS.md)
