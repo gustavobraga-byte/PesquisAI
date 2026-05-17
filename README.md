@@ -3,61 +3,135 @@
  [![Abrir no Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb)
 
 
-O **PesquisAI** é um ecossistema de agentes de Inteligência Artificial baseado na arquitetura **OpenCode**. Ele foi projetado especificamente para automatizar, acelerar e otimizar o fluxo de trabalho de pesquisadores, acadêmicos e cientistas brasileiros, cobrindo etapas que vão desde o levantamento bibliográfico até a estruturação e submissão de artigos científicos.
+> Ecossistema de agentes de IA para acelerar a pesquisa científica.
+
+[![Abrir no Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb)
+[![Licença MIT](https://img.shields.io/badge/licença-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
+[![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow.svg)]()
+
+O **PesquisAI** é um agente de Inteligência Artificial construído sobre a arquitetura **OpenCode**, projetado especificamente para pesquisadores, acadêmicos e cientistas. Ele automatiza etapas que vão do levantamento bibliográfico à estruturação de artigos, integrando fontes de dados públicos do Brasil.
 
 ---
 
-## 🚀 Como Executar Grátis (Sem Instalação)
+## ✨ O que ele faz
 
-A forma mais rápida de testar o PesquisAI é através do Google Colab. Você não precisa instalar nada na sua máquina:
-
-1. Clique no botão abaixo para abrir o notebook oficial:
-   [![Abrir no Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb)
-2. No menu superior do Colab, clique em **Ambiente de execução** ➡️ **Executar tudo** (ou use o atalho `Ctrl + F9`).
-3. Aguarde cerca de **2 minutos** para o download do ambiente.
-4. Role até a última célula do notebook e clique no botão azul **🤖 Abrir o PesquisAI**.
-
----
-
-## 🛠️ Skills Integradas (Habilidades do Agente)
-
-O PesquisAI opera através de módulos especializados (*skills*) focados no cenário científico e de dados do Brasil:
-
-*   **📊 Skill-IBGE (`gustavobraga-byte`)**: Consulta automatizada e extração de dados estatísticos, demográficos e socioeconômicos do Instituto Brasileiro de Geografia e Estatística.
-*   **🏥 Skill-DataSus (`gustavobraga-byte`)**: Integração com a base de dados do OpenDataSUS para coleta e análise de dados públicos de saúde.
-*   **📚 Scientific-Skills (`K-Dense-AI`)**: Ferramentas focadas em pesquisa acadêmica, mineração de textos científicos, revisão bibliográfica e suporte metodológico.
+| Capacidade | Descrição |
+|---|---|
+| 📊 **Dados IBGE** | Consulta e extração de dados estatísticos, demográficos e socioeconômicos |
+| 🏥 **Dados DataSUS** | Acesso e análise de dados públicos de saúde via OpenDataSUS |
+| 📚 **Pesquisa científica** | Mineração de textos, revisão bibliográfica e suporte metodológico |
+| ✍️ **Redação acadêmica** | Auxílio na estruturação e revisão de artigos científicos |
 
 ---
 
-## ⚙️ Estrutura da Arquitetura
+## 🚀 Início rápido
 
-O projeto utiliza o **ttyd** para renderizar um terminal Linux interativo via navegador web dentro do proxy do Google Colab, injetando as variáveis do ecossistema OpenCode:
+### Opção 1 — Google Colab (sem instalação)
+
+A forma mais rápida. Nenhuma configuração necessária:
+
+1. Clique no badge do Colab acima
+2. No menu, vá em **Ambiente de execução → Executar tudo** (ou `Ctrl+F9`)
+3. Aguarde ~2 minutos para o ambiente carregar
+4. Role até a última célula e clique em **🤖 Abrir o PesquisAI**
+
+### Opção 2 — Instalação local
+
+**Pré-requisitos:** Python 3.10+ e [uv](https://github.com/astral-sh/uv)
 
 ```bash
-# O ambiente instala dependências via uv (Astral) de forma ultrarrápida:
-curl -LsSf https://astral.sh | sh
+# Clone o repositório
+git clone https://github.com/gustavobraga-byte/PesquisAI.git
+cd PesquisAI
 
-# Inicializa o ecossistema isolado
-ttyd -p 8000 bash -i -c "opencode; exec bash"
+# Instale as dependências
+uv sync
+
+# Configure sua chave de API
+cp .env.example .env
+# Edite o .env com sua chave
+
+# Execute
+uv run pesquisai
 ```
 
 ---
 
-## 🤝 Como Contribuir
+## 🛠️ Skills disponíveis
 
-Contribuições são extremamente bem-vindas! Se você deseja criar uma nova *skill* de dados públicos (ex: IPEA, INEP) ou melhorar a inteligência do agente científico:
+O PesquisAI opera por módulos especializados (*skills*). Cada skill conecta o agente a uma fonte de dados ou capacidade específica:
 
-1. Faça um **Fork** do projeto.
-2. Crie uma branch para sua modificação (`git checkout -b feature/NovaSkill`).
-3. Envie o **Pull Request** para análise.
+### `skill-ibge` · [@gustavobraga-byte](https://github.com/gustavobraga-byte)
+Consulta automatizada à API do IBGE. Suporta dados do Censo, PNAD, PIB municipal, índices de preços e indicadores demográficos.
+
+### `skill-datasus` · [@gustavobraga-byte](https://github.com/gustavobraga-byte)
+Integração com o OpenDataSUS para coleta e análise de dados de saúde pública: mortalidade, internações, cobertura vacinal e outros.
+
+### `scientific-skills` · [@K-Dense-AI](https://github.com/K-Dense-AI)
+Ferramentas focadas em pesquisa acadêmica: mineração de textos científicos, revisão bibliográfica e suporte metodológico.
+
+---
+
+## 🗺️ Roadmap
+
+| Fase | Período | Foco |
+|---|---|---|
+| **1 — Base sólida** | Meses 1–3 | CLI, testes, CI/CD, instalação local |
+| **2 — Expansão de dados** | Meses 4–7 | Inserir novas habilidades: IPEA, INEP, Sucupira/CAPES, plugins,... |
+| **3 — Interface & UX** | Meses 8–11 | Interface web, editor de artigos, possibilidade de copilot |
+| **4 — Ecossistema** | Meses 12–18 | API pública, versão SaaS, integração institucional |
 
 ---
 
-## 📬 Contato e Suporte
+## 🤝 Como contribuir
 
-*   **Autor:** Gustavo Bastos Braga — Universidade Federal de Viçosa (UFV)
-*   **E-mail:** [gustavo.braga@ufv.br](mailto:gustavo.braga@ufv.br)
-*   **GitHub:** [@gustavobraga-byte](https://github.com)
+Contribuições são bem-vindas — especialmente novas skills para fontes de dados públicos brasileiros.
+
+```bash
+# 1. Faça um fork e clone o seu fork
+git clone https://github.com/SEU_USUARIO/PesquisAI.git
+
+# 2. Crie uma branch para sua contribuição
+git checkout -b feature/skill-ipea
+
+# 3. Desenvolva, teste e abra um Pull Request
+```
+
+Consulte o arquivo [`AGENTS.md`](AGENTS.md) para entender a arquitetura das skills e os padrões de desenvolvimento esperados.
+
+**Ideias de contribuição:**
+- Skills para novas fontes (IPEA, INEP, ANEEL, ANS, IBICT...)
+- Melhorias na skill científica (suporte a mais bases como Scielo, BDTD)
+- Traduções da documentação
+- Casos de uso e exemplos de pesquisa
 
 ---
-<p align="center">Desenvolvido com 💙 para impulsionar a comunidade científica brasileira.</p>
+
+## ⚙️ Arquitetura
+
+O PesquisAI usa o **ttyd** para renderizar um terminal Linux interativo via navegador dentro do proxy do Google Colab, com o ecossistema OpenCode injetado como ambiente isolado:
+
+```
+Google Colab
+└── ttyd (terminal web na porta 8000)
+    └── opencode (runtime do agente)
+        ├── skill-ibge
+        ├── skill-datasus
+        └── scientific-skills
+```
+
+As dependências são gerenciadas pelo [uv (Astral)](https://github.com/astral-sh/uv) para instalação ultrarrápida e ambientes reproduzíveis.
+
+---
+
+## 📬 Contato
+
+Desenvolvido por **Gustavo Bastos Braga** na Universidade Federal de Viçosa (UFV).
+
+- ✉️ gustavo.braga@ufv.br
+- 🐙 [@gustavobraga-byte](https://github.com/gustavobraga-byte)
+
+---
+
+Feito com 💙 para impulsionar a ciência brasileira.
