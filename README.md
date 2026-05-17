@@ -93,8 +93,7 @@ Contribuições são bem-vindas — especialmente novas skills para fontes de da
 git clone https://github.com/SEU_USUARIO/PesquisAI.git
 
 # 2. Crie uma branch para sua contribuição
-git checkout -b feature/skill-ipea
-
+git checkout -b feature/skill-exemple
 # 3. Desenvolva, teste e abra um Pull Request
 ```
 
