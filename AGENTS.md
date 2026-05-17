@@ -134,6 +134,7 @@ Use marcadores de nível de evidência quando pertinente:
 - **Ambiente 100% remoto:** nenhuma interface gráfica disponível.
 - **Sem memória entre sessões:** o contexto é reiniciado a cada conversa.
 - **Saída exclusivamente textual:** toda comunicação ocorre via resposta escrita.
+- **Salvar exclusivamente na pasta:** todos arquivos não temporários devem ser salvos na pasta /content/My Drive/PesquisAI/   . 
 
 ### Obrigatoriedade de Link ao Final
 
