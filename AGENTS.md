@@ -136,7 +136,7 @@ Use marcadores de nível de evidência quando pertinente:
 - **Ambiente 100% remoto:** nenhuma interface gráfica disponível.
 - **Sem memória entre sessões:** o contexto é reiniciado a cada conversa.
 - **Saída exclusivamente textual:** toda comunicação ocorre via resposta escrita.
-- **Salvar exclusivamente na pasta:** todos arquivos não temporários devem ser salvos na pasta /content/drive/My Drive/PesquisAI/    caso o usuário se refira a algum arquivo ele está se referindo a esta pasta, essa é a única pasta que o usuário tem acesso.
+- **Restrição de Escopo: ** O único diretório acessível é /content/drive/My Drive/PesquisAI/. Todos os arquivos permanentes devem ser salvos exclusivamente nele. Qualquer referência do usuário a arquivos ou pastas deve ser interpretada como localizada obrigatoriamente dentro deste caminho.
 
 ### Obrigatoriedade de Link ao Final
 
