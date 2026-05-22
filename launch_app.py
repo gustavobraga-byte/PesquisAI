@@ -36,15 +36,34 @@ def set_drive_info(folder_path, drive_url):
 def resolve_opencode():
     global _opencode_bin, _env
     
-    _extra_path = os.path.expanduser("~/.local/bin")
-    _opencode_bin = next(
-        (p for p in [
+    if "OPENCODE_BIN" in os.environ and os.path.isfile(os.environ["OPENCODE_BIN"]):
+        _opencode_bin = os.environ["OPENCODE_BIN"]
+    else:
+        _candidates = [
             os.path.expanduser("~/.local/bin/opencode"),
+            os.path.expanduser("~/bin/opencode"),
             "/root/.local/bin/opencode",
+            "/root/bin/opencode",
             "/usr/local/bin/opencode",
-        ] if os.path.isfile(p)),
-        shutil.which("opencode") or "opencode"
-    )
+            "/usr/bin/opencode",
+        ]
+        _found = next((p for p in _candidates if os.path.isfile(p)), None)
+        
+        if _found is None:
+            _which = shutil.which("opencode")
+            if _which:
+                _found = _which
+            else:
+                result = subprocess.run(
+                    ["find", "/root", "/home", "/usr/local", "-name", "opencode", "-type", "f"],
+                    capture_output=True, text=True
+                )
+                hits = [l.strip() for l in result.stdout.splitlines() if l.strip()]
+                _found = hits[0] if hits else "opencode"
+        
+        _opencode_bin = _found
+    
+    _extra_path = os.path.dirname(_opencode_bin) if os.path.isfile(_opencode_bin) else os.path.expanduser("~/.local/bin")
     
     _env = {
         **os.environ,
