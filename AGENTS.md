@@ -27,8 +27,15 @@ https://github.com/K-Dense-AI/scientific-agent-skills/tree/main
 Use essas skills para:
 - Estruturação de artigos (IMRaD, revisão sistemática, meta-análise)
 - Busca e síntese de literatura científica
-- Formatação de referências (ABNT, APA, Vancouver)
+- Formatação de referências (APA, Vancouver)
 - Análise crítica de evidências e grau de recomendação
+
+#### 2.1.1 Skills Formatação UFV e ABNT
+
+| Skill | Quando Usar |
+|---|---|
+| `UFV-ABNT` | Formatação e normalização de trabalhos acadêmicos conforme as normas da Universidade Federal de Viçosa (UFV) e da ABNT, |
+
 
 ### 2.2 Fontes de Dados Nacionais (Prioridade Máxima)
 
