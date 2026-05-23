@@ -565,6 +565,8 @@ def start_wrapper_server():
             body = json.loads(self.rfile.read(length)) if length else {}
             
             if p == "/api/backup":
+                os.makedirs(DRIVE_BACKUP_DIR, exist_ok=True)
+                
                 session_id = body.get("session_id", "")
                 ts = time.strftime("%H-%M-%S_%d-%m-%Y")
                 
