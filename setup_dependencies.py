@@ -3,9 +3,35 @@ import json
 import subprocess
 import shutil
 
-THEME_DIR = os.path.expanduser("~/.agents/themes")
-AGENT_DIR = os.path.expanduser("~/.agents/agents")
-TUI_JSON = os.path.expanduser("~/.agents/tui.json")
+THEME_DIR = os.path.expanduser("~/.config/opencode/themes")
+AGENT_DIR = os.path.expanduser("~/.config/opencode/agents")
+TUI_JSON = os.path.expanduser("~/.config/opencode/tui.json")
+OPENCODE_CFG = os.path.expanduser("~/.config/opencode/config.json")
+
+OPENCODE_BIN = None
+
+JOKES_INSTALL = [
+    "⚛️ Relatividade geral: o tempo passa mais devagar quando você olha para o progresso.",
+    "⚗️ Catalisador: o café que você tomou deveria acelerar isso.",
+    "⚛️ Primeira lei de Newton: download em repouso tende a permanecer em repouso.",
+    "⚗️ Se esse progresso fosse um elemento, seria o Gás Nobre: não reage com nada.",
+    "⚛️ Schrödinger já desistiu: esse download está e não está terminando.",
+    "⚗️ Estado de oxidação da paciência: -1000",
+    "⚛️ Entropia: a bagunça do seu progresso só aumenta.",
+    "⚗️ Reação: Paciência(lenta) → Paciência + Cansaço",
+    "⚛️ Princípio da incerteza: não sabemos quando termina nem se termina.",
+    "⚗️ Entalpia desse processo: ΔH = +muito",
+]
+
+_joke_index = 0
+
+def next_joke():
+    global _joke_index
+    if _joke_index < len(JOKES_INSTALL):
+        joke = JOKES_INSTALL[_joke_index]
+        _joke_index += 1
+        return joke
+    return JOKES_INSTALL[-1]
 
 
 def run(cmd, check=True, **kw):
@@ -15,23 +41,78 @@ def run(cmd, check=True, **kw):
     return result
 
 
+def find_opencode_binary():
+    global OPENCODE_BIN
+    
+    _candidates = [
+        os.path.expanduser("~/.local/bin/opencode"),
+        os.path.expanduser("~/bin/opencode"),
+        "/root/.local/bin/opencode",
+        "/root/bin/opencode",
+        "/usr/local/bin/opencode",
+        "/usr/bin/opencode",
+    ]
+    _found = next((p for p in _candidates if os.path.isfile(p)), None)
+    
+    if _found is None:
+        result = subprocess.run(
+            ["find", "/root", "/home", "/usr/local", "-name", "opencode", "-type", "f"],
+            capture_output=True, text=True
+        )
+        hits = [l.strip() for l in result.stdout.splitlines() if l.strip()]
+        _found = hits[0] if hits else None
+    
+    if _found:
+        OPENCODE_BIN = _found
+        _bin_dir = os.path.dirname(_found)
+        if _bin_dir not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = _bin_dir + ":" + os.environ["PATH"]
+        os.environ["OPENCODE_BIN"] = _found
+        print(f"\n{next_joke()}")
+        print(f"✅ opencode encontrado: {_found}")
+        try:
+            subprocess.run([_found, "--version"])
+        except:
+            pass
+    else:
+        print("\n❌ opencode NÃO encontrado.")
+    
+    return _found
+
+
 def install_opencode():
     print("📦 Instalando OpenCode...")
-    run("pip install opencode --quiet")
-    run("pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib --quiet")
+    print(f"\n{next_joke()}")
+    run("curl -fsSL https://opencode.ai/install | bash", check=True)
+    
+    print(f"\n{next_joke()}")
+    print("📦 Instalando uv...")
+    run("curl -LsSf https://astral.sh/uv/install.sh | sh", check=False)
+    
+    print(f"\n{next_joke()}")
+    print("📦 Instalando ferramentas de clipboard...")
+    run("apt-get update -qq && apt-get install -y -qq xclip xsel", check=False)
+    
+    print(f"\n{next_joke()}")
+    print("📦 Instalando dependências Python...")
+    run("pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib --quiet", check=False)
+    
+    find_opencode_binary()
+    print(f"\n{next_joke()}")
     print("✅ OpenCode instalado.")
 
 
 def create_directories():
-    os.makedirs(THEME_DIR, exist_ok=True)
-    os.makedirs(AGENT_DIR, exist_ok=True)
-    os.makedirs(os.path.expanduser("~/.config/opencode"), exist_ok=True)
+    for d in [THEME_DIR, AGENT_DIR]:
+        os.makedirs(d, exist_ok=True)
+    os.makedirs(os.path.dirname(OPENCODE_CFG), exist_ok=True)
 
 
 def setup_theme():
     pesquisai_theme = {
-        "palette": {
-            "bg0": "#0d0f10",
+        "$schema": "https://opencode.ai/theme.json",
+        "defs": {
+            "bg0": "#0b0d0f",
             "bg1": "#131618",
             "bg2": "#191e21",
             "bg3": "#1f262a",
@@ -135,20 +216,19 @@ Você é o **PesquisAI**, um assistente de pesquisa científica especializado em
     with open(agent_path, "w", encoding="utf-8") as f:
         f.write(agent_md)
 
-    cfg_path = os.path.join(os.path.expanduser("~/.config/opencode"), "config.json")
     try:
-        with open(cfg_path) as f:
+        with open(OPENCODE_CFG) as f:
             cfg = json.load(f)
     except Exception:
         cfg = {}
 
     cfg["default_agent"] = "pesquisai"
 
-    with open(cfg_path, "w") as f:
+    with open(OPENCODE_CFG, "w") as f:
         json.dump(cfg, f, indent=2)
 
     print("✅ Agente configurado:", agent_path)
-    print("✅ Config padrão:", cfg_path)
+    print("✅ Config padrão:", OPENCODE_CFG)
 
 
 def run_all():
@@ -156,6 +236,7 @@ def run_all():
     create_directories()
     setup_theme()
     setup_agent()
+    print(f"\n{next_joke()}")
     print("\n🎉 Dependências e configurações concluídas!")
 
 

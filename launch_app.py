@@ -21,6 +21,32 @@ TERMINAL_PORT = 8000
 WRAPPER_PORT = 8001
 WRAPPER_DIR = "/tmp/pesquisai-wrapper"
 
+JOKES_LAUNCH = [
+    "📊 Oportunidade de espera: o que você poderia estar fazendo agora.",
+    "📋 Planejamento estratégico: plano A = esperar, plano B = continuar esperando.",
+    "💰 Valor presente líquido (VPL): negativo.",
+    "📊 Inflação da paciência: cada minuto vale menos que o anterior.",
+    "📋 Missão, Visão, Valores: Missão = esperar, Visão = ver o botão.",
+    "💰 Retorno sobre investimento (ROI): investiu tempo, retorno zero.",
+    "📊 Juros compostos: sua frustração cresce exponencialmente.",
+    "📋 Ciclo PDCA: Plan, Do, Check, Agora esperar de novo.",
+    "💰 Fluxo de caixa: só saída (de paciência), sem entrada.",
+    "📊 Custo de oportunidade: muito alto para esse retorno zero.",
+    "📋 Metas SMART: esse download não atinge nem a letra S.",
+    "💰 Payback: período de retorno = nunca.",
+]
+
+_joke_index = 0
+
+def next_joke():
+    global _joke_index
+    if _joke_index < len(JOKES_LAUNCH):
+        joke = JOKES_LAUNCH[_joke_index]
+        _joke_index += 1
+        return joke
+    return JOKES_LAUNCH[-1]
+
+
 _opencode_bin = None
 _env = None
 _drive_url = "https://drive.google.com/drive/my-drive"
@@ -76,6 +102,7 @@ def resolve_opencode():
 
 
 def install_ttyd():
+    print(f"\n{next_joke()}")
     print("📦 Instalando ttyd...")
     subprocess.run(
         "apt-get update -qq && apt-get install -y -qq ttyd",
@@ -93,6 +120,7 @@ def kill_previous():
 
 
 def start_ttyd():
+    print(f"\n{next_joke()}")
     opencode_bin, env = resolve_opencode()
     
     subprocess.Popen(
@@ -538,7 +566,7 @@ def start_wrapper_server():
             
             if p == "/api/backup":
                 session_id = body.get("session_id", "")
-                ts = time.strftime("%Y%m%d_%H%M%S")
+                ts = time.strftime("%H-%M-%S_%d-%m-%Y")
                 
                 if not session_id:
                     r = _run([_opencode_bin, "session", "list", "--format", "json"])
@@ -598,7 +626,55 @@ def start_wrapper_server():
         target=lambda: HTTPServer(("0.0.0.0", WRAPPER_PORT), Handler).serve_forever(),
         daemon=True,
     ).start()
+    print(f"\n{next_joke()}")
     print(f"🚀 Servidor wrapper iniciado na porta {WRAPPER_PORT}")
+
+
+def show_ready_message():
+    if not IN_COLAB or not display or not HTML:
+        print("\n✨ PesquisAI pronto!\n")
+        return
+    
+    display(HTML(f"""
+<style>
+@keyframes glow {{
+    0%, 100% {{ box-shadow: 0 0 20px rgba(93, 186, 126, 0.3); }}
+    50% {{ box-shadow: 0 0 40px rgba(93, 186, 126, 0.6); }}
+}}
+.ready-container {{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 20px 0px 20px;
+}}
+.ready-badge {{
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 32px;
+    background: rgba(93, 186, 126, 0.12);
+    border: 2px solid rgba(93, 186, 126, 0.4);
+    border-radius: 12px;
+    animation: glow 2s ease-in-out infinite;
+}}
+.ready-icon {{
+    font-size: 28px;
+}}
+.ready-text {{
+    font-family: 'DM Mono', monospace;
+    font-size: 18px;
+    font-weight: 600;
+    color: #5dba7e;
+}}
+</style>
+<div class="ready-container">
+    <div class="ready-badge">
+        <span class="ready-icon">✨</span>
+        <span class="ready-text">PesquisAI pronto!</span>
+    </div>
+</div>
+"""))
 
 
 def show_launch_button(banner_url):
@@ -608,27 +684,98 @@ def show_launch_button(banner_url):
     
     display(HTML(f"""
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@500;700&family=Syne:wght@700;800&display=swap');
+  @keyframes pulse-glow {{
+    0%, 100% {{ box-shadow: 0 0 20px rgba(79,195,247,0.3), 0 4px 12px rgba(0,0,0,0.3); }}
+    50% {{ box-shadow: 0 0 40px rgba(79,195,247,0.6), 0 6px 20px rgba(0,0,0,0.4); }}
+  }}
+  .btn-container {{
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    margin-top: 10px;
+  }}
   .pesquisai-launch {{
-    display: inline-flex; align-items: center; gap: 12px;
-    padding: 12px 26px; margin-top: 16px;
-    font-family: "DM Mono", monospace; font-size: 13px;
-    font-weight: 500; letter-spacing: .06em;
-    color: #0d0f10; background: #4fc3f7;
-    border: none; border-radius: 5px; cursor: pointer;
+    display: inline-flex; 
+    align-items: center; 
+    justify-content: center;
+    gap: 16px;
+    padding: 24px 56px; 
+    font-family: "Syne", sans-serif; 
+    font-size: 22px;
+    font-weight: 800; 
+    letter-spacing: 0.08em;
+    color: #0d0f10; 
+    background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 50%, #03a9f4 100%);
+    border: none; 
+    border-radius: 14px; 
+    cursor: pointer;
     text-decoration: none;
-    transition: filter .18s, transform .12s, box-shadow .3s;
+    transition: all 0.2s ease;
+    animation: pulse-glow 2.5s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+  }}
+  .pesquisai-launch::before {{
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transition: left 0.5s;
+  }}
+  .pesquisai-launch:hover::before {{
+    left: 100%;
   }}
   .pesquisai-launch:hover {{
-    filter: brightness(1.08); transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(79,195,247,.3);
+    transform: translateY(-4px) scale(1.02);
+    filter: brightness(1.1);
+    box-shadow: 0 12px 40px rgba(79,195,247,0.5), 0 8px 24px rgba(0,0,0,0.4);
   }}
-  .pesquisai-launch .arrow {{ transition: transform .18s; }}
-  .pesquisai-launch:hover .arrow {{ transform: translateX(3px); }}
+  .pesquisai-launch:active {{
+    transform: translateY(-1px) scale(0.99);
+  }}
+  .btn-icon {{
+    font-size: 28px;
+  }}
+  .btn-text {{
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }}
+  .btn-main {{
+    font-size: 22px;
+    font-weight: 800;
+  }}
+  .btn-sub {{
+    font-family: "DM Mono", monospace;
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.8;
+    letter-spacing: 0.1em;
+  }}
+  .pesquisai-launch .arrow {{ 
+    font-size: 28px;
+    font-weight: 500;
+    transition: transform 0.2s ease; 
+  }}
+  .pesquisai-launch:hover .arrow {{ 
+    transform: translateX(8px); 
+  }}
 </style>
-<a href="{banner_url}" target="_blank" class="pesquisai-launch">
-  Abrir o PesquisAI <span class="arrow">→</span>
-</a>
+<div class="btn-container">
+  <a href="{banner_url}" target="_blank" class="pesquisai-launch">
+    <span class="btn-icon">🚀</span>
+    <span class="btn-text">
+      <span class="btn-main">ABRIR O PESQUISAI</span>
+      <span class="btn-sub">clique para começar</span>
+    </span>
+    <span class="arrow">→</span>
+  </a>
+</div>
 """))
 
 
@@ -651,6 +798,7 @@ def launch():
     start_wrapper_server()
     
     time.sleep(1)
+    show_ready_message()
     show_launch_button(banner_url)
     
     return banner_url
