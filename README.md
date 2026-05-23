@@ -69,6 +69,9 @@ Consulta automatizada à API do IBGE. Suporta dados do Censo, PNAD, PIB municipa
 ### `skill-datasus` · [@gustavobraga-byte](https://github.com/gustavobraga-byte)
 Integração com o OpenDataSUS para coleta e análise de dados de saúde pública: mortalidade, internações, cobertura vacinal e outros.
 
+### `skill-UFV-ABNT` · [@gustavobraga-byte](https://github.com/gustavobraga-byte)
+Formatação e normalização de trabalhos acadêmicos conforme as normas da Universidade Federal de Viçosa (UFV) e da ABNT.
+
 ### `scientific-skills` · [@K-Dense-AI](https://github.com/K-Dense-AI)
 Ferramentas focadas em pesquisa acadêmica: mineração de textos científicos, revisão bibliográfica e suporte metodológico.
 
@@ -80,7 +83,7 @@ Ferramentas focadas em pesquisa acadêmica: mineração de textos científicos, 
 |---|---|---|
 | **1 — Base sólida** | Meses 1–3 | CLI, testes, CI/CD, instalação local |
 | **2 — Expansão de dados** | Meses 4–7 | Inserir novas habilidades: IPEA, INEP, Sucupira/CAPES, plugins,... |
-| **3 — Interface & UX** | Meses 8–11 | Interface web, editor de artigos, possibilidade de copilot |
+| **3 — Interface** | Meses 8–11 | Aprimorar interface web, editor de artigos, possibilidade de copilot |
 | **4 — Ecossistema** | Meses 12–18 | API pública, versão SaaS, integração institucional |
 
 ---
