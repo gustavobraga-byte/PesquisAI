@@ -740,6 +740,316 @@ Todos os arquivos gerados são salvos **exclusivamente** nesta pasta.
 
 ---
 
+## 9. 📎 Citação do PesquisAI
+
+### Como citar o PesquisAI em trabalhos acadêmicos
+
+**Referência ABNT NBR 6023:2018 (Software/Ferramenta):**
+
+```
+BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para pesquisa
+científica. Versão 1.0. Viçosa: Universidade Federal de Viçosa, 2026.
+Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
+Acesso em: DD mês. AAAA.
+```
+
+**Formato simplificado (nota de rodapé):**
+
+```
+PesquisAI, versão 1.0, desenvolvido por Gustavo Bastos Braga (UFV, 2026). Disponível em:
+https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
+```
+
+### Exemplos de uso em diferentes situações
+
+**1. No corpo do texto (ABNT — sistema autor-data):**
+
+> Para a análise dos dados demográficos, utilizou-se o agente de pesquisa **PesquisAI** (BRAGA, 2026), que integra consultas automatizadas às bases do IBGE e do DataSUS.
+
+**2. Em seção de Materiais e Métodos:**
+
+> O processamento e a organização dos dados foram realizados com o auxílio do **PesquisAI** (BRAGA, 2026), um agente de inteligência artificial especializado em pesquisa científica com acesso às bases de dados oficiais brasileiras (IBGE e DataSUS), executado via Google Colaboratory. Todas as informações geradas pela ferramenta foram posteriormente revisadas e validadas pelos autores.
+
+**3. Em seção de Agradecimentos:**
+
+> Os autores agradecem ao desenvolvedor Gustavo Bastos Braga (UFV) pela disponibilização do agente **PesquisAI**, utilizado como ferramenta auxiliar na coleta e organização de dados das bases públicas consultadas neste trabalho.
+
+**4. Em nota de rodapé na primeira menção:**
+
+> \* **PesquisAI** é um agente de inteligência artificial de código aberto desenvolvido na Universidade Federal de Viçosa (UFV), especializado em pesquisa científica com acesso às bases oficiais do IBGE e DataSUS. Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
+
+### Metadados para gerenciadores de referência
+
+| Campo | Valor |
+|---|---|
+| **Tipo** | Software / Computer Program |
+| **Autor** | Braga, Gustavo Bastos |
+| **Título** | PesquisAI: agente de inteligência artificial para pesquisa científica |
+| **Versão** | 1.0 |
+| **Ano** | 2026 |
+| **Instituição** | Universidade Federal de Viçosa (UFV) |
+| **URL** | https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/ |
+| **Repositório** | https://github.com/gustavobraga-byte/PesquisAI |
+| **Licença** | MIT |
+| **Linguagem** | Python 3.10+ |
+| **Plataforma** | Google Colaboratory |
+
+### BibTeX (para usuários LaTeX):
+
+```bibtex
+@software{braga2026pesquisai,
+author = {Gustavo Bastos Braga},
+title = {{PesquisAI}: Agente de Intelig{\^e}ncia Artificial para Pesquisa Cient{\'\i}fica},
+year = {2026},
+version = {1.0},
+institution = {Universidade Federal de Vi{\c{c}}osa (UFV)},
+url = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/},
+note = {Acessado em: DD m{\^e}s AAAA}
+}
+```
+
+---
+
+## 10. 🤖 Declaração de Uso de Inteligência Artificial (IA)
+
+### Modelos para Inclusão em Trabalhos Acadêmicos
+
+> **Importante:** As declarações abaixo são sugestões elaboradas conforme as diretrizes do **Committee on Publication Ethics (COPE)**, da **CAPES**, e de periódicos científicos como **Nature, Science, Elsevier e Springer**. Sempre verifique as políticas específicas do periódico ou da instituição para a qual você está submetendo o trabalho.
+
+### Tabela Rápida: Qual modelo usar?
+
+| Situação | Modelo Recomendado |
+|---|---|
+| Monografia, Dissertação ou Tese (UFV/ABNT) | Modelo A — Declaração Padrão Acadêmica |
+| Artigo para periódico (seção de Métodos) | Modelo B — Materiais e Métodos |
+| Artigo para periódico (seção de Agradecimentos) | Modelo C — Agradecimentos |
+| Uso apenas para busca de dados (IBGE/DataSUS) | Modelo D — Auxílio com Dados |
+| Uso para estruturação e formatação (ABNT/UFV) | Modelo E — Formatação e Estrutura |
+| Resumo expandido para congresso | Modelo F — Declaração Curta |
+
+### Modelo A — Declaração Padrão Acadêmica (TCC, Dissertação, Tese)
+
+> **Recomendado para:** Trabalhos de conclusão de curso, dissertações e teses formatadas conforme normas UFV/ABNT. Inserir como seção própria após a Conclusão, antes das Referências.
+
+```
+DECLARAÇÃO DE USO DE INTELIGÊNCIA ARTIFICIAL
+
+Durante a elaboração deste trabalho, foi utilizada a ferramenta PesquisAI (BRAGA, 2026),
+um agente de inteligência artificial de código aberto especializado em pesquisa
+científica, desenvolvido na Universidade Federal de Viçosa (UFV). A ferramenta foi
+empregada como auxílio nas seguintes etapas:
+
+a) Consulta e extração de dados das bases oficiais do IBGE e DataSUS;
+b) Organização e estruturação do referencial teórico conforme normas ABNT;
+c) Revisão da formatação das referências bibliográficas;
+d) [ESPECIFICAR OUTRAS ETAPAS, SE APLICÁVEL].
+
+Declaro que todas as informações geradas pela ferramenta foram criteriosamente
+revisadas, validadas à luz das fontes originais e editadas por mim. A ferramenta
+foi utilizada exclusivamente como instrumento auxiliar, jamais como substituta
+do trabalho intelectual de pesquisa, análise e redação. Assumo integral
+responsabilidade pelo conteúdo final deste trabalho, incluindo a acurácia de
+todos os dados, citações, análises e conclusões aqui apresentados.
+
+A ferramenta PesquisAI não foi listada como autora ou coautora deste trabalho,
+em conformidade com os critérios de autoria do International Committee of
+Medical Journal Editors (ICMJE) e com as diretrizes do Committee on Publication
+Ethics (COPE).
+
+Referência da ferramenta:
+BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para
+pesquisa científica. Versão 1.0. Viçosa: UFV, 2026. Disponível em:
+https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
+```
+
+### Modelo B — Materiais e Métodos (Artigo Científico)
+
+> **Recomendado para:** Artigos submetidos a periódicos que exigem menção de ferramentas na seção de Métodos.
+
+```
+O processamento e a organização dos dados foram realizados com o auxílio do
+PesquisAI (Braga, 2026), um agente de inteligência artificial especializado em
+pesquisa científica, executado via Google Colaboratory, com acesso programático
+às bases de dados do Instituto Brasileiro de Geografia e Estatística (IBGE) e
+do Departamento de Informática do Sistema Único de Saúde (DataSUS). Todas as
+informações extraídas pela ferramenta foram verificadas individualmente contra
+suas fontes primárias originais e validadas pelos autores. A ferramenta não foi
+utilizada para a redação de seções interpretativas (Discussão e Conclusão), que
+permaneceram como trabalho intelectual exclusivo dos autores.
+```
+
+### Modelo C — Agradecimentos (Artigo Científico)
+
+> **Recomendado para:** Periódicos que preferem a menção de ferramentas de IA na seção de Agradecimentos (ex.: política atual da Nature, Science).
+
+```
+Os autores declaram que, durante a elaboração deste trabalho, utilizaram o
+PesquisAI (Braga, 2026) como ferramenta auxiliar para [ESPECIFICAR: consulta a
+bases de dados públicos / formatação de referências / revisão de normalização
+documental]. Todo o conteúdo gerado pela ferramenta foi revisado e validado
+pelos autores, que assumem total responsabilidade pela integridade e precisão
+do manuscrito.
+```
+
+### Modelo D — Uso Específico para Coleta de Dados
+
+> **Recomendado para:** Trabalhos onde o PesquisAI foi usado basicamente para buscar dados no IBGE ou DataSUS.
+
+```
+Os dados demográficos e socioeconômicos utilizados neste estudo foram obtidos
+por meio do PesquisAI (Braga, 2026), um agente de IA que realiza consultas
+automatizadas às APIs oficiais do IBGE (SIDRA) e do DataSUS. Todas as
+extrações foram conferidas diretamente nas plataformas oficiais das respectivas
+instituições. A ferramenta atuou exclusivamente como intermediadora na consulta,
+não tendo qualquer participação na análise, interpretação ou redação dos
+resultados.
+```
+
+### Modelo E — Uso para Formatação e Normalização
+
+> **Recomendado para:** Trabalhos onde o PesquisAI foi usado prioritariamente para formatação ABNT/UFV.
+
+```
+A formatação deste trabalho conforme as normas da Associação Brasileira de
+Normas Técnicas (ABNT) e da Universidade Federal de Viçosa (UFV) foi realizada
+com o auxílio do PesquisAI (Braga, 2026), ferramenta de IA especializada que
+incorpora o módulo UFV-ABNT para normalização documental. A adequação final às
+normas foi verificada manualmente pelo autor.
+```
+
+### Modelo F — Declaração Curta (Resumo Expandido / Congresso)
+
+> **Recomendado para:** Resumos expandidos submetidos a congressos, onde o espaço é limitado.
+
+```
+Declaramos o uso do PesquisAI (Braga, 2026), agente de IA para pesquisa
+científica, como ferramenta auxiliar na [ESPECIFICAR ETAPAS]. Todos os
+conteúdos gerados foram revisados e validados pelos autores.
+```
+
+### Perguntas Frequentes sobre Declaração de Uso de IA
+
+**Preciso mesmo declarar? Não é só uma ferramenta, como o Excel ou o Google Scholar?**
+
+Sim. Ferramentas de IA generativa diferem de ferramentas convencionais porque produzem conteúdo original (texto, análise, interpretação) de forma autônoma. O COPE, a CAPES e os principais periódicos internacionais exigem transparência sobre seu uso. Além disso, declarar o uso de IA demonstra **integridade acadêmica** e protege você contra alegações de má conduta.
+
+**Declarar o uso de IA pode desvalorizar meu trabalho?**
+
+Não. Pelo contrário: a transparência é valorizada pela comunidade científica. Utilizar ferramentas modernas e declará-las adequadamente demonstra rigor metodológico. O problema não é usar IA — é **não declarar** seu uso.
+
+**Posso usar o PesquisAI para escrever seções inteiras?**
+
+O PesquisAI pode auxiliar na estruturação e redação de seções mais objetivas (Métodos, parte dos Resultados descritivos), mas as seções que envolvem interpretação e juízo crítico (Discussão, Conclusão) devem permanecer como trabalho intelectual do pesquisador. A ferramenta é um **copiloto**, não um **substituto**.
+
+**O PesquisAI pode ser considerado autor do meu trabalho?**
+
+**Não.** Ferramentas de IA não atendem aos critérios de autoria do ICMJE (não podem assumir responsabilidade pelo conteúdo, aprovar versão final, ou responder por integridade do trabalho). O PesquisAI deve ser citado como ferramenta, nunca como autor.
+
+### Referências para Fundamentação
+
+- COMMITTEE ON PUBLICATION ETHICS (COPE). **Authorship and AI tools**: COPE position statement. 2023. Disponível em: https://publicationethics.org/cope-position-statements/ai-author
+- INTERNATIONAL COMMITTEE OF MEDICAL JOURNAL EDITORS (ICMJE). **Recommendations for the Conduct, Reporting, Editing, and Publication of Scholarly Work in Medical Journals**. 2024. Disponível em: https://www.icmje.org/recommendations/
+- NATURE PORTFOLIO. **Editorial policies: Artificial Intelligence (AI)**. 2024. Disponível em: https://www.nature.com/nature-portfolio/editorial-policies/ai
+- ELSEVIER. **The use of AI and AI-assisted technologies in writing for Elsevier**. 2024. Disponível em: https://www.elsevier.com/about/policies-and-standards/the-use-of-generative-ai-and-ai-assisted-technologies-in-writing-for-elsevier
+- CAPES. **Orientações sobre integridade científica e uso de IA**. 2024.
+
+---
+
+## 11. ⚖️ Disclaimer do PesquisAI — Termos de Uso e Isenção de Responsabilidade
+
+> **Versão 1.0 — Maio de 2026**
+> **ATENÇÃO: Leia atentamente este documento antes de utilizar o PesquisAI. O uso da ferramenta implica a aceitação integral dos termos aqui dispostos.**
+
+### 11.1 Natureza da Ferramenta
+
+O **PesquisAI** é um agente de inteligência artificial desenvolvido como ferramenta de apoio à pesquisa científica. Ele opera sobre **Modelos de Linguagem de Grande Porte (LLMs)** e integra-se a bases de dados públicos brasileiros por meio de módulos especializados (*skills*).
+
+O PesquisAI é um **software experimental, de código aberto, fornecido "como está" (*as is*)**, sem garantias de qualquer natureza — expressas ou implícitas — quanto ao seu funcionamento ininterrupto, precisão dos resultados ou adequação a qualquer finalidade específica.
+
+### 11.2 Validação Humana Obrigatória
+
+**Risco de Alucinação de IA:** Modelos de Linguagem de Grande Porte (LLMs), incluindo aqueles que alimentam o PesquisAI, são suscetíveis ao fenômeno conhecido como **"alucinação"** — a geração de informações factualmente incorretas, dados inexistentes, referências fictícias ou afirmações plausíveis, porém falsas.
+
+**É responsabilidade exclusiva e intransferível do usuário:**
+
+- Revisar criteriosamente **todos** os dados, análises, textos e referências gerados pela ferramenta;
+- Validar cada informação factual contra suas fontes primárias originais;
+- Verificar a existência e a correção de toda citação bibliográfica sugerida;
+- Confirmar a acurácia de todos os dados estatísticos antes de utilizá-los em qualquer publicação, relatório, decisão acadêmica, profissional ou política;
+- Avaliar criticamente a qualidade metodológica das análises propostas pela ferramenta.
+
+> **O PesquisAI é um copiloto, não um piloto automático. O pesquisador humano é — e sempre será — o responsável último pela integridade do trabalho científico.**
+
+### 11.3 Limitação de Responsabilidade
+
+O desenvolvedor (Gustavo Bastos Braga) e a Universidade Federal de Viçosa (UFV) **não se responsabilizam** por:
+
+| Item | Descrição |
+|---|---|
+| **Erros factuais** | Dados incorretos, incompletos ou desatualizados gerados pela ferramenta |
+| **Decisões equivocadas** | Quaisquer decisões acadêmicas, profissionais, clínicas, políticas ou financeiras tomadas com base nos outputs do PesquisAI |
+| **Perdas e danos** | Danos diretos, indiretos, incidentais, especiais ou consequenciais decorrentes do uso ou da impossibilidade de uso da ferramenta |
+| **Violação de direitos** | Eventual reprodução não intencional de material protegido por direitos autorais nos outputs gerados |
+| **Indisponibilidade** | Interrupções no serviço causadas por falhas nas APIs de terceiros (Google Colab, IBGE, DataSUS, provedores de LLM), manutenção de servidores ou outros fatores técnicos |
+
+O PesquisAI depende de serviços de terceiros sobre os quais o desenvolvedor **não possui controle**: Google Colaboratory, APIs do IBGE e DataSUS, provedores de LLM e GitHub. Interrupções, alterações de política ou descontinuação de qualquer desses serviços podem afetar o funcionamento do PesquisAI sem aviso prévio.
+
+### 11.4 Uso Acadêmico e Publicações
+
+Trabalhos acadêmicos que utilizarem o PesquisAI em qualquer etapa da pesquisa (coleta de dados, análise, redação, formatação) **devem declarar explicitamente** o uso da ferramenta, conforme orientações do Committee on Publication Ethics (COPE), da CAPES e de periódicos científicos. Consulte a **Seção 10** para modelos prontos de declaração.
+
+O PesquisAI **não pode** ser listado como autor ou coautor de trabalhos acadêmicos, por não atender aos critérios de autoria do ICMJE.
+
+### 11.5 Conformidade com a LGPD (Lei nº 13.709/2018)
+
+O PesquisAI foi projetado seguindo os princípios de ***Privacy by Design***:
+
+| Princípio da LGPD | Como o PesquisAI aplica |
+|---|---|
+| **Segurança** | O app não armazena dados do usuário em servidores próprios. Todo processamento ocorre na sessão local do Google Colab. |
+| **Retenção** | Os arquivos são salvos exclusivamente na conta Google Drive do usuário. Nenhum dado é retido pelo desenvolvedor. |
+| **Finalidade** | Os dados são acessados exclusivamente para cumprir a tarefa de pesquisa solicitada pelo usuário. |
+| **Necessidade** | Apenas os dados estritamente necessários à pesquisa são processados. |
+| **Transparência** | O usuário tem visibilidade total dos arquivos lidos e gravados na pasta `/PesquisAI/` do seu Drive. |
+
+**Recomendações de Proteção de Dados:**
+
+- **Não submeta dados pessoais sensíveis** (registros médicos, dados bancários, documentos de identificação) a menos que estejam previamente anonimizados;
+- **Não compartilhe** o acesso à sua pasta `/PesquisAI/` com terceiros não autorizados;
+- **Revise** os arquivos gerados antes de compartilhá-los, removendo eventuais informações sensíveis.
+
+### 11.6 Direitos Autorais e Licenciamento
+
+O código do PesquisAI é distribuído sob a **Licença MIT**. O conteúdo gerado pelo PesquisAI pertence ao usuário que o gerou, ressalvadas as seguintes condições:
+
+- O usuário é responsável por verificar a originalidade do conteúdo e a ausência de plágio;
+- Dados extraídos de fontes públicas (IBGE, DataSUS) devem ser atribuídos às suas respectivas fontes;
+- O uso de conteúdo gerado por IA em publicações deve seguir as políticas do periódico ou instituição de destino.
+
+### 11.7 Usos Não Permitidos
+
+É expressamente vedado o uso do PesquisAI para:
+
+- Gerar, distribuir ou facilitar conteúdo ilegal, difamatório, fraudulento ou que viole direitos de terceiros;
+- Disseminar desinformação científica deliberada;
+- Burlar sistemas de verificação de originalidade ou integridade acadêmica;
+- Substituir, sem a devida declaração, o trabalho intelectual que deveria ser realizado pelo pesquisador;
+- Qualquer finalidade que viole a legislação brasileira ou internacional aplicável.
+
+### 11.8 Aceitação dos Termos
+
+Ao utilizar o PesquisAI, você declara que:
+
+- [x] Leu e compreendeu integralmente este Disclaimer;
+- [x] Tem ciência dos riscos inerentes ao uso de inteligência artificial generativa;
+- [x] Assume total responsabilidade pela validação dos resultados gerados;
+- [x] Compromete-se a declarar o uso da ferramenta em publicações acadêmicas;
+- [x] Isenta o desenvolvedor e a UFV de responsabilidade por quaisquer consequências decorrentes do uso da ferramenta.
+
+> *O PesquisAI é oferecido de boa-fé, com o propósito de impulsionar a pesquisa científica brasileira. Use com responsabilidade, senso crítico e integridade acadêmica.*
+
+---
+
 ## Apêndice: Marcadores de Evidência
 
 O PesquisAI usa estes marcadores para indicar o nível de confiança:
