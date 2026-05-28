@@ -138,7 +138,47 @@ O PesquisAI:
 - 🚨 **ATENÇÃO:** Sempre revise e confirme a precisão de todas as informações geradas por esta IA antes de utilizá-las em decisões ou projetos críticos.
 
 ---
+---
 
+## Citação
+
+**ABNT NBR 6023:2018:**
+
+```
+BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para pesquisa
+científica. Versão 1.0. Viçosa: Universidade Federal de Viçosa, 2026.
+Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
+Acesso em: DD mês. AAAA.
+```
+
+**BibTeX:**
+
+```bibtex
+@software{braga2026pesquisai,
+  author       = {Gustavo Bastos Braga},
+  title        = {{PesquisAI}: Agente de Intelig{\^e}ncia Artificial
+                  para Pesquisa Cient{\'\i}fica},
+  year         = {2026},
+  version      = {1.0},
+  institution  = {Universidade Federal de Vi{\c{c}}osa (UFV)},
+  url          = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/}
+}
+```
+
+---
+
+## Declaração de Uso de IA
+
+O uso do PesquisAI em trabalhos acadêmicos **deve ser declarado** conforme diretrizes do COPE, CAPES e principais periódicos. Consulte o arquivo [`declaracao_uso_ia.md`](declaracao_uso_ia.md) para modelos prontos (ABNT, ICMJE, Nature, Science, Elsevier, Springer).
+
+---
+
+## Disclaimer
+
+O PesquisAI é um **software experimental fornecido "como está"**, sem garantias. LLMs podem **alucinar** — é responsabilidade exclusiva do usuário validar todos os dados, análises e referências gerados. Consulte o [`disclaimer_pesquisai.md`](disclaimer_pesquisai.md) para os termos completos.
+
+
+---
 ## 📬 Contato
 
 Desenvolvido por **Gustavo Bastos Braga** na Universidade Federal de Viçosa (UFV).
