@@ -37,25 +37,8 @@ A forma mais rápida. Nenhuma configuração necessária:
 3. Aguarde ~2 minutos para o ambiente carregar
 4. Role até a última célula e clique em **🤖 Abrir o PesquisAI**
 
-### Opção 2 — Instalação local
 
-**Pré-requisitos:** Python 3.10+ e [uv](https://github.com/astral-sh/uv)
 
-```bash
-# Clone o repositório
-git clone https://github.com/gustavobraga-byte/PesquisAI.git
-cd PesquisAI
-
-# Instale as dependências
-uv sync
-
-# Configure sua chave de API
-cp .env.example .env
-# Edite o .env com sua chave
-
-# Execute
-uv run pesquisai
-```
 
 ---
 
