@@ -76,7 +76,7 @@ def install_skills():
     mappings = [
         ("/tmp/skill_ibge-br", "ibge-br"),
         ("/tmp/skill_opendatasus", "opendatasus"),
-        ("/tmp/skill_scientific/scientific-skills", "scientific"),
+        ("/tmp/skill_scientific/skills", "scientific"),
         ("/tmp/skill_ufv-abnt", "ufv-abnt"),
     ]
     
