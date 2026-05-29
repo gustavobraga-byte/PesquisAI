@@ -7,7 +7,7 @@ SKILLS_DIR = os.path.expanduser("~/.agents/skills")
 SKILLS = [
     ("https://github.com/gustavobraga-byte/Skill-IBGE.git", "ibge-br"),
     ("https://github.com/gustavobraga-byte/Skill-DataSus.git", "opendatasus"),
-    ("https://github.com/K-Dense-AI/scientific-agent-skills.git", "scientific"),
+    ("https://github.com/gustavobraga-byte/scientific-agent-skills.git", "scientific"),
     ("https://github.com/gustavobraga-byte/PesquisAI.git", "pesquisai"),
     ("https://github.com/gustavobraga-byte/UFV-ABNT.git", "ufv-abnt"),
 ]
