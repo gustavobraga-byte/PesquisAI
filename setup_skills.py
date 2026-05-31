@@ -79,7 +79,7 @@ def install_skills():
         ("/tmp/skill_opendatasus", "opendatasus"),
         ("/tmp/skill_scientific/skills", "scientific"),
         ("/tmp/skill_ufv-abnt", "ufv-abnt"),
-        ("/tmp/Skill_Analise_qualitativa", "qualitativa"),
+        ("/tmp/skill_qualitativa", "qualitativa"),
     ]
     
     for src, dest_name in mappings:
