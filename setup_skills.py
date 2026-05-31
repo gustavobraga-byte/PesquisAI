@@ -10,6 +10,7 @@ SKILLS = [
     ("https://github.com/gustavobraga-byte/scientific-agent-skills.git", "scientific"),
     ("https://github.com/gustavobraga-byte/PesquisAI.git", "pesquisai"),
     ("https://github.com/gustavobraga-byte/UFV-ABNT.git", "ufv-abnt"),
+    ("https://github.com/gustavobraga-byte/Skill_Analise_qualitativa.git", "qualitativa"),    
 ]
 
 JOKES_SKILLS = [
@@ -78,6 +79,7 @@ def install_skills():
         ("/tmp/skill_opendatasus", "opendatasus"),
         ("/tmp/skill_scientific/skills", "scientific"),
         ("/tmp/skill_ufv-abnt", "ufv-abnt"),
+        ("/tmp/Skill_Analise_qualitativa", "qualitativa"),
     ]
     
     for src, dest_name in mappings:
