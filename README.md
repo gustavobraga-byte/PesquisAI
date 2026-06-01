@@ -39,7 +39,6 @@ A forma mais rápida. Nenhuma configuração necessária:
 
 
 
-
 ---
 
 ## 🛠️ Skills disponíveis
@@ -54,6 +53,9 @@ Integração com o OpenDataSUS para coleta e análise de dados de saúde públic
 
 ### `skill-UFV-ABNT` · [@gustavobraga-byte](https://github.com/gustavobraga-byte)
 Formatação e normalização de trabalhos acadêmicos conforme as normas da Universidade Federal de Viçosa (UFV) e da ABNT.
+
+### `skill-analise-qualitativa` · [@gustavobraga-byte](https://github.com/gustavobraga-byte)
+Possibilita uma análise qualititativa e de conteúdo completa, substituindo sofwares especializados como NVivo e Iramuteq executando metódos clássicos e avançados (por exemplo, análise fatorial, análise de similitude, codificação qualitativa, método de Reinert, ...).
 
 ### `scientific-skills` · [@K-Dense-AI](https://github.com/K-Dense-AI)
 Ferramentas focadas em pesquisa acadêmica: mineração de textos científicos, revisão bibliográfica e suporte metodológico.
