@@ -11,7 +11,7 @@ SKILLS = [
     ("https://github.com/gustavobraga-byte/PesquisAI.git", "pesquisai"),
     ("https://github.com/gustavobraga-byte/UFV-ABNT.git", "ufv-abnt"),
     ("https://github.com/gustavobraga-byte/Skill_Analise_qualitativa.git", "qualitativa"),  
-    ("https://github.com/gustavobraga-byte/skill_dados_brasil/.git", "dados-brasil"),
+    ("https://github.com/gustavobraga-byte/skill_dados_brasil.git", "dados-brasil"),
     
 ]
 
