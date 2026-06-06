@@ -12,7 +12,7 @@ SKILLS = [
     ("https://github.com/gustavobraga-byte/UFV-ABNT.git", "ufv-abnt"),
     ("https://github.com/gustavobraga-byte/Skill_Analise_qualitativa.git", "qualitativa"),  
     ("https://github.com/gustavobraga-byte/skill_dados_brasil.git", "dados-brasil"),
-    
+    ("https://github.com/gustavobraga-byte/skill_agrobr.git", "agrobr"), 
 ]
 
 JOKES_SKILLS = [
@@ -83,6 +83,7 @@ def install_skills():
         ("/tmp/skill_ufv-abnt", "ufv-abnt"),
         ("/tmp/skill_qualitativa", "qualitativa"),
         ("/tmp/skill_dados-brasil", "dados-brasil"),
+        ("/tmp/skill_skill_agrobr", "agrobr"),
     ]
     
     for src, dest_name in mappings:
