@@ -83,7 +83,7 @@ def install_skills():
         ("/tmp/skill_ufv-abnt", "ufv-abnt"),
         ("/tmp/skill_qualitativa", "qualitativa"),
         ("/tmp/skill_dados-brasil", "dados-brasil"),
-        ("/tmp/skill_skill_agrobr", "agrobr"),
+        ("/tmp/skill_agrobr", "agrobr"),
     ]
     
     for src, dest_name in mappings:
