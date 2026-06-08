@@ -184,3 +184,39 @@ MEDICINA = [
     "🏥 Fisiologia: a sua fisiologia mudou para 'modo tartaruga'.",
     "🏥 Neurologia: os neurônios já desistiram de esperar.",
 ]
+
+JOKES_BY_CATEGORY = {
+    "fisica": FISICA,
+    "quimica": QUIMICA,
+    "biologia": BIOLOGIA,
+    "matematica": MATEMATICA,
+    "computacao": COMPUTACAO,
+    "astronomia": ASTRONOMIA,
+    "economia": ECONOMIA,
+    "administracao": ADMINISTRACAO,
+    "financas": FINANCAS,
+    "rh": RH,
+    "marketing": MARKETING,
+    "logistica": LOGISTICA,
+    "direito": DIREITO,
+    "medicina": MEDICINA,
+}
+
+ALL_JOKES = sum(
+    [FISICA, QUIMICA, BIOLOGIA, MATEMATICA, COMPUTACAO, ASTRONOMIA,
+     ECONOMIA, ADMINISTRACAO, FINANCAS, RH, MARKETING, LOGISTICA,
+     DIREITO, MEDICINA],
+    [],
+)
+
+_index: dict[str, int] = {}
+
+def next_joke(category: str = "aleatorio") -> str:
+    if category == "aleatorio" or category not in JOKES_BY_CATEGORY:
+        import random
+        return random.choice(ALL_JOKES)
+    pool = JOKES_BY_CATEGORY[category]
+    idx = _index.setdefault(category, 0)
+    joke = pool[idx % len(pool)]
+    _index[category] = idx + 1
+    return joke

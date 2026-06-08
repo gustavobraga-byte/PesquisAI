@@ -17,34 +17,9 @@ except ImportError:
     display = None
     HTML = None
 
-TERMINAL_PORT = 8000
-WRAPPER_PORT = 8001
-WRAPPER_DIR = "/tmp/pesquisai-wrapper"
-
-JOKES_LAUNCH = [
-    "📊 Oportunidade de espera: o que você poderia estar fazendo agora.",
-    "📋 Planejamento estratégico: plano A = esperar, plano B = continuar esperando.",
-    "💰 Valor presente líquido (VPL): negativo.",
-    "📊 Inflação da paciência: cada minuto vale menos que o anterior.",
-    "📋 Missão, Visão, Valores: Missão = esperar, Visão = ver o botão.",
-    "💰 Retorno sobre investimento (ROI): investiu tempo, retorno zero.",
-    "📊 Juros compostos: sua frustração cresce exponencialmente.",
-    "📋 Ciclo PDCA: Plan, Do, Check, Agora esperar de novo.",
-    "💰 Fluxo de caixa: só saída (de paciência), sem entrada.",
-    "📊 Custo de oportunidade: muito alto para esse retorno zero.",
-    "📋 Metas SMART: esse download não atinge nem a letra S.",
-    "💰 Payback: período de retorno = nunca.",
-]
-
-_joke_index = 0
-
-def next_joke():
-    global _joke_index
-    if _joke_index < len(JOKES_LAUNCH):
-        joke = JOKES_LAUNCH[_joke_index]
-        _joke_index += 1
-        return joke
-    return JOKES_LAUNCH[-1]
+from constants import TERMINAL_PORT, WRAPPER_PORT, WRAPPER_DIR, logger
+from jokes import next_joke
+from opencode_utils import find_opencode, build_env
 
 
 _opencode_bin = None
@@ -61,56 +36,40 @@ def set_drive_info(folder_path, drive_url):
 
 def resolve_opencode():
     global _opencode_bin, _env
-    
-    if "OPENCODE_BIN" in os.environ and os.path.isfile(os.environ["OPENCODE_BIN"]):
-        _opencode_bin = os.environ["OPENCODE_BIN"]
-    else:
-        _candidates = [
-            os.path.expanduser("~/.local/bin/opencode"),
-            os.path.expanduser("~/bin/opencode"),
-            "/root/.local/bin/opencode",
-            "/root/bin/opencode",
-            "/usr/local/bin/opencode",
-            "/usr/bin/opencode",
-        ]
-        _found = next((p for p in _candidates if os.path.isfile(p)), None)
-        
-        if _found is None:
-            _which = shutil.which("opencode")
-            if _which:
-                _found = _which
-            else:
-                result = subprocess.run(
-                    ["find", "/root", "/home", "/usr/local", "-name", "opencode", "-type", "f"],
-                    capture_output=True, text=True
-                )
-                hits = [l.strip() for l in result.stdout.splitlines() if l.strip()]
-                _found = hits[0] if hits else "opencode"
-        
-        _opencode_bin = _found
-    
-    _extra_path = os.path.dirname(_opencode_bin) if os.path.isfile(_opencode_bin) else os.path.expanduser("~/.local/bin")
-    
-    _env = {
-        **os.environ,
-        "OPENCODE_EXPERIMENTAL_DISABLE_COPY_ON_SELECT": "1",
-        "PATH": os.environ.get("PATH", "") + ":" + _extra_path,
-    }
-    
+    try:
+        _opencode_bin = find_opencode()
+    except FileNotFoundError:
+        logger.warning("opencode não encontrado, usando fallback 'opencode'")
+        _opencode_bin = "opencode"
+    _env = build_env()
     print(f"🔍 OpenCode binário: {_opencode_bin}")
     return _opencode_bin, _env
 
 
 def install_ttyd():
-    print(f"\n{next_joke()}")
+    print(f"\n{next_joke('economia')}")
     print("📦 Instalando ttyd...")
-    subprocess.run(
+    r1 = subprocess.run(
         "apt-get update -qq && apt-get install -y -qq ttyd",
         shell=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL
     )
-    print("✅ ttyd instalado.")
+    if r1.returncode != 0:
+        print("⚠️  apt-get falhou. Tentando download manual do ttyd...")
+        url = "https://github.com/tsl0922/ttyd/releases/latest/download/ttyd.x86_64"
+        r2 = subprocess.run(
+            f"curl -fsSL {url} -o /usr/local/bin/ttyd && chmod +x /usr/local/bin/ttyd",
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        if r2.returncode != 0:
+            print("⚠️  Download manual do ttyd também falhou. Continuando mesmo assim.")
+        else:
+            print("✅ ttyd baixado manualmente.")
+    else:
+        print("✅ ttyd instalado.")
 
 
 def kill_previous():
@@ -120,7 +79,7 @@ def kill_previous():
 
 
 def start_ttyd():
-    print(f"\n{next_joke()}")
+    print(f"\n{next_joke('economia')}")
     opencode_bin, env = resolve_opencode()
     
     subprocess.Popen(
@@ -1122,7 +1081,7 @@ def start_wrapper_server():
         target=lambda: HTTPServer(("0.0.0.0", WRAPPER_PORT), Handler).serve_forever(),
         daemon=True,
     ).start()
-    print(f"\n{next_joke()}")
+    print(f"\n{next_joke('economia')}")
     print(f"🚀 Servidor wrapper iniciado na porta {WRAPPER_PORT}")
 
 

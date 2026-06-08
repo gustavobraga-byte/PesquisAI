@@ -53,6 +53,9 @@ No caso do **PesquisAI**, essas conexões são chamadas de **Skills**:
 |-------|------------------|
 | `ibge-br` | Todos os bancos de dados públicos do IBGE (Censo, PNAD, PIB, etc.) |
 | `opendatasus` | Todos os dados de saúde pública do Brasil (DataSUS, SINAN, SUS) |
+| `dados-brasil` | Conjunto amplo de indicadores e datasets oficiais brasileiros |
+| `agrobr` | Dados do agronegócio brasileiro, produção agrícola e CAR |
+| `qualitativa` | Análise qualitativa e de conteúdo (categorização, Reinert, similitude) |
 | K-Dense Scientific Skills | Ferramentas de pesquisa científica, estrutura de artigos, busca de literatura |
 | `UFV-ABNT` | Normas de formatação acadêmica da UFV e ABNT |
 
@@ -491,6 +494,8 @@ O PesquisAI utiliza **skills** (módulos especializados) para acessar dados e fe
 |-------|-------|-----------|
 | `ibge-br` | IBGE | Censo, PNAD, PIB, dados demográficos, socioeconômicos |
 | `opendatasus` | DataSUS | Epidemiologia, SUS, mortalidade, SINAN, notificações |
+| `dados-brasil` | Fontes oficiais BR | Conjunto amplo de indicadores e datasets brasileiros |
+| `agrobr` | AgroBR/CAR | Dados do agronegócio, produção agropecuária, cadastro ambiental rural |
 
 > **Regra de Ouro:** Para qualquer afirmação sobre o Brasil, o PesquisAI consulta `ibge-br` ou `opendatasus` ANTES de responder.
 
@@ -500,7 +505,13 @@ O PesquisAI utiliza **skills** (módulos especializados) para acessar dados e fe
 |-------|-------|-----------|
 | K-Dense | Scientific Agent Skills | Estrutura IMRaD, revisão sistemática, busca de literatura, formatação APA/Vancouver |
 
-### 3.3 Normas Acadêmicas
+### 3.3 Análise Qualitativa
+
+| Skill | Fonte | O que faz |
+|-------|-------|-----------|
+| `qualitativa` | Métodos clássicos e avançados | Análise de conteúdo, método Reinert, análise de similitude, codificação qualitativa, análise fatorial — substitui NVivo e Iramuteq |
+
+### 3.4 Normas Acadêmicas
 
 | Skill | Norma | O que faz |
 |-------|-------|-----------|
@@ -521,6 +532,9 @@ Todo ciclo de pesquisa no PesquisAI segue **6 etapas obrigatórias**:
 │                       K-Dense → literatura acadêmica    │
 │                       ibge-br → dados BR gerais         │
 │                       opendatasus → dados de saúde BR   │
+│                       dados-brasil → indicadores BR     │
+│                       agrobr → dados do agronegócio     │
+│                       qualitativa → análise qualitativa │
 ├─────────────────────────────────────────────────────────┤
 │  3. VALIDAÇÃO         Verifique consistência entre      │
 │                       fontes. Aponte divergências.      │

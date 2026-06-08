@@ -2,7 +2,8 @@ import subprocess
 import os
 import shutil
 
-SKILLS_DIR = os.path.expanduser("~/.agents/skills")
+from constants import SKILLS_DIR, logger
+from jokes import next_joke
 
 SKILLS = [
     ("https://github.com/gustavobraga-byte/Skill-IBGE.git", "ibge-br"),
@@ -15,37 +16,11 @@ SKILLS = [
     ("https://github.com/gustavobraga-byte/skill_agrobr.git", "agrobr"), 
 ]
 
-JOKES_SKILLS = [
-    "🧬 Se a evolução dependesse dessa velocidade, ainda seríamos amebas.",
-    "💻 Mais lento que bubble sort em 1 milhão de elementos.",
-    "🧬 Mais lento que a duplicação do DNA em uma lesma.",
-    "💻 Deadlock: você e o download estão esperando um pelo outro.",
-    "🧬 Seu progresso está em metáfase: parado no meio.",
-    "💻 Loop infinito: while not terminou: espere()",
-    "🧬 A paciência é o gene dominante nesse momento.",
-    "💻 Complexidade O(n²), onde n = sua paciência.",
-    "🧬 Célula em G0: fase de espera prolongada.",
-    "💻 Pilha de chamada: você está no fundo da pilha.",
-    "📚 Instalando ABNT: a única regra que não muda é que ela sempre muda.",
-    "📖 Formatação ABNT: transformando sua tese em dor de cabeça desde 1940.",
-    "📝 Citações ABNT: porque referenciar um autor deveria ser mais complicado que a própria pesquisa.",
-]
-
-_joke_index = 0
-
-def next_joke():
-    global _joke_index
-    if _joke_index < len(JOKES_SKILLS):
-        joke = JOKES_SKILLS[_joke_index]
-        _joke_index += 1
-        return joke
-    return JOKES_SKILLS[-1]
-
 
 def run(cmd, check=True, **kw):
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True, **kw)
     if check and result.returncode != 0:
-        print(f"⚠️  Aviso: comando falhou: {cmd}")
+        logger.warning("Aviso: comando falhou: %s", cmd)
     return result
 
 

@@ -21,8 +21,12 @@ O **PesquisAI** é um agente de Inteligência Artificial construído sobre a arq
 |---|---|
 | 📊 **Dados IBGE** | Consulta e extração de dados estatísticos, demográficos e socioeconômicos |
 | 🏥 **Dados DataSUS** | Acesso e análise de dados públicos de saúde via OpenDataSUS |
+| 🌾 **Dados Agro & Ambientais** | Acesso a dados do agronegócio brasileiro e cadastro ambiental rural |
+| 🇧🇷 **Dados Brasil** | Conjunto amplo de indicadores e datasets oficiais brasileiros |
 | 📚 **Pesquisa científica** | Mineração de textos, revisão bibliográfica e suporte metodológico |
 | ✍️ **Redação acadêmica** | Auxílio na estruturação e revisão de artigos científicos |
+| 🔬 **Análise qualitativa** | Análise de conteúdo com métodos clássicos e avançados (Reinert, similitude, codificação) |
+| 📐 **Normas ABNT/UFV** | Formatação e normalização de trabalhos acadêmicos |
 
 ---
 
@@ -59,6 +63,12 @@ Possibilita uma análise qualititativa e de conteúdo completa, substituindo sof
 
 ### `scientific-skills` · [@K-Dense-AI](https://github.com/K-Dense-AI)
 Ferramentas focadas em pesquisa acadêmica: mineração de textos científicos, revisão bibliográfica e suporte metodológico.
+
+### `skill-dados-brasil` · [@gustavobraga-byte](https://github.com/gustavobraga-byte)
+Conjunto amplo de indicadores e datasets oficiais brasileiros, complementando as bases do IBGE e DataSUS com outras fontes nacionais.
+
+### `skill-agrobr` · [@gustavobraga-byte](https://github.com/gustavobraga-byte)
+Dados do agronegócio brasileiro: produção agrícola, pecuária, comércio internacional do setor e cadastro ambiental rural (CAR).
 
 ---
 
@@ -106,7 +116,12 @@ Google Colab
     └── opencode (runtime do agente)
         ├── skill-ibge
         ├── skill-datasus
-        └── scientific-skills
+        ├── skill-dados-brasil
+        ├── skill-agrobr
+        ├── ufv-abnt
+        ├── skill-analise-qualitativa
+        ├── scientific-skills
+        └── pesquisai (instruções do agente)
 ```
 
 As dependências são gerenciadas pelo [uv (Astral)](https://github.com/astral-sh/uv) para instalação ultrarrápida e ambientes reproduzíveis.
