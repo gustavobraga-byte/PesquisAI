@@ -417,24 +417,23 @@ O PesquisAI é uma **ferramenta de amplificação**. Ele tira de você o trabalh
 3. [Fluxo de Trabalho](#3-fluxo-de-trabalho)
 4. [Exemplos Práticos](#4-exemplos-práticos)
 5. [Backup e Restauração](#5-backup-e-restauração)
-6. [Princípios e Limitações](#6-princípios-e-limitações)
+6. [Limitações Importantes](#6-limitações-importantes)
 7. [Troubleshooting](#7-troubleshooting)
+8. [Citação do PesquisAI](#8-citação-do-pesquisai)
+9. [Declaração de Uso de IA](#9-declaração-de-uso-de-inteligência-artificial-ia)
+10. [Disclaimer](#10-disclaimer-do-pesquisai--termos-de-uso-e-isenção-de-responsabilidade)
 
 ---
 
 ## 1. Primeiros Passos
 
----
-
-## 2. Primeiros Passos
-
-### 2.1 Abrindo no Colab
+### 1.1 Abrindo no Colab
 
 1. **Upload** do arquivo `PesquisAI_Colab.ipynb` para o seu Google Drive
 2. Clique duas vezes para abrir no **Google Colab**
 3. No menu superior: **Ambiente de execução → Executar tudo** (ou `Ctrl + F9`)
 
-### 2.2 Primeira Execução
+### 1.2 Primeira Execução
 
 Você verá esta sequência:
 
@@ -455,7 +454,7 @@ Carregando o PesquisAI...
 4. Copie o código e cole no campo do Colab
 5. Pressione `Enter`
 
-### 2.3 Aguardando Carregamento
+### 1.3 Aguardando Carregamento
 
 Durante a instalação, aparecerão **piadas científicas** para entreter enquanto você espera (demora em torno de 2 a 3 minutos para iniciar):
 
@@ -466,7 +465,7 @@ Durante a instalação, aparecerão **piadas científicas** para entreter enquan
 ...
 ```
 
-### 2.4 Tudo Pronto!
+### 1.4 Tudo Pronto!
 
 Quando terminar, você verá:
 
@@ -484,11 +483,11 @@ E logo depois, um **botão gigante**:
 
 ---
 
-## 3. Skills Disponíveis
+## 2. Skills Disponíveis
 
 O PesquisAI utiliza **skills** (módulos especializados) para acessar dados e ferramentas.
 
-### 3.1 Dados Brasileiros (Prioridade Máxima)
+### 2.1 Dados Brasileiros (Prioridade Máxima)
 
 | Skill | Fonte | O que faz |
 |-------|-------|-----------|
@@ -499,19 +498,19 @@ O PesquisAI utiliza **skills** (módulos especializados) para acessar dados e fe
 
 > **Regra de Ouro:** Para qualquer afirmação sobre o Brasil, o PesquisAI consulta `ibge-br` ou `opendatasus` ANTES de responder.
 
-### 3.2 Pesquisa Científica
+### 2.2 Pesquisa Científica
 
 | Skill | Fonte | O que faz |
 |-------|-------|-----------|
 | K-Dense | Scientific Agent Skills | Estrutura IMRaD, revisão sistemática, busca de literatura, formatação APA/Vancouver |
 
-### 3.3 Análise Qualitativa
+### 2.3 Análise Qualitativa
 
 | Skill | Fonte | O que faz |
 |-------|-------|-----------|
 | `qualitativa` | Métodos clássicos e avançados | Análise de conteúdo, método Reinert, análise de similitude, codificação qualitativa, análise fatorial — substitui NVivo e Iramuteq |
 
-### 3.4 Normas Acadêmicas
+### 2.4 Normas Acadêmicas
 
 | Skill | Norma | O que faz |
 |-------|-------|-----------|
@@ -519,7 +518,7 @@ O PesquisAI utiliza **skills** (módulos especializados) para acessar dados e fe
 
 ---
 
-## 4. Fluxo de Trabalho
+## 3. Fluxo de Trabalho
 
 Todo ciclo de pesquisa no PesquisAI segue **6 etapas obrigatórias**:
 
@@ -553,7 +552,7 @@ Todo ciclo de pesquisa no PesquisAI segue **6 etapas obrigatórias**:
 
 ---
 
-## 5. Exemplos Práticos
+## 4. Exemplos Práticos
 
 ### Exemplo 1: Consulta Rápida de Dados
 
@@ -644,9 +643,9 @@ e controle desse agravo.
 
 ---
 
-## 6. Backup e Restauração
+## 5. Backup e Restauração
 
-### 6.1 Salvando sua Sessão
+### 5.1 Salvando sua Sessão
 
 No topo da interface do PesquisAI, há 3 botões importantes:
 
@@ -656,7 +655,7 @@ No topo da interface do PesquisAI, há 3 botões importantes:
 | 🔄 **Restaurar** | Abre uma lista de backups anteriores para restaurar |
 | 📁 **Drive** | Abre a pasta do PesquisAI no Google Drive |
 
-### 6.2 Fazendo Backup
+### 5.2 Fazendo Backup
 
 1. Clique em **💾 Salvar backup**
 2. O arquivo é salvo automaticamente em:
@@ -665,7 +664,7 @@ No topo da interface do PesquisAI, há 3 botões importantes:
    ```
 3. Formato do nome: `backup_<id_sessão>_HH-MM-SS_DD-MM-AAAA.json`
 
-### 6.3 Restaurando Backup
+### 5.3 Restaurando Backup
 
 1. Clique em **🔄 Restaurar**
 2. Uma lista de backups aparecerá (mais recentes primeiro)
@@ -677,9 +676,9 @@ No topo da interface do PesquisAI, há 3 botões importantes:
 
 ---
 
-## 7. Limitações Importantes
+## 6. Limitações Importantes
 
-### 7.1 O que o PesquisAI NÃO faz
+### 6.1 O que o PesquisAI NÃO faz
 
 | Limitação | Explicação |
 |-----------|------------|
@@ -689,7 +688,7 @@ No topo da interface do PesquisAI, há 3 botões importantes:
 | **Não garante tempo real** | Dados dependem da disponibilidade das APIs das skills |
 | **Sem memória entre sessões** | Cada conversa começa com contexto limpo |
 
-### 7.2 Diretório Único
+### 6.2 Diretório Único
 
 O **único diretório acessível** é:
 ```
@@ -698,7 +697,7 @@ O **único diretório acessível** é:
 
 Todos os arquivos gerados são salvos **exclusivamente** nesta pasta.
 
-### 7.3 Ambiente 100% Remoto
+### 6.3 Ambiente 100% Remoto
 
 - Nenhuma interface gráfica disponível
 - Todo comunicação via texto
@@ -706,7 +705,7 @@ Todos os arquivos gerados são salvos **exclusivamente** nesta pasta.
 
 ---
 
-## 8. Troubleshooting
+## 7. Troubleshooting
 
 ### Problema 1: "Não consigo autorizar o Drive"
 
@@ -754,7 +753,7 @@ Todos os arquivos gerados são salvos **exclusivamente** nesta pasta.
 
 ---
 
-## 9. 📎 Citação do PesquisAI
+## 8. 📎 Citação do PesquisAI
 
 ### Como citar o PesquisAI em trabalhos acadêmicos
 
@@ -762,9 +761,12 @@ Todos os arquivos gerados são salvos **exclusivamente** nesta pasta.
 
 ```
 BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para pesquisa
-científica. Versão 1.0. Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão 0.2. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
+
+Projeto registrado no SisPPG/UFV sob nº 10356285004.
+Verificar autenticidade em: http://sisppg.ufv.br
 ```
 
 **Formato simplificado (nota de rodapé):**
@@ -815,7 +817,7 @@ https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 author = {Gustavo Bastos Braga},
 title = {{PesquisAI}: Agente de Intelig{\^e}ncia Artificial para Pesquisa Cient{\'\i}fica},
 year = {2026},
-version = {1.0},
+version = {0.2},
 institution = {Universidade Federal de Vi{\c{c}}osa (UFV)},
 url = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/},
 note = {Acessado em: DD m{\^e}s AAAA}
@@ -824,7 +826,7 @@ note = {Acessado em: DD m{\^e}s AAAA}
 
 ---
 
-## 10. 🤖 Declaração de Uso de Inteligência Artificial (IA)
+## 9. 🤖 Declaração de Uso de Inteligência Artificial (IA)
 
 ### Modelos para Inclusão em Trabalhos Acadêmicos
 
@@ -872,8 +874,9 @@ Ethics (COPE).
 
 Referência da ferramenta:
 BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para
-pesquisa científica. Versão 1.0. Viçosa: UFV, 2026. Disponível em:
+pesquisa científica. Versão 0.2. Viçosa: UFV, 2026. Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
+Registro SisPPG/UFV nº 10356285004 — http://sisppg.ufv.br
 ```
 
 ### Modelo B — Materiais e Métodos (Artigo Científico)
@@ -969,18 +972,18 @@ O PesquisAI pode auxiliar na estruturação e redação de seções mais objetiv
 
 ---
 
-## 11. ⚖️ Disclaimer do PesquisAI — Termos de Uso e Isenção de Responsabilidade
+## 10. ⚖️ Disclaimer do PesquisAI — Termos de Uso e Isenção de Responsabilidade
 
-> **Versão 1.0 — Maio de 2026**
+> **Versão 0.2 — Junho de 2026**
 > **ATENÇÃO: Leia atentamente este documento antes de utilizar o PesquisAI. O uso da ferramenta implica a aceitação integral dos termos aqui dispostos.**
 
-### 11.1 Natureza da Ferramenta
+### 10.1 Natureza da Ferramenta
 
 O **PesquisAI** é um agente de inteligência artificial desenvolvido como ferramenta de apoio à pesquisa científica. Ele opera sobre **Modelos de Linguagem de Grande Porte (LLMs)** e integra-se a bases de dados públicos brasileiros por meio de módulos especializados (*skills*).
 
 O PesquisAI é um **software experimental, de código aberto, fornecido "como está" (*as is*)**, sem garantias de qualquer natureza — expressas ou implícitas — quanto ao seu funcionamento ininterrupto, precisão dos resultados ou adequação a qualquer finalidade específica.
 
-### 11.2 Validação Humana Obrigatória
+### 10.2 Validação Humana Obrigatória
 
 **Risco de Alucinação de IA:** Modelos de Linguagem de Grande Porte (LLMs), incluindo aqueles que alimentam o PesquisAI, são suscetíveis ao fenômeno conhecido como **"alucinação"** — a geração de informações factualmente incorretas, dados inexistentes, referências fictícias ou afirmações plausíveis, porém falsas.
 
@@ -994,7 +997,7 @@ O PesquisAI é um **software experimental, de código aberto, fornecido "como es
 
 > **O PesquisAI é um copiloto, não um piloto automático. O pesquisador humano é — e sempre será — o responsável último pela integridade do trabalho científico.**
 
-### 11.3 Limitação de Responsabilidade
+### 10.3 Limitação de Responsabilidade
 
 O desenvolvedor (Gustavo Bastos Braga) e a Universidade Federal de Viçosa (UFV) **não se responsabilizam** por:
 
@@ -1008,13 +1011,13 @@ O desenvolvedor (Gustavo Bastos Braga) e a Universidade Federal de Viçosa (UFV)
 
 O PesquisAI depende de serviços de terceiros sobre os quais o desenvolvedor **não possui controle**: Google Colaboratory, APIs do IBGE e DataSUS, provedores de LLM e GitHub. Interrupções, alterações de política ou descontinuação de qualquer desses serviços podem afetar o funcionamento do PesquisAI sem aviso prévio.
 
-### 11.4 Uso Acadêmico e Publicações
+### 10.4 Uso Acadêmico e Publicações
 
-Trabalhos acadêmicos que utilizarem o PesquisAI em qualquer etapa da pesquisa (coleta de dados, análise, redação, formatação) **devem declarar explicitamente** o uso da ferramenta, conforme orientações do Committee on Publication Ethics (COPE), da CAPES e de periódicos científicos. Consulte a **Seção 10** para modelos prontos de declaração.
+Trabalhos acadêmicos que utilizarem o PesquisAI em qualquer etapa da pesquisa (coleta de dados, análise, redação, formatação) **devem declarar explicitamente** o uso da ferramenta, conforme orientações do Committee on Publication Ethics (COPE), da CAPES e de periódicos científicos. Consulte a **Seção 9** para modelos prontos de declaração.
 
 O PesquisAI **não pode** ser listado como autor ou coautor de trabalhos acadêmicos, por não atender aos critérios de autoria do ICMJE.
 
-### 11.5 Conformidade com a LGPD (Lei nº 13.709/2018)
+### 10.5 Conformidade com a LGPD (Lei nº 13.709/2018)
 
 O PesquisAI foi projetado seguindo os princípios de ***Privacy by Design***:
 
@@ -1032,7 +1035,7 @@ O PesquisAI foi projetado seguindo os princípios de ***Privacy by Design***:
 - **Não compartilhe** o acesso à sua pasta `/PesquisAI/` com terceiros não autorizados;
 - **Revise** os arquivos gerados antes de compartilhá-los, removendo eventuais informações sensíveis.
 
-### 11.6 Direitos Autorais e Licenciamento
+### 10.6 Direitos Autorais e Licenciamento
 
 O código do PesquisAI é distribuído sob a **Licença MIT**. O conteúdo gerado pelo PesquisAI pertence ao usuário que o gerou, ressalvadas as seguintes condições:
 
@@ -1040,7 +1043,7 @@ O código do PesquisAI é distribuído sob a **Licença MIT**. O conteúdo gerad
 - Dados extraídos de fontes públicas (IBGE, DataSUS) devem ser atribuídos às suas respectivas fontes;
 - O uso de conteúdo gerado por IA em publicações deve seguir as políticas do periódico ou instituição de destino.
 
-### 11.7 Usos Não Permitidos
+### 10.7 Usos Não Permitidos
 
 É expressamente vedado o uso do PesquisAI para:
 
@@ -1050,7 +1053,7 @@ O código do PesquisAI é distribuído sob a **Licença MIT**. O conteúdo gerad
 - Substituir, sem a devida declaração, o trabalho intelectual que deveria ser realizado pelo pesquisador;
 - Qualquer finalidade que viole a legislação brasileira ou internacional aplicável.
 
-### 11.8 Aceitação dos Termos
+### 10.8 Aceitação dos Termos
 
 Ao utilizar o PesquisAI, você declara que:
 
@@ -1087,4 +1090,4 @@ O PesquisAI usa estes marcadores para indicar o nível de confiança:
 ---
 
 *Documentação atualizada: Maio 2026*  
-*PesquisAI v1.0*
+*PesquisAI v0.2*

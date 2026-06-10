@@ -1,6 +1,6 @@
 # ⚖️ Disclaimer do PesquisAI — Termos de Uso e Isenção de Responsabilidade
 
-> **Versão 1.0 — Maio de 2026**
+> **Versão 0.2 — Junho de 2026**
 
 **ATENÇÃO: Leia atentamente este documento antes de utilizar o PesquisAI. O uso da ferramenta implica a aceitação integral dos termos aqui dispostos.**
 
@@ -171,4 +171,4 @@ Repositório: https://github.com/gustavobraga-byte/PesquisAI
 
 ---
 
-*PesquisAI · v1.0 · Licenciado sob MIT · Documento atualizado em Maio de 2026*
+*PesquisAI · v0.2 · Licenciado sob MIT · Documento atualizado em Junho de 2026*

@@ -4,7 +4,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "pesquisai"
-version = "1.0"
+version = "0.2"
 description = "Agente de IA para Pesquisa Científica com foco em dados brasileiros"
 authors = [{ name = "Gustavo Bastos Braga", email = "gustavo.braga@ufv.br" }]
 license = { text = "MIT" }

@@ -34,6 +34,42 @@ def set_drive_info(folder_path, drive_url):
     _folder_path = folder_path
 
 
+def load_keys_from_drive(backup_dir, env_dict, write_bashrc=True):
+    """Load saved API keys from Drive .keys.json into environment.
+    
+    Returns list of loaded env var names.
+    """
+    keys_file = os.path.join(backup_dir, ".keys.json")
+    if not os.path.exists(keys_file):
+        return []
+    try:
+        with open(keys_file, "r") as f:
+            saved_keys = json.load(f)
+    except Exception:
+        return []
+    loaded = []
+    for k, v in saved_keys.items():
+        if k.startswith("_env_"):
+            continue
+        env_var = saved_keys.get(f"_env_{k}", "")
+        if env_var and v:
+            os.environ[env_var] = v
+            env_dict[env_var] = v
+            loaded.append(env_var)
+            if write_bashrc:
+                try:
+                    bashrc = os.path.expanduser("~/.bashrc")
+                    marker = f"# opencode-key-{k}"
+                    export_line = f'export {env_var}="{v}"'
+                    lines = open(bashrc).readlines() if os.path.exists(bashrc) else []
+                    lines = [l for l in lines if marker not in l and (env_var not in l or "export" not in l)]
+                    lines.append(f"{export_line}  {marker}\n")
+                    open(bashrc, "w").writelines(lines)
+                except Exception:
+                    pass
+    return loaded
+
+
 def resolve_opencode():
     global _opencode_bin, _env
     try:
@@ -101,6 +137,7 @@ def create_wrapper_html(terminal_url, drive_url):
   <title>PesquisAI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
   <style>
     *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
@@ -310,7 +347,7 @@ def create_wrapper_html(terminal_url, drive_url):
   <div id="topbar">
     <div class="logo">
       <span class="logo-p">Pesquis</span><span class="logo-ai">AI</span>
-      <span class="logo-tag">v1.0</span>
+      <span class="logo-tag">v0.2</span>
     </div>
 
     <div class="status">
@@ -363,7 +400,7 @@ def create_wrapper_html(terminal_url, drive_url):
       GitHub
     </a>
     <span class="footer-sep"></span>
-    <span style="color:var(--ink-muted)">UFV · Viçosa, MG</span>
+    <span style="color:var(--ink-muted)">UFV · Viçosa, MG - Brasil</span>
 
     <div class="footer-right">
       <button class="btn-provider" onclick="connectProvider()" title="Conectar novo provedor de IA">
@@ -556,19 +593,21 @@ def create_wrapper_html(terminal_url, drive_url):
 
     /* ── Provider list (all opencode-compatible) ───────────────── */
     const PROVIDERS = [
-      {{ id:"anthropic",    name:"Anthropic",       env:"ANTHROPIC_API_KEY",      hint:"sk-ant-…"    }},
-      {{ id:"openai",       name:"OpenAI",           env:"OPENAI_API_KEY",         hint:"sk-…"        }},
-      {{ id:"google",       name:"Google Gemini",    env:"GOOGLE_GENERATIVE_AI_API_KEY",         hint:"AIza…"       }},
-      {{ id:"groq",         name:"Groq",             env:"GROQ_API_KEY",           hint:"gsk_…"       }},
-      {{ id:"mistral",      name:"Mistral",          env:"MISTRAL_API_KEY",        hint:"…"           }},
-      {{ id:"xai",          name:"xAI (Grok)",       env:"XAI_API_KEY",            hint:"xai-…"       }},
-      {{ id:"deepseek",     name:"DeepSeek",         env:"DEEPSEEK_API_KEY",       hint:"sk-…"        }},
-      {{ id:"openrouter",   name:"OpenRouter",       env:"OPENROUTER_API_KEY",     hint:"sk-or-…"     }},
-      {{ id:"nvidia",       name:"Nvidia NIM",       env:"NVIDIA_API_KEY",         hint:"nvapi-…"     }},
-      {{ id:"together",     name:"Together AI",      env:"TOGETHER_API_KEY",       hint:"…"           }},
-      {{ id:"bedrock",      name:"AWS Bedrock",      env:"AWS_ACCESS_KEY_ID",      hint:"AKIA…"       }},
-      {{ id:"azure",        name:"Azure OpenAI",     env:"AZURE_OPENAI_API_KEY",   hint:"…"           }},
-      {{ id:"vertex",       name:"Vertex AI",        env:"VERTEX_API_KEY",         hint:"…"           }},
+      {{ id:"anthropic",    name:"Anthropic",             env:"ANTHROPIC_API_KEY",          hint:"sk-ant-…"    }},
+      {{ id:"bedrock",      name:"AWS Bedrock",           env:"AWS_ACCESS_KEY_ID",          hint:"AKIA…"       }},
+      {{ id:"azure",        name:"Azure OpenAI",          env:"AZURE_OPENAI_API_KEY",       hint:"…"           }},
+      {{ id:"deepseek",     name:"DeepSeek",              env:"DEEPSEEK_API_KEY",           hint:"sk-…"        }},
+      {{ id:"google",       name:"Google Gemini",         env:"GOOGLE_GENERATIVE_AI_API_KEY",         hint:"AIza…"       }},
+      {{ id:"groq",         name:"Groq",                  env:"GROQ_API_KEY",               hint:"gsk_…"       }},
+      {{ id:"mistral",      name:"Mistral",               env:"MISTRAL_API_KEY",            hint:"…"           }},
+      {{ id:"nvidia",       name:"Nvidia NIM",            env:"NVIDIA_API_KEY",             hint:"nvapi-…"     }},
+      {{ id:"openai",       name:"OpenAI",                env:"OPENAI_API_KEY",             hint:"sk-…"        }},
+      {{ id:"opencode_go",  name:"OpenCode Go",           env:"OPENCODE_GO_API_KEY",        hint:"sk-…"        }},
+      {{ id:"opencode_zen", name:"OpenCode Zen",          env:"OPENCODE_ZEN_API_KEY",       hint:"sk-…"        }},
+      {{ id:"openrouter",   name:"OpenRouter",            env:"OPENROUTER_API_KEY",         hint:"sk-or-…"     }},
+      {{ id:"together",     name:"Together AI",           env:"TOGETHER_API_KEY",           hint:"…"           }},
+      {{ id:"vertex",       name:"Vertex AI",             env:"VERTEX_API_KEY",             hint:"…"           }},
+      {{ id:"xai",          name:"xAI (Grok)",            env:"XAI_API_KEY",                hint:"xai-…"       }},
     ]
 
     let _selProv = null;
@@ -754,36 +793,9 @@ def start_wrapper_server():
     if restore_opencode_config_from_drive():
         print(f"🔑 Config do OpenCode restaurada do Drive.")
     
-    # Auto-load all saved provider keys into environment on startup
-    _keys_file = os.path.join(DRIVE_BACKUP_DIR, ".keys.json")
-    if os.path.exists(_keys_file):
-        try:
-            with open(_keys_file, "r") as _kf:
-                _saved_keys = json.load(_kf)
-            _loaded = []
-            for _k, _v in _saved_keys.items():
-                if _k.startswith("_env_"):
-                    continue
-                _env_var = _saved_keys.get(f"_env_{_k}", "")
-                if _env_var and _v:
-                    os.environ[_env_var] = _v
-                    _env[_env_var] = _v
-                    # Also write to bashrc so bash -i sessions pick it up
-                    try:
-                        _bashrc = os.path.expanduser("~/.bashrc")
-                        _marker = f"# opencode-key-{_k}"
-                        _export = f'export {_env_var}="{_v}"'
-                        _lines = open(_bashrc).readlines() if os.path.exists(_bashrc) else []
-                        _lines = [l for l in _lines if _marker not in l and (_env_var not in l or "export" not in l)]
-                        _lines.append(f"{_export}  {_marker}\n")
-                        open(_bashrc, "w").writelines(_lines)
-                    except Exception:
-                        pass
-                    _loaded.append(_env_var)
-            if _loaded:
-                print(f"🔑 Keys carregadas do Drive: {', '.join(_loaded)}")
-        except Exception:
-            pass
+    _loaded_keys = load_keys_from_drive(DRIVE_BACKUP_DIR, _env)
+    if _loaded_keys:
+        print(f"🔑 Keys carregadas do Drive: {', '.join(_loaded_keys)}")
     
     def _run(cmd, **kw):
         return subprocess.run(cmd, capture_output=True, text=True, env=_env, **kw)
@@ -931,23 +943,8 @@ def start_wrapper_server():
                 return
             
             if p == "/api/apikey/apply":
-                # Inject all saved keys into the current environment
-                keys_file = os.path.join(DRIVE_BACKUP_DIR, ".keys.json")
-                applied = []
-                try:
-                    with open(keys_file, "r") as f:
-                        keys = json.load(f)
-                    for k, v in keys.items():
-                        if k.startswith("_env_"):
-                            # This is a mapping entry, skip
-                            continue
-                        env_var = keys.get(f"_env_{k}", "")
-                        if env_var and v:
-                            os.environ[env_var] = v
-                            _env[env_var] = v
-                            applied.append(env_var)
-                    self._json(200, {"ok": True, "applied": applied})
-                except Exception:
+                applied = load_keys_from_drive(DRIVE_BACKUP_DIR, _env, write_bashrc=False)
+                self._json(200, {"ok": True, "applied": applied}) if applied else \
                     self._json(200, {"ok": False, "reason": "no keys stored"})
                 return
             
@@ -957,20 +954,7 @@ def start_wrapper_server():
                 if not cmd:
                     self._json(400, {"error": "Comando vazio."})
                     return
-                # Reload all saved provider keys into _env before restarting ttyd
-                keys_file = os.path.join(DRIVE_BACKUP_DIR, ".keys.json")
-                try:
-                    with open(keys_file, "r") as f:
-                        saved_keys = json.load(f)
-                    for k, v in saved_keys.items():
-                        if k.startswith("_env_"):
-                            continue
-                        env_var = saved_keys.get(f"_env_{k}", "")
-                        if env_var and v:
-                            _env[env_var] = v
-                            os.environ[env_var] = v
-                except Exception:
-                    pass
+                load_keys_from_drive(DRIVE_BACKUP_DIR, _env, write_bashrc=False)
                 # Hard kill ttyd + opencode
                 subprocess.run(
                     "pkill -9 -f ttyd 2>/dev/null; pkill -9 -f opencode 2>/dev/null; true",
