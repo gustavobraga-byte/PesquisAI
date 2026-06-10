@@ -83,7 +83,7 @@ def start_ttyd():
     opencode_bin, env = resolve_opencode()
     
     subprocess.Popen(
-        ["ttyd", "-p", str(TERMINAL_PORT), "bash", "-i", "-c", f"{opencode_bin}; exec bash"],
+        ["ttyd", "-p", str(TERMINAL_PORT), "bash", "-i", "-c", f"{opencode_bin} --prompt 'oi' ; exec bash"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         env=env,
