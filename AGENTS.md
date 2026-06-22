@@ -1,6 +1,6 @@
 # 🔬 PesquisAI — Agente de Pesquisa Científica de Alta Performance
 
-> **Versão:** 0.2  
+> **Versão:** 0.2.1  
 > **Domínio:** Pesquisa Científica & Dados Brasileiros  
 > **Ambiente:** Remoto · Sem estado entre sessões · Saída exclusivamente textual
 
@@ -202,6 +202,6 @@ Parágrafo com dado, fonte, ano e nota metodológica. Caso os dados não sejam r
 
 ---
 
-*PesquisAI · v0.2 · Registro SisPPG/UFV nº 10356285004 · Mantido em conformidade com os princípios de integridade científica da CAPES e CNPq*
+*PesquisAI · v0.2.1 · Registro SisPPG/UFV nº 10356285004 · Mantido em conformidade com os princípios de integridade científica da CAPES e CNPq*
 
 [📘 Diretrizes do Agente](AGENTS.md)

@@ -10,7 +10,7 @@
 
 ```
 BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.2. Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão 0.2.1. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -61,7 +61,7 @@ https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 
 ```
 BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para
-pesquisa científica. Versão 0.2. Viçosa: Universidade Federal de Viçosa,
+pesquisa científica. Versão 0.2.1. Viçosa: Universidade Federal de Viçosa,
 2026. Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
@@ -94,7 +94,7 @@ Acesso em: DD mês. AAAA.
   author       = {Gustavo Bastos Braga},
   title        = {{PesquisAI}: Agente de Intelig{\^e}ncia Artificial para Pesquisa Cient{\'\i}fica},
   year         = {2026},
-  version      = {0.2},
+  version      = {0.2.1},
   institution  = {Universidade Federal de Vi{\c{c}}osa (UFV)},
   url          = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/},
   note         = {Acessado em: DD m{\^e}s AAAA}

@@ -761,7 +761,7 @@ Todos os arquivos gerados são salvos **exclusivamente** nesta pasta.
 
 ```
 BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.2. Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão 0.2.1. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -817,7 +817,7 @@ https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 author = {Gustavo Bastos Braga},
 title = {{PesquisAI}: Agente de Intelig{\^e}ncia Artificial para Pesquisa Cient{\'\i}fica},
 year = {2026},
-version = {0.2},
+version = {0.2.1},
 institution = {Universidade Federal de Vi{\c{c}}osa (UFV)},
 url = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/},
 note = {Acessado em: DD m{\^e}s AAAA}
@@ -874,7 +874,7 @@ Ethics (COPE).
 
 Referência da ferramenta:
 BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para
-pesquisa científica. Versão 0.2. Viçosa: UFV, 2026. Disponível em:
+pesquisa científica. Versão 0.2.1. Viçosa: UFV, 2026. Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Registro SisPPG/UFV nº 10356285004 — http://sisppg.ufv.br
 ```
@@ -974,7 +974,7 @@ O PesquisAI pode auxiliar na estruturação e redação de seções mais objetiv
 
 ## 10. ⚖️ Disclaimer do PesquisAI — Termos de Uso e Isenção de Responsabilidade
 
-> **Versão 0.2 — Junho de 2026**
+> **Versão 0.2.1 — Junho de 2026**
 > **ATENÇÃO: Leia atentamente este documento antes de utilizar o PesquisAI. O uso da ferramenta implica a aceitação integral dos termos aqui dispostos.**
 
 ### 10.1 Natureza da Ferramenta
@@ -1090,4 +1090,4 @@ O PesquisAI usa estes marcadores para indicar o nível de confiança:
 ---
 
 *Documentação atualizada: Maio 2026*  
-*PesquisAI v0.2*
+*PesquisAI v0.2.1*
