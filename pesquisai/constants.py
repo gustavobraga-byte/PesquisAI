@@ -58,6 +58,8 @@ SKILL_REGISTRY: list[SkillEntry] = [
     ("https://github.com/gustavobraga-byte/Skill_Analise_qualitativa.git", "qualitativa", False),
     ("https://github.com/gustavobraga-byte/skill_dados_brasil.git", "dados-brasil", False),
     ("https://github.com/gustavobraga-byte/skill_agrobr.git", "agrobr", False),
+    ("https://github.com/gustavobraga-byte/grant-finder.git", "grant-finder", False),
+    ("https://github.com/gustavobraga-byte/meta-search-br.git", "meta-search-br", False),
 ]
 
 # Mapeamento de /tmp/skill_<nome> → diretório final em SKILLS_DIR
@@ -69,6 +71,8 @@ SKILL_MAPPINGS: list[tuple[str, str]] = [
     ("/tmp/skill_qualitativa", "qualitativa"),
     ("/tmp/skill_dados-brasil", "dados-brasil"),
     ("/tmp/skill_agrobr", "agrobr"),
+    ("/tmp/grant-finder", "grant-finder"),
+    ("/tmp/meta-search-br", "meta-search-br"),
 ]
 
 # Skills que o sistema considera ESSENCIAIS para funcionar
