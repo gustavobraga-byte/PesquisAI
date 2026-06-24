@@ -2,10 +2,6 @@
 
 ## [0.4.2.3] — 2026-06-24 — ses_106b HOTFIX (JS Broken Escapes — Botões Restaurados)
 
-> Sessão `ses_106b` (continuação): bug crítico reportado pelo usuário — ao abrir
-> o wrapper HTML, **nenhum botão funcionava**. Investigação revelou JavaScript
-> com sintaxe inválida.
-
 ### 🐛 Bug Crítico Resolvido
 
 **Sintoma:** ao carregar `/tmp/pesquisai-wrapper/index.html` no navegador, NENHUM
