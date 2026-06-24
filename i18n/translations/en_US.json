@@ -1,0 +1,91 @@
+{
+  "ui": {
+    "backup": "Save backup",
+    "restore": "Restore",
+    "drive": "Drive",
+    "settings": "Settings",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "open": "Open",
+    "search": "Search",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Info"
+  },
+  "dashboard": {
+    "title": "Health Dashboard",
+    "drive_mounted": "Google Drive mounted",
+    "backup_dir": "Backup directory exists",
+    "ttyd_active": "ttyd running",
+    "opencode_found": "OpenCode found",
+    "keys_loaded": "Keys loaded",
+    "skills_installed": "Skills installed",
+    "ffmpeg": "ffmpeg available",
+    "disk_free": "Free space",
+    "version": "Version"
+  },
+  "providers": {
+    "title": "Connect AI Provider",
+    "select": "Select the provider",
+    "api_key": "API KEY",
+    "placeholder": "Paste your key here…",
+    "save_connect": "Save and Connect",
+    "back": "Back",
+    "configuring": "Configuring provider and restarting terminal…",
+    "configured": "Provider configured! Terminal reopened.",
+    "saved_to_drive": "Key saved to Drive!",
+    "select_provider": "Select a provider",
+    "insert_key": "Enter the API key"
+  },
+  "sessions": {
+    "title": "Session History",
+    "search_placeholder": "Search by id or content…",
+    "no_sessions": "No sessions found.",
+    "open": "open"
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "copy": "Copy selection",
+    "copy_hint": "Hold Shift and select",
+    "interrupt": "Interrupt command",
+    "paste": "Paste (Chrome)",
+    "menu": "Menu and options",
+    "model": "Change model",
+    "history_prev": "Previous history",
+    "history_next": "Next history"
+  },
+  "theme": {
+    "light": "Light theme (UI + terminal)",
+    "dark": "Dark theme (UI + terminal)",
+    "toggle": "Toggle theme"
+  },
+  "languages": {
+    "pt_BR": "Portuguese (Brazil)",
+    "en_US": "English (United States)",
+    "es_ES": "Spanish (Spain)"
+  },
+  "agents": {
+    "rules_title": "Absolute Rules",
+    "rule1": "References require citation-management",
+    "rule2": "Do not invent data/statistics",
+    "rule3": "Do not simulate primary data collection",
+    "rule4": "Refuse requests that violate scientific integrity"
+  },
+  "errors": {
+    "drive_not_mounted": "Google Drive is not mounted",
+    "no_opencode": "OpenCode not found",
+    "no_data": "[NO DATA AVAILABLE]",
+    "connection_failed": "Connection failed",
+    "invalid_key": "Invalid API key"
+  },
+  "success_messages": {
+    "backup_saved": "Backup saved",
+    "key_saved": "Key saved to Drive!",
+    "session_imported": "Session imported!",
+    "session_opened": "Session opened!",
+    "config_applied": "Configuration applied"
+  }
+}

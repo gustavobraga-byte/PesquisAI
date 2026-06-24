@@ -21,12 +21,23 @@ from .constants import TERMINAL_PORT, WRAPPER_PORT, WRAPPER_DIR, VERSION, logger
 from .jokes import next_joke
 from .opencode_utils import find_opencode, build_env
 from .security import load_encrypted_keys, save_encrypted_keys, sanitize_command
+# v0.4.2.2: __version__ foi MOVIDO para pesquisai/__version__.py
+# (estava em /__version__.py). Mantemos fallback para robustez.
+try:
+    from .__version__ import get_greeting
+except ImportError:
+    def get_greeting(lang: str = "pt_BR") -> str:
+        # Fallback v0.4.2.2: saudação curta + dica entre parênteses
+        return "Olá! (Dica: A partir de agora responda em português brasileiro.)"
 
 
 _opencode_bin: str | None = None
 _env: dict | None = None
 _drive_url: str = "https://drive.google.com/drive/my-drive"
 _folder_path: str = "/content"
+# v0.4.2.2: idioma atual persistido pelo backend (cookie + endpoint)
+_current_lang: str = "pt_BR"
+_LANG_COOKIE_FILE: str = os.path.expanduser("~/.config/pesquisai_lang")
 
 
 def set_drive_info(folder_path: str, drive_url: str) -> None:
@@ -150,924 +161,103 @@ def kill_previous():
     time.sleep(0.5)
 
 
-def start_ttyd():
+def start_ttyd(lang: str | None = None):
+    """Inicia o ttyd com saudação no idioma solicitado.
+
+    Args:
+        lang: Código do idioma (pt_BR, en_US, es_ES, fr_FR). Se None, usa
+              o _current_lang global ou o env PESQUISAI_LANG.
+
+    v0.4.2.2: ao invés de `--prompt 'oi'` genérico, usa saudação no idioma
+              + instrução "(a partir de agora responda em X)".
+    """
     print(f"\n{next_joke('economia')}")
     opencode_bin, env = resolve_opencode()
-    
+
+    # Resolve idioma (param > env > _current_lang > pt_BR)
+    if lang is None:
+        lang = os.environ.get("PESQUISAI_LANG") or _current_lang or "pt_BR"
+    # Normaliza para o conjunto canônico
+    _valid = {"pt": "pt_BR", "en": "en_US", "es": "es_ES", "fr": "fr_FR"}
+    short = (lang or "pt_BR").split("_")[0].lower()
+    full_lang = _valid.get(short, lang if lang in _valid.values() else "pt_BR")
+
+    greeting = get_greeting(full_lang)
+    # Escapar aspas para o bash -c "..."
+    safe_prompt = greeting.replace('"', '\\"').replace("'", "\\'")
+    bash_cmd = f'{opencode_bin} --prompt "{safe_prompt}" ; exec bash'
+
     subprocess.Popen(
-        ["ttyd", "-p", str(TERMINAL_PORT), "bash", "-i", "-c", f"{opencode_bin} --prompt 'oi' ; exec bash"],
+        ["ttyd", "-p", str(TERMINAL_PORT), "bash", "-i", "-c", bash_cmd],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         env=env,
     )
-    print("🚀 Terminal iniciado.")
+    print(f"🚀 Terminal iniciado (idioma: {full_lang}).")
     time.sleep(2)
 
 
-def create_wrapper_html(terminal_url, drive_url):
-    wrapper_html = f"""<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PesquisAI</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Syne:wght@700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
-  <style>
-    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+def restart_ttyd_with_lang(lang: str) -> bool:
+    """Reinicia o ttyd com saudação no novo idioma.
 
-    :root {{
-      --ink:        #e8e6e0;
-      --ink-muted:  #8a8780;
-      --surface:    #0d0f10;
-      --rail:       #151819;
-      --line:       rgba(255,255,255,.07);
-      --accent:     #4fc3f7;
-      --accent-dim: rgba(79,195,247,.12);
-      --accent-glow:rgba(79,195,247,.22);
-      --green:      #5dba7e;
-      --green-dim:  rgba(93,186,126,.12);
-      --amber:      #e8b84b;
-      --amber-dim:  rgba(232,184,75,.12);
-      --red:        #e07070;
-      --red-dim:    rgba(224,112,112,.12);
-      --radius:     5px;
-    }}
+    Usado pelo endpoint /api/lang quando o usuário troca o idioma.
+    Retorna True se reiniciou, False se falhou.
+    """
+    global _current_lang
+    try:
+        # Mata ttyd + opencode existentes
+        subprocess.run(["pkill", "-9", "-f", "ttyd"], capture_output=True, timeout=5)
+        subprocess.run(["pkill", "-9", "-f", "opencode"], capture_output=True, timeout=5)
+        time.sleep(1.0)
+        # Persiste o idioma
+        _current_lang = lang
+        try:
+            os.makedirs(os.path.dirname(_LANG_COOKIE_FILE), exist_ok=True)
+            with open(_LANG_COOKIE_FILE, "w", encoding="utf-8") as f:
+                f.write(lang)
+        except Exception:
+            pass
+        # Reinicia ttyd com a saudação no novo idioma
+        start_ttyd(lang=lang)
+        return True
+    except Exception as e:
+        logger.error("Falha ao reiniciar ttyd com lang=%s: %s", lang, e)
+        return False
 
-    html, body {{
-      height: 100%;
-      background: var(--surface);
-      color: var(--ink);
-      font-family: "DM Mono", monospace;
-      overflow: hidden;
-    }}
 
-    #topbar {{
-      position: fixed; inset: 0 0 auto 0;
-      height: 50px;
-      background: var(--rail);
-      border-bottom: 1px solid var(--line);
-      display: flex; align-items: center;
-      padding: 0 18px; gap: 14px;
-      z-index: 9999;
-    }}
-    #topbar::after {{
-      content: "";
-      position: absolute; inset: 0;
-      background: repeating-linear-gradient(0deg, transparent, transparent 2px,
-        rgba(0,0,0,.05) 2px, rgba(0,0,0,.05) 4px);
-      pointer-events: none;
-    }}
 
-    .logo {{ display: flex; align-items: baseline; gap: 2px; }}
-    .logo-p  {{ font-family:"Syne",sans-serif; font-weight:800; font-size:17px; color:var(--ink); letter-spacing:-.5px; }}
-    .logo-ai {{ font-family:"Syne",sans-serif; font-weight:700; font-size:17px; color:var(--accent); letter-spacing:-.5px; }}
-    .logo-tag {{
-      margin-left:9px; font-size:10px; color:var(--ink-muted);
-      letter-spacing:.07em; padding:1px 6px;
-      border:1px solid var(--line); border-radius:3px; align-self:center;
-    }}
+# ───────────────────────────────────────────────────────────────────
+# 🔧 PATCH v0.4.1 — Substitui a função create_wrapper_html original
+# pela versão responsiva com tema escuro + idioma na UI.
+# 
+# Mudanças aplicadas:
+#   1. 📱 Site responsivo (6 media queries + hamburger menu)
+#   2. 🎨 Tema claro/escuro com reload do iframe do ttyd
+#   3. 🌐 Seletor de idioma na topbar (4 idiomas: pt_BR, en_US, es_ES, fr_FR)
+#   4. 🌙 Tema padrão ESCURO com anti-flash CSS
+# 
+# Compatibilidade: API inalterada (create_wrapper_html(terminal_url, drive_url))
+# Detalhes: docs/PATCH_v0.4.1.md
+# ───────────────────────────────────────────────────────────────────
+try:
+    from .launch_app_responsive_v041 import create_wrapper_html
+except ImportError:
+    # Fallback: importa do caminho absoluto (modo standalone)
+    import os as _os
+    import sys as _sys
+    _patch_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "launch_app_responsive_v041.py")
+    if _os.path.exists(_patch_path):
+        import importlib.util as _ilu
+        _spec = _ilu.spec_from_file_location("launch_app_responsive_v041", _patch_path)
+        _mod = _ilu.module_from_spec(_spec)
+        _spec.loader.exec_module(_mod)
+        create_wrapper_html = _mod.create_wrapper_html
+    else:
+        raise ImportError(
+            "Patch v0.4.1 não encontrado. Copie launch_app_responsive_v041.py "
+            "para a mesma pasta de launch_app.py"
+        )
 
-    .status {{ display:flex; align-items:center; gap:7px; font-size:11px; color:var(--ink-muted); }}
-    .status-dot {{
-      width:7px; height:7px; border-radius:50%; background:var(--green);
-      animation: pulse 2.4s ease infinite;
-    }}
-    @keyframes pulse {{
-      0%,100% {{ box-shadow:0 0 0 0 rgba(93,186,126,.5); }}
-      50%      {{ box-shadow:0 0 0 5px rgba(93,186,126,0); }}
-    }}
-
-    .sep {{ flex: 1; }}
-
-    .tb-btn {{
-      display: inline-flex; align-items: center; gap: 7px;
-      padding: 0 13px; height: 30px;
-      font-family: "DM Mono", monospace; font-size: 11px;
-      font-weight: 500; letter-spacing: .04em;
-      border-radius: var(--radius); cursor: pointer;
-      border: 1px solid; transition: background .15s, transform .1s, border-color .15s;
-      text-decoration: none; white-space: nowrap;
-    }}
-    .tb-btn:active {{ transform: scale(.96); }}
-    .tb-btn svg {{ width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }}
-
-    .btn-drive  {{ color:var(--accent); background:var(--accent-dim); border-color:rgba(79,195,247,.25); }}
-    .btn-drive:hover  {{ background:var(--accent-glow); border-color:rgba(79,195,247,.5); }}
-
-    .btn-backup {{ color:var(--green); background:var(--green-dim); border-color:rgba(93,186,126,.25); }}
-    .btn-backup:hover {{ background:rgba(93,186,126,.2); border-color:rgba(93,186,126,.5); }}
-
-    .btn-restore {{ color:var(--amber); background:var(--amber-dim); border-color:rgba(232,184,75,.25); }}
-    .btn-restore:hover {{ background:rgba(232,184,75,.2); border-color:rgba(232,184,75,.5); }}
-
-    #toast {{
-      position: fixed; bottom: 58px; right: 18px;
-      padding: 9px 16px; border-radius: var(--radius);
-      font-size: 12px; font-family: "DM Mono", monospace;
-      display: flex; align-items: center; gap: 8px;
-      opacity: 0; transform: translateY(6px);
-      transition: opacity .22s, transform .22s;
-      pointer-events: none; z-index: 9998; max-width: 340px;
-      border: 1px solid;
-    }}
-    #toast.show {{ opacity: 1; transform: translateY(0); }}
-    #toast.ok    {{ background:rgba(93,186,126,.15);  border-color:rgba(93,186,126,.35);  color:var(--green); }}
-    #toast.err   {{ background:rgba(224,112,112,.15); border-color:rgba(224,112,112,.35); color:var(--red);   }}
-    #toast.info  {{ background:var(--accent-dim);     border-color:rgba(79,195,247,.35);  color:var(--accent);}}
-
-    #modal-overlay {{
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,.65); backdrop-filter: blur(3px);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 99999; opacity: 0; pointer-events: none;
-      transition: opacity .2s;
-    }}
-    #modal-overlay.open {{ opacity: 1; pointer-events: all; }}
-    #modal {{
-      background: #181b1e; border: 1px solid rgba(255,255,255,.1);
-      border-radius: 8px; padding: 24px; width: 400px; max-width: 90vw;
-      box-shadow: 0 24px 64px rgba(0,0,0,.6);
-    }}
-    .modal-title {{
-      font-family: "Syne", sans-serif; font-weight: 800;
-      font-size: 15px; color: var(--ink); margin-bottom: 16px;
-    }}
-    .backup-list {{
-      max-height: 260px; overflow-y: auto;
-      border: 1px solid var(--line); border-radius: var(--radius);
-      margin-bottom: 16px;
-    }}
-    .backup-item {{
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 9px 12px; font-size: 11.5px; color: var(--ink-muted);
-      border-bottom: 1px solid var(--line); cursor: pointer;
-      transition: background .12s;
-    }}
-    .backup-item:last-child {{ border-bottom: none; }}
-    .backup-item:hover {{ background: rgba(255,255,255,.04); color: var(--ink); }}
-    .backup-item .restore-lbl {{
-      font-size: 10px; padding: 2px 8px;
-      background: var(--amber-dim); color: var(--amber);
-      border: 1px solid rgba(232,184,75,.3); border-radius: 3px;
-    }}
-    .modal-empty {{ padding:20px; text-align:center; font-size:12px; color:var(--ink-muted); }}
-    .modal-close {{
-      display: block; width: 100%; padding: 8px;
-      background: rgba(255,255,255,.05); border: 1px solid var(--line);
-      border-radius: var(--radius); color: var(--ink-muted);
-      font-family: "DM Mono", monospace; font-size: 12px;
-      cursor: pointer; transition: background .15s;
-    }}
-    .modal-close:hover {{ background: rgba(255,255,255,.1); }}
-
-    #terminal-frame {{
-      position: absolute;
-      inset: 50px 0 40px 0;
-      width: 100%; height: calc(100% - 10px);
-      border: none;
-    }}
-
-    #footer {{
-      position: fixed; inset: auto 0 0 0;
-      height: 40px;
-      background: var(--rail);
-      border-top: 1px solid var(--line);
-      display: flex; align-items: center;
-      padding: 0 18px; gap: 0;
-      font-size: 10.5px; color: var(--ink-muted);
-      z-index: 9999;
-    }}
-    .footer-brand {{
-      font-family: "Syne", sans-serif; font-weight: 700;
-      font-size: 11px; color: var(--ink);
-      margin-right: 14px;
-    }}
-    .footer-sep {{ width:1px; height:16px; background:var(--line); margin:0 12px; flex-shrink:0; }}
-    .footer-link {{
-      color: var(--ink-muted); text-decoration: none;
-      letter-spacing: .03em;
-      transition: color .15s;
-    }}
-    .footer-link:hover {{ color: var(--accent); }}
-    .footer-link svg {{ width:11px; height:11px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:-.15em; margin-right:4px; }}
-    .footer-right {{ margin-left:auto; display:flex; align-items:center; gap:12px; }}
-    .footer-oc {{ color:var(--ink-muted); letter-spacing:.03em; }}
-    .footer-oc a {{ color:var(--ink-muted); text-decoration:none; }}
-    .footer-oc a:hover {{ color:var(--accent); }}
-
-    .btn-provider {{
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 0 10px; height: 24px;
-      font-family: "DM Mono", monospace; font-size: 10px;
-      font-weight: 500; letter-spacing: .03em;
-      border-radius: var(--radius); cursor: pointer;
-      border: 1px solid rgba(79,195,247,.18);
-      color: rgba(79,195,247,.55);
-      background: transparent;
-      transition: background .15s, color .15s, border-color .15s;
-      white-space: nowrap;
-    }}
-    .btn-provider:hover {{
-      background: var(--accent-dim);
-      color: var(--accent);
-      border-color: rgba(79,195,247,.4);
-    }}
-    .btn-provider:active {{ transform: scale(.96); }}
-    .btn-provider svg {{ width:10px; height:10px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }}
-
-    .tb-icons {{ display:flex; align-items:center; gap:4px; margin-left:6px; }}
-    .tb-icon {{
-      display:inline-flex; align-items:center; justify-content:center;
-      width:30px; height:30px; padding:0;
-      background:transparent; border:1px solid var(--line);
-      border-radius:var(--radius); cursor:pointer;
-      color:var(--ink-muted); transition:background .15s,color .15s,border-color .15s;
-    }}
-    .tb-icon:hover {{
-      background:var(--accent-dim); color:var(--accent);
-      border-color:rgba(79,195,247,.4);
-    }}
-    .tb-icon:active {{ transform: scale(.94); }}
-    .tb-icon svg {{ width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }}
-
-    .health-row {{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:9px 12px; font-size:11.5px; color:var(--ink);
-      border-bottom:1px solid var(--line);
-    }}
-    .health-row:last-child {{ border-bottom:none; }}
-    .health-status {{
-      font-size:13px; font-weight:700; padding:2px 8px; border-radius:3px;
-    }}
-    .health-ok {{ background:var(--green-dim); color:var(--green); }}
-    .health-warn {{ background:var(--amber-dim); color:var(--amber); }}
-    .health-fail {{ background:var(--red-dim); color:var(--red); }}
-
-    .session-search {{
-      display:block; width:100%; padding:8px 10px; margin-bottom:10px;
-      box-sizing:border-box; background:rgba(255,255,255,.04);
-      border:1px solid var(--line); border-radius:var(--radius);
-      color:var(--ink); font-family:'DM Mono',monospace; font-size:11px;
-      outline:none; transition:border-color .15s;
-    }}
-    .session-search:focus {{ border-color:rgba(79,195,247,.4); }}
-    .session-item {{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:9px 12px; font-size:11.5px; color:var(--ink-muted);
-      border-bottom:1px solid var(--line); cursor:pointer;
-      transition:background .12s;
-    }}
-    .session-item:last-child {{ border-bottom:none; }}
-    .session-item:hover {{ background:rgba(255,255,255,.04); color:var(--ink); }}
-    .session-item .ses-meta {{ font-size:10px; color:var(--ink-muted); opacity:.7; }}
-
-    .shortcut-row {{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:8px 12px; font-size:11.5px; color:var(--ink);
-      border-bottom:1px solid var(--line);
-    }}
-    .shortcut-row:last-child {{ border-bottom:none; }}
-    .shortcut-key {{
-      font-family:'DM Mono',monospace; font-size:10.5px; font-weight:600;
-      padding:2px 8px; background:var(--accent-dim); color:var(--accent);
-      border:1px solid rgba(79,195,247,.25); border-radius:3px;
-    }}
-   </style>
-</head>
-<body>
-
-  <div id="topbar">
-    <div class="logo">
-      <span class="logo-p">Pesquis</span><span class="logo-ai">AI</span>
-      <span>  <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/CHANGELOG.md" target="_blank" class="logo-tag"> v{VERSION} </a> </span>
-    </div>
-
-    <div class="status">
-      <span class="status-dot"></span>
-      agente ativo
-    </div>
-
-    <div class="tb-icons">
-      <button class="tb-icon" onclick="openHealth()" title="Dashboard de Saúde">
-        <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-      </button>
-      <button class="tb-icon" onclick="openSessions()" title="Histórico de Sessões">
-        <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
-      </button>
-      <button class="tb-icon" onclick="openShortcuts()" title="Atalhos de Teclado">
-        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/></svg>
-      </button>
-      <button class="tb-icon" onclick="toggleTheme()" id="theme-toggle" title="Alternar tema claro/escuro">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-      </button>
-    </div>
-    <div class="sep"></div>
-
-    <button class="tb-btn btn-backup" onclick="doBackup()">
-      <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-      Salvar backup
-    </button>
-
-    <button class="tb-btn btn-restore" onclick="openRestore()">
-      <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
-      Restaurar
-    </button>
-
-    <a href="{drive_url}" target="_blank" class="tb-btn btn-drive">
-      <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-      Drive
-    </a>
-
-  </div>
-
- <iframe
-  id="terminal-frame"
-  src="{terminal_url}"
-  allow="clipboard-read; clipboard-write"
-  tabindex="0"
-  autofocus
-  style="
-    width:100%;
-    height:calc(100% - 90px);
-    border:none;
-    outline:none;
-  ">
-</iframe>
-
-  <div id="footer">
-    <span class="footer-brand">PesquisAI</span>
-    <span class="footer-sep"></span>
-    <a href="mailto:gustavo.braga@ufv.br" class="footer-link">
-      <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-      gustavo.braga@ufv.br
-    </a>
-    <span class="footer-sep"></span>
-    <a href="https://github.com/gustavobraga-byte/PesquisAI" target="_blank" class="footer-link">
-      <svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
-      GitHub
-    </a>
-    <span class="footer-sep"></span>
-    <span style="color:var(--ink-muted)">UFV · Viçosa, MG - Brasil</span>
-
-    <div class="footer-right">
-      <button class="btn-provider" onclick="connectProvider()" title="Conectar novo provedor de IA">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
-        + provedor
-      </button>
-      <span class="footer-sep"></span>
-      <span class="footer-oc">
-        Powered by <a href="https://opencode.ai" target="_blank">OpenCode</a>
-      </span>
-    </div>
-  </div>
-
-  <div id="toast"></div>
-
-  <div id="modal-overlay" onclick="if(event.target===this)closeModal()">
-    <div id="modal">
-      <div class="modal-title">🔄 Restaurar Sessão</div>
-      <div class="backup-list" id="backup-list">
-        <div class="modal-empty">Carregando backups…</div>
-      </div>
-      <button class="modal-close" onclick="closeModal()">Fechar</button>
-    </div>
-  </div>
-
-  <!-- Modal: Conectar Provedor — Step 1: escolher, Step 2: inserir key -->
-  <div id="provider-overlay" onclick="if(event.target===this)closeProvider()" style="
-    position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
-    display:flex;align-items:center;justify-content:center;
-    z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:480px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
-
-      <!-- STEP 1 -->
-      <div id="prov-step1">
-        <div class="modal-title">🔌 Conectar Provedor de IA</div>
-        <p style="font-size:11.5px;color:var(--ink-muted);margin-bottom:14px;line-height:1.6;">
-          Selecione o provedor para configurar a API key:
-        </p>
-        <div id="prov-list" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;"></div>
-        <button onclick="closeProvider()" style="
-          display:block;width:100%;padding:8px;background:rgba(255,255,255,.04);
-          border:1px solid var(--line);border-radius:var(--radius);color:var(--ink-muted);
-          font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;">Cancelar</button>
-      </div>
-
-      <!-- STEP 2 -->
-      <div id="prov-step2" style="display:none;">
-        <div class="modal-title">🔑 <span id="prov-name-title"></span></div>
-        <p style="font-size:11px;color:var(--ink-muted);margin-bottom:4px;line-height:1.5;">
-          Variável de ambiente: <code id="prov-env-code" style="color:var(--accent);background:rgba(79,195,247,.08);padding:1px 6px;border-radius:3px;font-size:11px;"></code>
-        </p>
-        <p style="font-size:11px;color:var(--ink-muted);margin-bottom:14px;line-height:1.5;">
-          A key será salva no Drive e o terminal executará:<br>
-          <code id="prov-cmd-preview" style="color:var(--amber);background:rgba(232,184,75,.07);padding:2px 6px;border-radius:3px;font-size:10.5px;"></code>
-        </p>
-        <label style="display:block;font-size:10.5px;color:var(--ink-muted);margin-bottom:6px;letter-spacing:.05em;">API KEY</label>
-        <input id="prov-key-input" type="password" placeholder="Cole sua key aqui…" autocomplete="off" style="
-          display:block;width:100%;padding:9px 12px;box-sizing:border-box;
-          background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);
-          color:var(--ink);font-family:'DM Mono',monospace;font-size:12px;
-          outline:none;margin-bottom:14px;transition:border-color .15s;"
-          onfocus="this.style.borderColor='rgba(79,195,247,.4)'"
-          onblur="this.style.borderColor='var(--line)'"
-          onkeydown="if(event.key==='Enter')confirmProvider()"/>
-        <div style="display:flex;gap:8px;">
-          <button onclick="provBack()" style="
-            padding:9px 14px;background:rgba(255,255,255,.04);border:1px solid var(--line);
-            border-radius:var(--radius);color:var(--ink-muted);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;">
-            ← Voltar
-          </button>
-          <button onclick="confirmProvider()" style="
-            flex:1;padding:9px;background:var(--accent-dim);border:1px solid rgba(79,195,247,.3);
-            border-radius:var(--radius);color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;">
-            Salvar e Conectar
-          </button>
-          <button onclick="closeProvider()" style="
-            padding:9px 14px;background:rgba(255,255,255,.04);border:1px solid var(--line);
-            border-radius:var(--radius);color:var(--ink-muted);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;">
-            Cancelar
-          </button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- Modal: Dashboard de Saúde -->
-  <div id="health-overlay" onclick="if(event.target===this)closeHealth()" style="
-    position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
-    display:flex;align-items:center;justify-content:center;
-    z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:440px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
-      <div class="modal-title">🩺 Dashboard de Saúde</div>
-      <div id="health-list" style="max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;">
-        <div class="modal-empty">Carregando diagnóstico…</div>
-      </div>
-      <button onclick="closeHealth()" class="modal-close">Fechar</button>
-    </div>
-  </div>
-
-  <!-- Modal: Histórico de Sessões -->
-  <div id="sessions-overlay" onclick="if(event.target===this)closeSessions()" style="
-    position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
-    display:flex;align-items:center;justify-content:center;
-    z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:520px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
-      <div class="modal-title">📜 Histórico de Sessões</div>
-      <input id="session-search" class="session-search" placeholder="🔍 Buscar por id ou conteúdo…" oninput="filterSessions()">
-      <div id="session-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;">
-        <div class="modal-empty">Carregando sessões…</div>
-      </div>
-      <button onclick="closeSessions()" class="modal-close">Fechar</button>
-    </div>
-  </div>
-
-  <!-- Modal: Atalhos de Teclado -->
-  <div id="shortcuts-overlay" onclick="if(event.target===this)closeShortcuts()" style="
-    position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
-    display:flex;align-items:center;justify-content:center;
-    z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:420px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
-      <div class="modal-title">⌨️ Atalhos de Teclado</div>
-      <div style="border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;">
-        <div class="shortcut-row"><span>Copiar seleção</span><span class="shortcut-key">Segure o Shift e selecione</span></div>
-        <div class="shortcut-row"><span>Interromper comando</span><span class="shortcut-key">Ctrl+C</span></div>
-        <div class="shortcut-row"><span>Colar (Chrome)</span><span class="shortcut-key">Ctrl+Shift+V</span></div>
-        <div class="shortcut-row"><span>Menu e opções</span><span class="shortcut-key">Ctrl+P</span></div>
-        <div class="shortcut-row"><span>Alterar modelo</span><span class="shortcut-key">Ctrl+X m</span></div>
-        <div class="shortcut-row"><span>Histórico anterior</span><span class="shortcut-key">↑</span></div>
-        <div class="shortcut-row"><span>Histórico seguinte</span><span class="shortcut-key">↓</span></div>
-      </div>
-      <button onclick="closeShortcuts()" class="modal-close">Fechar</button>
-    </div>
-  </div>
-
-  <script>
-    const BASE = location.origin;
-
-    let _toastT;
-    function toast(msg, type = "info") {{
-      const el = document.getElementById("toast");
-      el.className = "show " + type;
-      el.textContent = msg;
-      clearTimeout(_toastT);
-      _toastT = setTimeout(() => el.classList.remove("show"), 3800);
-    }}
-
-    async function doBackup() {{
-      toast("⏳ Exportando sessão…", "info");
-      try {{
-        const r = await fetch(BASE + "/api/backup", {{
-          method: "POST",
-          headers: {{ "Content-Type": "application/json" }},
-          body: JSON.stringify({{}})
-        }});
-        const d = await r.json();
-        if (d.ok) {{
-          toast("✅ Backup salvo: " + d.file, "ok");
-        }} else {{
-          toast("❌ " + (d.error || "Erro desconhecido"), "err");
-        }}
-      }} catch(e) {{
-        toast("❌ Falha na conexão: " + e.message, "err");
-      }}
-    }}
-
-    async function openRestore() {{
-      document.getElementById("modal-overlay").classList.add("open");
-      const list = document.getElementById("backup-list");
-      list.innerHTML = '<div class="modal-empty">Carregando backups…</div>';
-      try {{
-        const r = await fetch(BASE + "/api/backups");
-        const d = await r.json();
-        if (!d.backups || d.backups.length === 0) {{
-          list.innerHTML = '<div class="modal-empty">Nenhum backup encontrado no Drive.</div>';
-          return;
-        }}
-        list.innerHTML = d.backups.map(f => `
-          <div class="backup-item" onclick="doRestore('${{f}}')">
-            <span>${{f}}</span>
-            <span class="restore-lbl">restaurar</span>
-          </div>
-        `).join("");
-      }} catch(e) {{
-        list.innerHTML = '<div class="modal-empty">Erro ao carregar backups.</div>';
-      }}
-    }}
-
-    function closeModal() {{
-      document.getElementById("modal-overlay").classList.remove("open");
-    }}
-
-    async function doRestore(file) {{
-      closeModal();
-      toast("⏳ Importando " + file + "…", "info");
-      try {{
-        const r = await fetch(BASE + "/api/restore", {{
-          method: "POST",
-          headers: {{ "Content-Type": "application/json" }},
-          body: JSON.stringify({{ file }})
-        }});
-        const d = await r.json();
-
-        if (d.ok) {{
-          const sessionId = d.session_id || "";
-          const cmd = sessionId ? "opencode -s " + sessionId : "opencode";
-          toast("✅ Importado! session_id: " + (sessionId || "(não encontrado)"), "ok");
-          setTimeout(() => {{
-            const msg = "Sessão restaurada!\\n" +
-              (sessionId ? "Vai abrir: " + cmd : "Sem sessionId — vai abrir opencode padrão.") +
-              "\\n\\nReiniciar o terminal agora?";
-            if (window.confirm(msg)) {{
-              toast("🔄 Rodando: " + cmd, "info");
-              fetch(BASE + "/api/run_terminal", {{
-                method: "POST",
-                headers: {{ "Content-Type": "application/json" }},
-                body: JSON.stringify({{ command: cmd, no_fallback: true }})
-              }}).then(() => {{
-                // Force iframe reload: blank → original URL after ttyd restarts
-                const fr = document.getElementById("terminal-frame");
-                const origSrc = fr.src.split("?")[0];
-                fr.src = "about:blank";
-                setTimeout(() => {{
-                  fr.src = origSrc + "?t=" + Date.now();
-                  toast("✅ Terminal recarregado com sessão!", "ok");
-                }}, 3500);
-              }}).catch(e => {{ toast("❌ Erro: " + e.message, "err"); }});
-            }}
-          }}, 600);
-
-        }} else {{
-          toast("❌ " + (d.error || "Erro ao importar"), "err");
-        }}
-
-      }} catch(e) {{
-        toast("❌ Falha na conexão: " + e.message, "err");
-      }}
-    }}
-
-    /* ── Provider list (all opencode-compatible) ───────────────── */
-    const PROVIDERS = [
-      {{ id:"anthropic",    name:"Anthropic",             env:"ANTHROPIC_API_KEY",          hint:"sk-ant-…"    }},
-      {{ id:"bedrock",      name:"AWS Bedrock",           env:"AWS_ACCESS_KEY_ID",          hint:"AKIA…"       }},
-      {{ id:"azure",        name:"Azure OpenAI",          env:"AZURE_OPENAI_API_KEY",       hint:"…"           }},
-      {{ id:"deepseek",     name:"DeepSeek",              env:"DEEPSEEK_API_KEY",           hint:"sk-…"        }},
-      {{ id:"google",       name:"Google Gemini",         env:"GOOGLE_GENERATIVE_AI_API_KEY",         hint:"AIza…"       }},
-      {{ id:"groq",         name:"Groq",                  env:"GROQ_API_KEY",               hint:"gsk_…"       }},
-      {{ id:"mistral",      name:"Mistral",               env:"MISTRAL_API_KEY",            hint:"…"           }},
-      {{ id:"nvidia",       name:"Nvidia NIM",            env:"NVIDIA_API_KEY",             hint:"nvapi-…"     }},
-      {{ id:"openai",       name:"OpenAI",                env:"OPENAI_API_KEY",             hint:"sk-…"        }},
-      {{ id:"opencode_go",  name:"OpenCode Go",           env:"OPENCODE_API_KEY",        hint:"sk-…"        }},
-      {{ id:"opencode_zen", name:"OpenCode Zen",          env:"OPENCODE_API_KEY",       hint:"sk-…"        }},
-      {{ id:"openrouter",   name:"OpenRouter",            env:"OPENROUTER_API_KEY",         hint:"sk-or-…"     }},
-      {{ id:"together",     name:"Together AI",           env:"TOGETHER_API_KEY",           hint:"…"           }},
-      {{ id:"vertex",       name:"Vertex AI",             env:"VERTEX_API_KEY",             hint:"…"           }},
-      {{ id:"xai",          name:"xAI (Grok)",            env:"XAI_API_KEY",                hint:"xai-…"       }},
-    ]
-
-    let _selProv = null;
-
-    function connectProvider() {{
-      // Build provider grid
-      const grid = document.getElementById("prov-list");
-      grid.innerHTML = PROVIDERS.map(p => `
-        <button onclick="selectProvider('${{p.id}}')" style="
-          display:flex;align-items:center;gap:8px;padding:9px 12px;
-          background:rgba(255,255,255,.03);border:1px solid var(--line);
-          border-radius:var(--radius);color:var(--ink-muted);
-          font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;
-          text-align:left;transition:background .12s,color .12s,border-color .12s;"
-          onmouseover="this.style.background='var(--accent-dim)';this.style.color='var(--accent)';this.style.borderColor='rgba(79,195,247,.35)'"
-          onmouseout="this.style.background='rgba(255,255,255,.03)';this.style.color='var(--ink-muted)';this.style.borderColor='var(--line)'">
-          ${{p.name}}
-        </button>
-      `).join("");
-      // Show step 1
-      document.getElementById("prov-step1").style.display = "block";
-      document.getElementById("prov-step2").style.display = "none";
-      document.getElementById("prov-key-input").value = "";
-      const overlay = document.getElementById("provider-overlay");
-      overlay.style.opacity = "1";
-      overlay.style.pointerEvents = "all";
-    }}
-
-    function selectProvider(id) {{
-      _selProv = PROVIDERS.find(p => p.id === id);
-      if (!_selProv) return;
-      document.getElementById("prov-name-title").textContent = _selProv.name;
-      document.getElementById("prov-env-code").textContent = _selProv.env;
-      document.getElementById("prov-cmd-preview").textContent =
-        `opencode --set-key ${{_selProv.id}}="<sua-key>"`;
-      document.getElementById("prov-key-input").placeholder = _selProv.hint || "Cole sua key aqui…";
-      // Check if already saved
-      fetch(BASE + "/api/apikey?provider=" + _selProv.id)
-        .then(r => r.json())
-        .then(d => {{ if (d.apikey) document.getElementById("prov-key-input").value = d.apikey; }})
-        .catch(() => {{}});
-      document.getElementById("prov-step1").style.display = "none";
-      document.getElementById("prov-step2").style.display = "block";
-      setTimeout(() => document.getElementById("prov-key-input").focus(), 80);
-    }}
-
-    function provBack() {{
-      document.getElementById("prov-step1").style.display = "block";
-      document.getElementById("prov-step2").style.display = "none";
-      document.getElementById("prov-key-input").value = "";
-    }}
-
-    function closeProvider() {{
-      const overlay = document.getElementById("provider-overlay");
-      overlay.style.opacity = "0";
-      overlay.style.pointerEvents = "none";
-      _selProv = null;
-    }}
-
-    async function confirmProvider() {{
-      const key = document.getElementById("prov-key-input").value.trim();
-      if (!key) {{ toast("⚠️ Insira a API key.", "err"); return; }}
-      if (!_selProv) {{ toast("⚠️ Selecione um provedor.", "err"); return; }}
-      const prov = _selProv; // capture before closeProvider() sets _selProv = null
-      closeProvider();
-
-      // 1. Save key to Drive
-      toast("💾 Salvando key no Drive…", "info");
-      try {{
-        const sr = await fetch(BASE + "/api/apikey", {{
-          method: "POST",
-          headers: {{ "Content-Type": "application/json" }},
-          body: JSON.stringify({{ provider: prov.id, env: prov.env, apikey: key }})
-        }});
-        const sd = await sr.json();
-        if (!sd.ok) {{ toast("❌ Erro ao salvar: " + (sd.error || ""), "err"); return; }}
-        toast("✅ Key salva no Drive!", "ok");
-      }} catch(e) {{
-        toast("❌ Falha ao salvar key: " + e.message, "err");
-        return;
-      }}
-
-      // 2. Run: export ENV="key" && opencode
-      const cmd = `export ${{prov.env}}="${{key}}" && opencode`;
-      toast("🔌 Configurando provedor e reiniciando terminal…", "info");
-      try {{
-        await fetch(BASE + "/api/run_terminal", {{
-          method: "POST",
-          headers: {{ "Content-Type": "application/json" }},
-          body: JSON.stringify({{ command: cmd, no_fallback: true }})
-        }});
-        const fr = document.getElementById("terminal-frame");
-        const origSrc = fr.src.split("?")[0];
-        fr.src = "about:blank";
-        setTimeout(() => {{
-          fr.src = origSrc + "?t=" + Date.now();
-          toast("✅ " + prov.name + " configurado! Terminal reaberto.", "ok");
-        }}, 3500);
-      }} catch(e) {{ toast("❌ Erro ao rodar comando.", "err"); }}
-    }}
-
-    /* ── 3.2 Dashboard de Saúde ──────────────────────────────── */
-    async function openHealth() {{
-      const overlay = document.getElementById("health-overlay");
-      overlay.style.opacity = "1"; overlay.style.pointerEvents = "all";
-      const list = document.getElementById("health-list");
-      list.innerHTML = '<div class="modal-empty">Carregando diagnóstico…</div>';
-      try {{
-        const r = await fetch(BASE + "/api/health");
-        const d = await r.json();
-        if (!d.ok) {{ list.innerHTML = '<div class="modal-empty">Erro ao carregar.</div>'; return; }}
-        const c = d.checks;
-        const row = (label, ok, okText="OK", failText="Falha", warn=false) =>
-          `<div class="health-row"><span>${{label}}</span>` +
-          `<span class="health-status ${{warn ? 'health-warn' : (ok ? 'health-ok' : 'health-fail')}}">${{warn ? '⚠️' : (ok ? '✅ ' + okText : '❌ ' + failText)}}</span></div>`;
-        const skillsList = c.skills_loaded && c.skills_loaded.length
-          ? c.skills_loaded.join(", ") : "(nenhuma)";
-        list.innerHTML =
-          row("Google Drive montado", c.drive_mounted) +
-          row("Diretório de backup existe", c.backup_dir_exists) +
-          row("ttyd ativo", c.ttyd_alive) +
-          row("OpenCode binário encontrado", c.opencode_found, "encontrado", "ausente") +
-          row("Arquivo de keys existe", c.keys_store_exists, "sim", "não", !c.keys_store_exists && c.keys_loaded_count === 0 ? false : !c.keys_store_exists) +
-          row("Chave de criptografia existe", c.encryption_key_exists, "sim", "não") +
-          row(`Keys carregadas (${{c.keys_loaded_count}})`, c.keys_loaded_count > 0, "ativas", "0 keys", c.keys_loaded_count === 0) +
-          row(`Skills instaladas (${{c.skills_count}})`, c.skills_count > 0, "OK", "0 skills", c.skills_count === 0) +
-          `<div class="health-row"><span>Skills: ${{skillsList}}</span></div>` +
-          row("ffmpeg disponível", c.ffmpeg_ok, "sim", "não", !c.ffmpeg_ok) +
-          row(`Espaço livre (${{c.disk_free_mb}} / ${{c.disk_total_mb}} MB)`, c.disk_free_mb > 100, "suficiente", "baixo", c.disk_free_mb >= 0 && c.disk_free_mb < 100) +
-          `<div class="health-row"><span>PesquisAI v${{d.version}}</span></div>`;
-      }} catch(e) {{
-        list.innerHTML = '<div class="modal-empty">Falha: ' + e.message + '</div>';
-      }}
-    }}
-    function closeHealth() {{
-      const o = document.getElementById("health-overlay");
-      o.style.opacity = "0"; o.style.pointerEvents = "none";
-    }}
-
-    /* ── 3.3 Histórico de Sessões ────────────────────────────── */
-    let _allSessions = [];
-    async function openSessions() {{
-      const overlay = document.getElementById("sessions-overlay");
-      overlay.style.opacity = "1"; overlay.style.pointerEvents = "all";
-      const list = document.getElementById("session-list");
-      list.innerHTML = '<div class="modal-empty">Carregando sessões…</div>';
-      document.getElementById("session-search").value = "";
-      try {{
-        const r = await fetch(BASE + "/api/sessions");
-        const d = await r.json();
-        _allSessions = d.sessions || [];
-        renderSessions(_allSessions);
-      }} catch(e) {{
-        list.innerHTML = '<div class="modal-empty">Falha: ' + e.message + '</div>';
-      }}
-    }}
-    function renderSessions(sessions) {{
-      const list = document.getElementById("session-list");
-      if (!sessions || sessions.length === 0) {{
-        list.innerHTML = '<div class="modal-empty">Nenhuma sessão encontrada.</div>';
-        return;
-      }}
-      list.innerHTML = sessions.map(s => {{
-        const id = typeof s === "string" ? s : (s.id || JSON.stringify(s).slice(0, 40));
-        const meta = typeof s === "object" && s !== null
-          ? Object.keys(s).filter(k => k !== "id").slice(0, 2).map(k => k + "=" + String(s[k]).slice(0,20)).join(" · ")
-          : "";
-        return `<div class="session-item" onclick="restoreSession('${{id}}')">` +
-          `<span>${{id.length > 32 ? id.slice(0,32) + "…" : id}}<br><span class="ses-meta">${{meta || "sem metadados"}}</span></span>` +
-          `<span class="restore-lbl">abrir</span></div>`;
-      }}).join("");
-    }}
-    function filterSessions() {{
-      const q = document.getElementById("session-search").value.toLowerCase().trim();
-      if (!q) {{ renderSessions(_allSessions); return; }}
-      const filtered = _allSessions.filter(s => {{
-        const txt = typeof s === "string" ? s : JSON.stringify(s);
-        return txt.toLowerCase().includes(q);
-      }});
-      renderSessions(filtered);
-    }}
-    async function restoreSession(id) {{
-      closeSessions();
-      const cmd = "opencode -s " + id;
-      toast("🔄 Abrindo sessão " + id.slice(0,12) + "…", "info");
-      try {{
-        await fetch(BASE + "/api/run_terminal", {{
-          method: "POST",
-          headers: {{ "Content-Type": "application/json" }},
-          body: JSON.stringify({{ command: cmd, no_fallback: true }})
-        }});
-        const fr = document.getElementById("terminal-frame");
-        const origSrc = fr.src.split("?")[0];
-        fr.src = "about:blank";
-        setTimeout(() => {{
-          fr.src = origSrc + "?t=" + Date.now();
-          toast("✅ Sessão aberta!", "ok");
-        }}, 3500);
-      }} catch(e) {{ toast("❌ Erro: " + e.message, "err"); }}
-    }}
-    function closeSessions() {{
-      const o = document.getElementById("sessions-overlay");
-      o.style.opacity = "0"; o.style.pointerEvents = "none";
-    }}
-
-    /* ── 3.6 Atalhos de Teclado ──────────────────────────────── */
-    function openShortcuts() {{
-      const o = document.getElementById("shortcuts-overlay");
-      o.style.opacity = "1"; o.style.pointerEvents = "all";
-    }}
-    function closeShortcuts() {{
-      const o = document.getElementById("shortcuts-overlay");
-      o.style.opacity = "0"; o.style.pointerEvents = "none";
-    }}
-
-    /* ── 3.8 Tema Claro/Escuro ────────────────────────────────── */
-    async function toggleTheme() {{
-      const btn = document.getElementById("theme-toggle");
-      const cur = btn.dataset.theme || "pesquisai";
-      const next = cur === "pesquisai" ? "pesquisai-light" : "pesquisai";
-      try {{
-        const r = await fetch(BASE + "/api/theme", {{
-          method: "POST",
-          headers: {{ "Content-Type": "application/json" }},
-          body: JSON.stringify({{ theme: next }})
-        }});
-        const d = await r.json();
-        if (d.ok) {{
-          btn.dataset.theme = next;
-          applyWrapperTheme(next);
-          toast(next === "pesquisai-light" ? "☀️ Tema claro (UI + terminal)" : "🌙 Tema escuro (UI + terminal)", "info");
-        }}
-      }} catch(e) {{ toast("❌ Erro ao trocar tema: " + e.message, "err"); }}
-    }}
-    function applyWrapperTheme(theme) {{
-      const root = document.documentElement;
-      if (theme === "pesquisai-light") {{
-        root.style.setProperty("--ink", "#1f262a");
-        root.style.setProperty("--ink-muted", "#4a5a62");
-        root.style.setProperty("--surface", "#f5f6f7");
-        root.style.setProperty("--rail", "#ffffff");
-        root.style.setProperty("--line", "rgba(0,0,0,.1)");
-        root.style.setProperty("--accent", "#0288d1");
-        root.style.setProperty("--accent-dim", "rgba(2,136,209,.1)");
-        root.style.setProperty("--accent-glow", "rgba(2,136,209,.2)");
-        root.style.setProperty("--green", "#2e7d32");
-        root.style.setProperty("--green-dim", "rgba(46,125,50,.1)");
-        root.style.setProperty("--amber", "#e65100");
-        root.style.setProperty("--amber-dim", "rgba(230,81,0,.1)");
-        root.style.setProperty("--red", "#c62828");
-        root.style.setProperty("--red-dim", "rgba(198,40,40,.1)");
-      }} else {{
-        root.style.setProperty("--ink", "#e8e6e0");
-        root.style.setProperty("--ink-muted", "#8a8780");
-        root.style.setProperty("--surface", "#0d0f10");
-        root.style.setProperty("--rail", "#151819");
-        root.style.setProperty("--line", "rgba(255,255,255,.07)");
-        root.style.setProperty("--accent", "#4fc3f7");
-        root.style.setProperty("--accent-dim", "rgba(79,195,247,.12)");
-        root.style.setProperty("--accent-glow", "rgba(79,195,247,.22)");
-        root.style.setProperty("--green", "#5dba7e");
-        root.style.setProperty("--green-dim", "rgba(93,186,126,.12)");
-        root.style.setProperty("--amber", "#e8b84b");
-        root.style.setProperty("--amber-dim", "rgba(232,184,75,.12)");
-        root.style.setProperty("--red", "#e07070");
-        root.style.setProperty("--red-dim", "rgba(224,112,112,.12)");
-      }}
-    }}
-    async function loadInitialTheme() {{
-      try {{
-        const r = await fetch(BASE + "/api/theme");
-        const d = await r.json();
-        if (d.theme === "pesquisai-light") {{
-          document.getElementById("theme-toggle").dataset.theme = "pesquisai-light";
-          applyWrapperTheme("pesquisai-light");
-        }}
-      }} catch(e) {{}}
-    }}
-
-    /* ── Listener tecla '?' abre atalhos ─────────────────────── */
-    document.addEventListener("keydown", (e) => {{
-      if (e.key === "?" && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) {{
-        e.preventDefault();
-        openShortcuts();
-      }}
-      if (e.key === "Escape") {{
-        closeHealth(); closeSessions(); closeShortcuts(); closeProvider(); closeModal();
-      }}
-    }});
-
-    /* ── Load saved keys on startup ─────────────────────────────── */
-    window.addEventListener("load", () => {{
-      fetch(BASE + "/api/apikey/apply", {{ method: "POST" }}).catch(() => {{}});
-      loadInitialTheme();
-    }});
-  </script>
-</body>
-</html>"""
-    
-    os.makedirs(WRAPPER_DIR, exist_ok=True)
-    with open(os.path.join(WRAPPER_DIR, "index.html"), "w", encoding="utf-8") as fh:
-        fh.write(wrapper_html)
 
 
 def start_wrapper_server():
@@ -1141,6 +331,18 @@ def start_wrapper_server():
     if restore_opencode_config_from_drive():
         print(f"🔑 Config do OpenCode restaurada do Drive.")
     
+    # v0.4.2.2: restaura idioma persistido (cookie/arquivo)
+    global _current_lang
+    try:
+        if os.path.exists(_LANG_COOKIE_FILE):
+            with open(_LANG_COOKIE_FILE, "r", encoding="utf-8") as f:
+                _current_lang = (f.read() or "pt_BR").strip()
+        elif os.environ.get("PESQUISAI_LANG"):
+            _current_lang = os.environ["PESQUISAI_LANG"]
+    except Exception:
+        _current_lang = "pt_BR"
+    print(f"🌐 Idioma inicial: {_current_lang}")
+    
     _loaded_keys = load_keys_from_drive(DRIVE_BACKUP_DIR, _env)
     if _loaded_keys:
         print(f"🔑 Keys carregadas do Drive: {', '.join(_loaded_keys)}")
@@ -1186,6 +388,11 @@ def start_wrapper_server():
                 except Exception:
                     sessions = [{"id": l.strip()} for l in r.stdout.splitlines() if l.strip()]
                 self._json(200, {"sessions": sessions})
+                return
+
+            if p == "/api/lang":
+                # v0.4.2.2: retorna o idioma atual persistido
+                self._json(200, {"lang": _current_lang, "greeting": get_greeting(_current_lang)})
                 return
             
             if p == "/api/backups":
@@ -1343,7 +550,80 @@ def start_wrapper_server():
                     }
                     self._json(200, {"keys": masked})
                 return
-            
+
+            if p == "/api/agents":
+                # v0.4.2: serve o AGENTS.md no idioma solicitado
+                # Suporta ?lang=pt_BR | en_US | es_ES | fr_FR (default pt_BR)
+                qs = parse_qs(urlparse(self.path).query)
+                lang = (qs.get("lang", ["pt_BR"])[0] or "pt_BR").strip()
+                lang_code = lang.split("_")[0].lower() if "_" in lang else lang.lower()
+                # Map pt_BR -> pt, en_US -> en, es_ES -> es, fr_FR -> fr
+                _valid = {"pt": "pt_BR", "en": "en_US", "es": "es_ES", "fr": "fr_FR"}
+                if lang_code in _valid:
+                    full = _valid[lang_code]
+                elif lang in _valid.values():
+                    full = lang
+                else:
+                    full = "pt_BR"
+                # Localiza o arquivo de diretriz apropriado.
+                # Estrutura esperada:
+                #   <raiz>/agents/AGENTS.<lang>.md   ← fonte primária (irmão de pesquisai/)
+                #   <raiz>/pesquisai/launch_app.py    ← este arquivo
+                _candidates = []
+                # 1. Irmão do módulo pesquisai/ (caso padrão do projeto)
+                here = os.path.dirname(os.path.abspath(__file__))
+                parent = os.path.dirname(here)
+                _candidates.append(os.path.join(parent, "agents"))
+                # 2. Níveis acima (caso esteja rodando de subpastas)
+                for _ in range(5):
+                    here = os.path.dirname(here)
+                    if here and here != os.path.dirname(here):
+                        _candidates.append(os.path.join(here, "agents"))
+                # 3. Folder do Drive configurado
+                if _folder_path:
+                    _candidates.append(os.path.join(_folder_path, "agents"))
+                    _candidates.append(os.path.join(os.path.dirname(_folder_path), "agents"))
+                # 4. CWD e home (último recurso)
+                _candidates.append(os.path.join(os.getcwd(), "agents"))
+                agents_dir = None
+                tried_dirs = []
+                for d in _candidates:
+                    tried_dirs.append(d)
+                    if os.path.isdir(d):
+                        agents_dir = d
+                        break
+                short = full.split("_")[0]
+                content = None
+                tried_files = []
+                if agents_dir:
+                    for fname in (f"AGENTS.{short}.md", f"AGENTS.{full}.md"):
+                        fpath = os.path.join(agents_dir, fname)
+                        tried_files.append(fpath)
+                        if os.path.isfile(fpath):
+                            try:
+                                with open(fpath, "r", encoding="utf-8") as f:
+                                    content = f.read()
+                                break
+                            except Exception as e:
+                                content = f"⚠️ Erro ao ler {fname}: {e}"
+                                break
+                if content is None:
+                    self._json(200, {
+                        "ok": False,
+                        "error": f"AGENTS.md não encontrado para o idioma '{full}'.",
+                        "tried_dirs": tried_dirs[:8],
+                        "tried_files": tried_files,
+                        "lang": full,
+                    })
+                    return
+                self._json(200, {
+                    "ok": True,
+                    "lang": full,
+                    "filename": f"AGENTS.{short}.md",
+                    "content": content,
+                })
+                return
+
             self.send_error(404)
         
         def do_POST(self):
@@ -1719,7 +999,32 @@ def start_wrapper_server():
                 except Exception as e:
                     self._json(500, {"error": str(e)})
                 return
-            
+
+            if p == "/api/lang":
+                # v0.4.2.2: persiste idioma e reinicia ttyd com saudação
+                # no novo idioma ao invés de --prompt "oi" genérico.
+                lang_in = (body.get("lang", "") or "").strip()
+                if not lang_in:
+                    self._json(400, {"error": "lang obrigatório (pt_BR/en_US/es_ES/fr_FR)"})
+                    return
+                _valid = {"pt": "pt_BR", "en": "en_US", "es": "es_ES", "fr": "fr_FR"}
+                short = lang_in.split("_")[0].lower() if "_" in lang_in else lang_in.lower()
+                full_lang = _valid.get(short, lang_in if lang_in in _valid.values() else "pt_BR")
+                ok = restart_ttyd_with_lang(full_lang)
+                if ok:
+                    self._json(200, {
+                        "ok": True,
+                        "lang": full_lang,
+                        "greeting": get_greeting(full_lang),
+                        "message": f"ttyd reiniciado com saudação em {full_lang}",
+                    })
+                else:
+                    self._json(500, {
+                        "ok": False,
+                        "error": "Falha ao reiniciar ttyd com o novo idioma.",
+                    })
+                return
+
             self.send_error(404)
     
     threading.Thread(

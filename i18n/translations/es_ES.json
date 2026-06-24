@@ -1,0 +1,91 @@
+{
+  "ui": {
+    "backup": "Guardar copia",
+    "restore": "Restaurar",
+    "drive": "Drive",
+    "settings": "Configuración",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "open": "Abrir",
+    "search": "Buscar",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito",
+    "warning": "Aviso",
+    "info": "Información"
+  },
+  "dashboard": {
+    "title": "Panel de Salud",
+    "drive_mounted": "Google Drive montado",
+    "backup_dir": "Directorio de copia existe",
+    "ttyd_active": "ttyd en ejecución",
+    "opencode_found": "OpenCode encontrado",
+    "keys_loaded": "Claves cargadas",
+    "skills_installed": "Skills instaladas",
+    "ffmpeg": "ffmpeg disponible",
+    "disk_free": "Espacio libre",
+    "version": "Versión"
+  },
+  "providers": {
+    "title": "Conectar proveedor de IA",
+    "select": "Seleccione el proveedor",
+    "api_key": "API KEY",
+    "placeholder": "Pegue su clave aquí…",
+    "save_connect": "Guardar y Conectar",
+    "back": "Volver",
+    "configuring": "Configurando proveedor y reiniciando terminal…",
+    "configured": "¡Proveedor configurado! Terminal reabierto.",
+    "saved_to_drive": "¡Clave guardada en Drive!",
+    "select_provider": "Seleccione un proveedor",
+    "insert_key": "Ingrese la API key"
+  },
+  "sessions": {
+    "title": "Historial de Sesiones",
+    "search_placeholder": "Buscar por id o contenido…",
+    "no_sessions": "No se encontraron sesiones.",
+    "open": "abrir"
+  },
+  "shortcuts": {
+    "title": "Atajos de Teclado",
+    "copy": "Copiar selección",
+    "copy_hint": "Mantenga Shift y seleccione",
+    "interrupt": "Interrumpir comando",
+    "paste": "Pegar (Chrome)",
+    "menu": "Menú y opciones",
+    "model": "Cambiar modelo",
+    "history_prev": "Historial anterior",
+    "history_next": "Historial siguiente"
+  },
+  "theme": {
+    "light": "Tema claro (UI + terminal)",
+    "dark": "Tema oscuro (UI + terminal)",
+    "toggle": "Alternar tema"
+  },
+  "languages": {
+    "pt_BR": "Portugués (Brasil)",
+    "en_US": "Inglés (Estados Unidos)",
+    "es_ES": "Español (España)"
+  },
+  "agents": {
+    "rules_title": "Reglas Absolutas",
+    "rule1": "Las referencias requieren citation-management",
+    "rule2": "No inventar datos/estadísticas",
+    "rule3": "No simular recolección primaria de datos",
+    "rule4": "Rechazar solicitudes que violen la integridad científica"
+  },
+  "errors": {
+    "drive_not_mounted": "Google Drive no está montado",
+    "no_opencode": "OpenCode no encontrado",
+    "no_data": "[SIN DATOS SUFICIENTES]",
+    "connection_failed": "Falló la conexión",
+    "invalid_key": "API key inválida"
+  },
+  "success_messages": {
+    "backup_saved": "Copia guardada",
+    "key_saved": "¡Clave guardada en Drive!",
+    "session_imported": "¡Sesión importada!",
+    "session_opened": "¡Sesión abierta!",
+    "config_applied": "Configuración aplicada"
+  }
+}
