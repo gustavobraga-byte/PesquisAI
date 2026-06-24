@@ -71,8 +71,8 @@ SKILL_MAPPINGS: list[tuple[str, str]] = [
     ("/tmp/skill_qualitativa", "qualitativa"),
     ("/tmp/skill_dados-brasil", "dados-brasil"),
     ("/tmp/skill_agrobr", "agrobr"),
-    ("/tmp/grant-finder", "grant-finder"),
-    ("/tmp/meta-search-br", "meta-search-br"),
+    ("/tmp/skill_grant-finder", "grant-finder"),
+    ("/tmp/skill_meta-search-br", "meta-search-br"),
 ]
 
 # Skills que o sistema considera ESSENCIAIS para funcionar
