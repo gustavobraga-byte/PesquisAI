@@ -147,11 +147,29 @@ v0.4.2.2 — Ses_10a4+ Polish (6 correções adicionais da sessão do usuário)
         v0.4.2.2, com fallback de versão hardcoded se o módulo não for
         encontrado.
 
-  14. 🧹 AGENTS.md multilíngues padronizados
-      - Problema: francês tinha `[lien]` em todos os 3 outros idiomas; pt/en/es
-        tinham `[link/enlace]` só para o francês. Padrão inconsistente.
-      - Correção: removido todo "- [link/lien/enlace](...)" das 4 variantes.
-        Formato final: `- `agents/AGENTS.<lang>.md` (nome do idioma)`.
+   14. 🧹 AGENTS.md multilíngues padronizados
+       - Problema: francês tinha `[lien]` em todos os 3 outros idiomas; pt/en/es
+         tinham `[link/enlace]` só para o francês. Padrão inconsistente.
+       - Correção: removido todo "- [link/lien/enlace](...)" das 4 variantes.
+         Formato final: `- `agents/AGENTS.<lang>.md` (nome do idioma)`.
+
+═════════════════════════════════════════════════════════════════════════
+v0.4.2.5 — Bugfix Rolagem Mobile via ttyd (1 correção crítica)
+═════════════════════════════════════════════════════════════════════════
+
+  15. 📱 Rolagem E zoom NÃO funcionam no mobile quando opencode é injetado via ttyd
+      - Problema: a versão responsiva do wrapper funciona (topbar, footer,
+        modais rolam), MAS o conteúdo DENTRO do iframe do ttyd (o terminal
+        xterm.js com a TUI do opencode) NÃO rola e NÃO faz zoom no mobile.
+      - Causa-raiz REAL: o xterm.js dentro do ttyd só rola via eventos `wheel`
+        (desktop). Em mobile, `wheel` não existe — são eventos `touchmove`. O
+        ttyd upstream NÃO converte touch→wheel. Nenhum CSS no wrapper resolve
+        isso porque o problema está DENTRO da página do ttyd (porta 8000).
+      - Correção (injeção de JS no HTML do ttyd via flag --index):
+        Ver `launch_app.py`: função `_prepare_ttyd_touch_index()` busca o HTML
+        do ttyd, injeta script com touch handlers (scroll + pinch-zoom), e
+        reinicia o ttyd com `--index`. O script injetado manipula
+        `.xterm-viewport.scrollTop` (scroll) e CSS `zoom` (pinch-to-zoom).
 
 Instalação:
     Editar ``pesquisai/launch_app.py`` e substituir a função
@@ -300,7 +318,7 @@ RESPONSIVE_CSS: str = """
     .btn-provider { padding: 0 6px; font-size: 9px; height: 22px; }
     .footer-oc { font-size: 9.5px; }
     /* terminal: ocupa mais espaço em mobile */
-    #terminal-frame { height: calc(100vh - 50px - 56px) !important; }
+    #terminal-frame { height: calc(100vh - 50px - 56px) !important; touch-action: pan-y !important; }
     /* modais: largura quase total */
     #modal, #provider-overlay > div, #health-overlay > div,
     #sessions-overlay > div, #shortcuts-overlay > div, #lang-overlay > div,
@@ -339,7 +357,7 @@ RESPONSIVE_CSS: str = """
     /* esconde GitHub link, mantém só email */
     .footer-link-footer-github { display: none; }
     /* terminal */
-    #terminal-frame { height: calc(100vh - 50px - 52px) !important; }
+    #terminal-frame { height: calc(100vh - 50px - 52px) !important; touch-action: pan-y !important; }
   }
 
   /* === Landscape em mobile (altura < 500px) === */
@@ -354,7 +372,7 @@ RESPONSIVE_CSS: str = """
     }
     .footer-row-2 { display: none; }
     .footer-ufv { display: none; }
-    #terminal-frame { height: calc(100vh - 40px - 30px) !important; }
+    #terminal-frame { height: calc(100vh - 40px - 30px) !important; touch-action: pan-y !important; }
   }
 
   /* === Tablet/iPad portrait: esconde UFV footer === */
@@ -746,6 +764,11 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       font-family: "DM Mono", monospace;
       overflow: hidden;
       -webkit-tap-highlight-color: transparent;
+      /* v0.4.2.5: rolagem mobile via ttyd — evita bounce/refresh do browser
+         e garante que gestos de toque não sejam descartados pelo body. */
+      overscroll-behavior: none;
+      touch-action: pan-y;
+      -webkit-touch-callout: none;
     }
 
     /* Touch: target mínimo 32x44 px (Apple HIG / WCAG 2.5.5) */
@@ -877,6 +900,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       inset: 50px 0 40px 0;
       width: 100%; height: calc(100vh - 90px);
       border: none;
+      /* v0.4.2.5: não bloquear touch — os handlers são injetados no HTML do ttyd via --index */
+      overscroll-behavior: contain;
     }
 
     #footer {
@@ -1087,7 +1112,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   allow="clipboard-read; clipboard-write"
   tabindex="0"
   autofocus
-  style="width:100%; height:calc(100% - 90px); border:none; outline:none;">
+  style="width:100%; height:calc(100vh - 90px); border:none; outline:none;">
 </iframe>
 
   <div id="footer">
@@ -2048,6 +2073,9 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       loadInitialTheme();
       // 3. Aplica keys no ambiente
       fetch(BASE + "/api/apikey/apply", { method: "POST" }).catch(() => {});
+      // v0.4.2.5: touch handlers (scroll + pinch-zoom) são injetados
+      // diretamente no HTML do ttyd via --index (ver launch_app.py).
+      // Nada a fazer aqui no wrapper — o iframe carrega o HTML custom.
     });
   </script>
 </body>
