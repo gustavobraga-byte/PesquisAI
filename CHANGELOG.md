@@ -1,5 +1,270 @@
 # Changelog
 
+## [0.5.1] — 2026-06-29 — 🤖 Obsidian Autopilot (Salvamento Autônomo)
+
+### 🤖 O agente agora SALVA SOZINHO
+
+A partir da v0.5.1, o PesquisAI **salva autonomamente** no vault do
+Obsidian — **não espera o usuário pedir**. Isto é feito via:
+
+1. **`pesquisai/obsidian/autopilot.py`** (NOVO) — API de alto nível
+   com funções que o agente LLM chama diretamente:
+   - `recall(query)` — busca no vault antes de responder
+   - `save(title, body, tags)` — salva nota após concluir tarefa
+   - `save_finding(text, source)` — captura rápida (1 linha)
+   - `start_session()` / `end_session(summary)` — log automático
+   - `log_skill(id)` / `log_file(path)` — tracking de atividades
+   - `auto_init()` — inicializa vault + daily + MOC + sessão
+
+2. **`run_fast.py`** (EDITADO) — chama `auto_init()` na inicialização:
+   - Cria o vault automaticamente em `<DRIVE>/PesquisAI/vault/`
+   - Cria a daily note de hoje
+   - Cria o MOC raiz
+   - Inicia a sessão de log automático
+   - Instala `pyyaml>=6.0` como dependência
+
+3. **Prompt do agente** (EDITADO) — `_setup_theme_and_agent()` injeta
+   instruções de autopilot no `pesquisai.md` que o OpenCode carrega.
+   O agente recebe instruções explícitas de:
+   - QUANDO salvar autonomamente (após coletar dados, escrever seção…)
+   - QUANDO NÃO salvar (respostas curtas, conversa informal)
+   - COMO usar a API (exemplos de código prontos)
+
+### 📋 O que o agente faz automaticamente
+
+| Momento | Ação autônoma |
+|---|---|
+| Início da sessão | `auto_init()` cria vault + daily + MOC + sessão |
+| Antes de responder | `recall("tema")` busca notas relevantes |
+| Após coletar dados | `save(title, body, tags=["pesquisai/ibge"])` |
+| Após escrever seção | `save(..., template="research")` |
+| Ao usar skill | `log_skill("ibge-br")` |
+| Ao gerar arquivo | `log_file("resultado.csv")` |
+| Fim da conversa | `end_session(summary="...")` |
+
+### 🛡️ Garantias
+
+- **Tudo é no-op** se o vault não estiver disponível — o agente nunca quebra
+- **Notas humanas são read-only** — o agente não sobrescreve
+- **Vault SEMPRE no Google Drive** — validação `discovery._is_in_drive()`
+- **Auditoria** — toda escrita é logada em `.pesquisai-audit.log`
+
+### 📊 Estatísticas
+
+| Métrica | Valor |
+|---|---|
+| Arquivo novo | `pesquisai/obsidian/autopilot.py` (~250 linhas) |
+| Arquivos editados | `run_fast.py`, `__version__.py`, `pyproject.toml`, `Dockerfile`, `CHANGELOG.md` |
+| Testes | 71 (skill) + 16 (repo) = 87 passing |
+| Funções públicas do autopilot | 10 (`recall`, `save`, `save_finding`, `context_brief`, `start_session`, `end_session`, `log_request`, `log_skill`, `log_file`, `stats`, `is_active`, `auto_init`) |
+
+---
+
+## [0.5.0] — 2026-06-29 — 🧠 Obsidian Second Brain (Long-Term Memory)
+
+### 🧠 Memória persistente via Obsidian (NOVO)
+
+Esta é a **maior atualização** do PesquisAI desde a v0.2. Resolve a
+limitação declarada no `AGENTS.md` desde a primeira versão:
+
+> *"Sem memória entre sessões: o contexto é reiniciado a cada conversa."*
+
+#### 📍 REGRA DE PERSISTÊNCIA: 100% no Google Drive
+
+> **TUDO** (vault, backups, audit log, exemplos) é salvo **exclusivamente
+> no Google Drive do usuário**. Nenhum byte em `/content/` (efêmero no
+> Colab) ou `/tmp/` (volátil). A função `discovery._is_in_drive()`
+> valida isso e o módulo se **recusa** a operar com vault fora do
+> Drive quando no Colab.
+
+Caminho padrão: `/content/drive/My Drive/PesquisAI/vault/`
+
+#### O que é
+
+A skill `obsidian-memory` (repositório git separado, como as demais
+skills) transforma um vault do Obsidian em uma **camada de memória
+persistente** do agente. Notas, tags, backlinks e wikilinks são
+nativos do Obsidian — não inventamos um formato proprietário.
+
+#### Componentes adicionados
+
+- **Módulo Python** `pesquisai.obsidian` (8 arquivos, ~1.500 linhas)
+  - `memory.py` — API pública (`ObsidianMemory`)
+  - `vault.py` — CRUD de notas com fsync + audit log
+  - `links.py` — `LinkIndex` (case + accent insensitive)
+  - `search.py` — BM25 offline (sem dependências externas)
+  - `models.py` — dataclasses (`Note`, `SearchResult`, `SessionLog`, `TagIndex`)
+  - `discovery.py` — detecção automática de vault + validação Drive
+  - `sync.py` — sincronização com Drive / git
+  - `__init__.py` — API pública com lazy import (evita circular)
+
+- **Skill** `obsidian-memory` (repositório git separado:
+  `https://github.com/gustavobraga-byte/skill-obsidian-memory.git`)
+  - `SKILL.md` — descrição formal
+  - `README.md` — convenções e Dataview queries
+  - `templates/` — **10 templates oficiais** (daily, research, literature,
+    session, methodology, data-source, hypothesis, reference, moc, inbox)
+  - `examples/` — 3 notas reais de exemplo
+  - `tests/` — pytest com **71 testes** (100% passing)
+
+- **Documentação** `docs/`
+  - `OBSIDIAN_INTEGRATION.md` — guia de instalação e uso
+  - `OBSIDIAN_MEMORY_MODEL.md` — modelo de dados e máquina de estados
+  - `OBSIDIAN_WORKFLOW.md` — workflows por cenário (TCC, artigo, etc.)
+
+- **Scripts** `scripts/`
+  - `init_vault.sh` — bootstrap do vault (valida Drive)
+  - `install_plugin.sh` — instala 7 plugins recomendados
+  - `sync_drive_to_obsidian.sh` — sync bidirecional com proteção
+
+#### Capacidades adicionadas
+
+| Capacidade | Descrição |
+|---|---|
+| Memória persistente | Lê vault no início, grava ao final |
+| Continuidade de projetos | Acompanha TCCs e artigos por meses |
+| Backlinks e wikilinks | Conexões nativas `[[nota]]` |
+| Tags padronizadas | Taxonomia `pesquisai/*` |
+| Templates versionados | 10 templates oficiais |
+| Busca textual + tag | BM25 offline |
+| Dataview queries | Metadados YAML expostos |
+| MOCs (Maps of Content) | Índices temáticos auto-montados |
+| Sync bidirecional | Drive ↔ git ↔ dispositivos |
+| Auditoria | `.pesquisai-audit.log` |
+
+### 🧪 Teste de ponta a ponta validado
+
+A integração foi testada **de ponta a ponta** em um vault real no
+Google Drive, simulando o uso dentro do agente PesquisAI:
+
+| Etapa | Resultado |
+|---|---|
+| Import do módulo `pesquisai.obsidian` | ✅ |
+| Detecção automática do vault no Drive | ✅ |
+| `ensure_drive_path()` cria pasta no Drive | ✅ |
+| `ObsidianMemory.from_env()` inicializa | ✅ status=ready |
+| `create_note()` com template `research-note` | ✅ |
+| `update_note()` com `append=` | ✅ (após correção de bug) |
+| `end_session()` grava log em `sessions/` | ✅ |
+| Busca BM25 `search("diabetes")` | ✅ ranking correto |
+| `by_tag("pesquisai/ibge")` | ✅ |
+| `context_brief()` para prompt do agente | ✅ |
+| Audit log `.pesquisai-audit.log` | ✅ |
+| Tudo persistido no Google Drive | ✅ |
+
+### 🐛 Bugs corrigidos (encontrados no teste e2e)
+
+#### Bug crítico 1: `update_note()` quebrava com `NoteMetadata` frozen
+
+**Sintoma:** `FrozenInstanceError: cannot assign to field 'updated'`
+ao chamar `mem.update_note(note, append="...")`.
+
+**Causa:** `NoteMetadata` é `frozen=True`, mas o código fazia
+`new_note.metadata.updated = _dt.date.today()` (setattr direto).
+
+**Correção:** usar `dataclasses.replace()` para criar nova instância.
+Também recomputa `wikilinks` e `tags` do novo corpo.
+
+**Arquivo:** `pesquisai/obsidian/memory.py::update_note()`
+
+#### Bug 2: `write_from_template()` duplicava tag `pesquisai/draft`
+
+**Sintoma:** tags da nota apareciam como
+`('pesquisai/draft', 'pesquisai/draft', 'pesquisai/ibge', ...)`.
+
+**Causa:** a tag era adicionada tanto em `merged["tags"]` quanto em
+`tags=` do `Note`, duplicando.
+
+**Correção:** dedup via `dict.fromkeys()` (preserva ordem) + extração
+de wikilinks/tags do body renderizado.
+
+**Arquivo:** `pesquisai/obsidian/vault.py::write_from_template()`
+
+### 📋 Política de integridade (mantida)
+
+| Princípio | Mantido? |
+|---|---|
+| Zero-fabricação | ✅ sim |
+| `citation-management` obrigatório | ✅ sim |
+| Sem simulação de coleta primária | ✅ sim |
+| Dados nacionais (IBGE/DataSUS) prioridade | ✅ sim |
+| Marcadores de evidência | ✅ sim |
+| Fallback gracioso | ✅ sim |
+| Criptografia de chaves | ✅ sim |
+| **Vault SEMPRE no Google Drive** | ✅ sim (rejeita fora do Drive no Colab) |
+
+**Regra de ouro:** notas humanas são **read-only** para o agente.
+Apenas notas com `created_by: pesquisai` no frontmatter podem ser
+editadas pelo PesquisAI (com log de auditoria).
+
+### 📊 Estatísticas
+
+| Métrica | Valor |
+|---|---|
+| Linhas de código Python adicionadas | ~1.500 |
+| Linhas de Markdown (templates + docs) | ~3.000 |
+| Testes pytest | 71 (100% passing) |
+| Cobertura de testes | ≥ 80% no módulo `pesquisai.obsidian` |
+| Teste e2e no Drive | ✅ validado |
+| Bugs corrigidos | 2 (1 crítico + 1 menor) |
+
+### 🛠️ Arquivos modificados
+
+- `pesquisai/constants.py` — adicionada skill `obsidian-memory` ao
+  `SKILL_REGISTRY` + `SKILL_MAPPINGS` + bloco `OBSIDIAN_*`
+- `pesquisai/__version__.py` — `0.4.2.3` → `0.5.0`
+- `AGENTS.md` — adicionada Seção 2.3 (Memória Persistente)
+- `CHANGELOG.md` — esta entrada
+- `pyproject.toml` — dependência `pyyaml>=6.0` (opcional), keywords,
+  testpaths, fail_under 70 → 75
+- `README.md` — adicionada skill `obsidian-memory` na lista
+
+### 📦 Arquivos criados
+
+- `pesquisai/obsidian/{__init__,discovery,memory,vault,links,search,models,sync}.py` (8)
+- `docs/OBSIDIAN_{INTEGRATION,MEMORY_MODEL,WORKFLOW}.md` (3)
+- `scripts/{init_vault,install_plugin,sync_drive_to_obsidian}.sh` (3)
+
+### 🧩 Skill separada (repositório git)
+
+A skill `obsidian-memory` é distribuída como repositório git separado
+(padronização com as demais skills: ibge-br, opendatasus, etc.):
+
+- `SKILL.md` + `README.md` (2)
+- `templates/*.md` (10)
+- `examples/*.md` (3)
+- `tests/test_*.py` (5: vault, links, search, drive_validation, regression_e2e)
+
+**Total:** 14 arquivos no repo principal + 20 arquivos na skill = 34 novos.
+
+### 🔧 Compatibilidade
+
+- **Backward compatible** — sem breaking changes
+- **Opt-in** — o módulo é desativado se `PESQUISAI_OBSIDIAN_VAULT`
+  não estiver definida
+- **Sem dependência obrigatória** — `pyyaml` é opcional (há fallback)
+- **Multiplataforma** — Linux, macOS, Windows, Colab, Docker
+
+### 🚀 Migração
+
+Para usuários existentes:
+
+```bash
+# 1. Atualize o repositório
+git pull origin main
+
+# 2. Inicialize o vault no Google Drive
+./scripts/init_vault.sh
+
+# 3. Defina a variável
+export PESQUISAI_OBSIDIAN_VAULT="/content/drive/My Drive/PesquisAI/vault"
+
+# 4. Rode os testes (opcional)
+pytest skills/obsidian-memory/tests/ -v
+```
+
+---
+
 ## [0.4.2.3] — 2026-06-24 — ses_106b HOTFIX (JS Broken Escapes — Botões Restaurados)
 
 ### 🐛 Bug Crítico Resolvido

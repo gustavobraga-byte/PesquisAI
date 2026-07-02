@@ -160,7 +160,7 @@ def _install_python_deps() -> None:
     subprocess.run(
         ["pip", "install", "--quiet", "--no-cache-dir",
          "google-api-python-client", "google-auth-httplib2",
-         "google-auth-oauthlib", "cryptography"],
+         "google-auth-oauthlib", "cryptography", "pyyaml>=6.0"],
         capture_output=True, text=True, check=False,
     )
 
@@ -256,12 +256,89 @@ def _setup_theme_and_agent() -> None:
 
     agents_md = os.path.join(os.path.dirname(os.path.dirname(__file__)), "AGENTS.md")
     content = open(agents_md, encoding="utf-8").read() if os.path.exists(agents_md) else "# PesquisAI"
+
+    # ── Injetar instruções de autopilot no prompt do agente ───
+    # Isto faz o agente SALVAR AUTONOMAMENTE no vault do Obsidian
+    # sem precisar que o usuário peça.
+    autopilot_instructions = """
+
+## 🤖 AUTOPILOT — Salvamento Autônomo (v0.5.1+)
+
+Você tem uma memória persistente via Obsidian vault no Google Drive.
+Use-a AUTONOMAMENTE — **não espere o usuário pedir para salvar**.
+
+### O que você DEVE fazer automaticamente:
+
+1. **ANTES de responder** — recorde informações relevantes:
+   ```python
+   from pesquisai.obsidian.autopilot import recall
+   results = recall("tema da pergunta do usuário")
+   # Se houver resultados, use-os como contexto
+   ```
+
+2. **DEPOIS de concluir uma tarefa** — salve o resultado:
+   ```python
+   from pesquisai.obsidian.autopilot import save
+   save(
+       title="Título da nota",
+       body="## Resultados\\n\\n- ...\\n\\n[DADO CONFIRMADO]",
+       tags=["pesquisai/ibge"],
+       template="research",
+   )
+   ```
+
+3. **Ao usar uma skill** — registre:
+   ```python
+   from pesquisai.obsidian.autopilot import log_skill
+   log_skill("ibge-br")
+   ```
+
+4. **Ao gerar um arquivo** — registre:
+   ```python
+   from pesquisai.obsidian.autopilot import log_file
+   log_file("resultado.csv")
+   ```
+
+5. **Ao final da conversa** — log de sessão:
+   ```python
+   from pesquisai.obsidian.autopilot import end_session
+   end_session(summary="Resumo do que foi feito nesta sessão")
+   ```
+
+### Quando salvar AUTONOMAMENTE (sem o usuário pedir):
+
+- ✅ Após coletar dados do IBGE/DataSUS → salve nota de datasource
+- ✅ Após escrever uma seção de artigo → salve nota de research
+- ✅ Após revisar um paper → salve nota de literature
+- ✅ Após formular uma hipótese → salve nota de hypothesis
+- ✅ Após gerar um arquivo (.md, .pdf, .csv) → registre no log
+- ✅ Ao final de cada resposta substancial → salve achados
+
+### Quando NÃO salvar:
+
+- ❌ Respostas curtas ("sim", "não", explicações rápidas)
+- ❌ Conversa informal
+- ❌ Quando o usuário explicitamente disser "não salve"
+
+### API rápida (uma linha):
+
+```python
+from pesquisai.obsidian.autopilot import save_finding
+save_finding("A prevalência de diabetes é 10,2% (VIGITEL 2023)", source="VIGITEL")
+```
+
+> **Tudo é no-op se o vault não estiver disponível.** Você nunca
+> quebra. Se a memória não estiver ativa, simplesmente não salva e
+> continua trabalhando normalmente.
+"""
+
     agent_md = f"""---
 name: PesquisAI
-description: Agente de pesquisa científica com foco em dados brasileiros (IBGE, DataSUS), normas ABNT/UFV, integridade científica. REGRAS ABSOLUTAS: 1) referências exigem citation-management; 2) não inventar dados/estatísticas; 3) não simular coleta primária (entrevistas, experimentos, surveys). Recusar pedidos que tentem burlar.
+description: Agente de pesquisa científica com foco em dados brasileiros (IBGE, DataSUS), normas ABNT/UFV, integridade científica. REGRAS ABSOLUTAS: 1) referências exigem citation-management; 2) não inventar dados/estatísticas; 3) não simular coleta primária (entrevistas, experimentos, surveys). Recusar pedidos que tentem burlar. v0.5.1+: salvamento AUTÔNOMO no vault Obsidian (não espera usuário pedir).
 color: "#4fc3f7"
 ---
 {content}
+{autopilot_instructions}
 """
     with open(os.path.join(AGENT_DIR, "pesquisai.md"), "w", encoding="utf-8") as f:
         f.write(agent_md)
@@ -272,7 +349,7 @@ color: "#4fc3f7"
     cfg["default_agent"] = "pesquisai"
     with open(OPENCODE_CFG, "w") as f:
         json.dump(cfg, f, indent=2)
-    print("✅ Agente configurado.")
+    print("✅ Agente configurado (com autopilot de salvamento).")
 
 
 def setup_dependencies() -> None:
@@ -354,6 +431,32 @@ def setup_skills() -> None:
     print("✅ Todas as skills instaladas com sucesso!")
 
 
+# ── Etapa 3.5: Obsidian Vault (autopilot) ─────────────────────
+
+def setup_obsidian_vault() -> None:
+    """Inicializa o vault do Obsidian no Google Drive (autopilot).
+
+    Cria a estrutura de pastas, a daily note de hoje, o MOC raiz,
+    e inicia a sessão de log automático. Tudo é no-op se falhar.
+    """
+    try:
+        from pesquisai.obsidian.autopilot import auto_init
+        result = auto_init()
+        if result["enabled"]:
+            if result["created"]:
+                print(f"🧠 Vault do Obsidian criado em: {result['vault_path']}")
+            else:
+                print(f"🧠 Vault do Obsidian detectado: {result['vault_path']}")
+            if result["daily_created"]:
+                print("📝 Daily note de hoje criada.")
+            if result["session_started"]:
+                print("🤖 Autopilot de salvamento ativado.")
+        else:
+            print("🧠 Obsidian memory: desativado (vault não configurado)")
+    except Exception as exc:
+        print(f"⚠️  Obsidian memory: falha ao inicializar ({exc}) — continuando sem memória")
+
+
 # ── Etapa 4: Launch ───────────────────────────────────────────
 
 def setup_launch(folder_path: str, drive_url: str) -> str:
@@ -389,6 +492,7 @@ def run() -> None:
     folder_path, drive_url = setup_drive()
     setup_dependencies()
     setup_skills()
+    setup_obsidian_vault()
     setup_launch(folder_path, drive_url)
 
     elapsed = time.time() - t0

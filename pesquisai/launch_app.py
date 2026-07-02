@@ -5,6 +5,7 @@ import threading
 import json
 import shutil
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 
 try:
@@ -980,13 +981,465 @@ def start_wrapper_server():
                 })
                 return
 
+            if p == "/api/obsidian":
+                # v0.5.1.2: status da memória Obsidian (segundo cérebro)
+                # Lê o vault via pesquisai.obsidian (módulo oficial).
+                # Retorna JSON com:
+                #   - enabled / status / root
+                #   - notes_count / tags_count / recent_notes / recent_daily
+                #   - templates / templates_path
+                #   - message (string amigável i18n pronta para toast)
+                result = {
+                    "ok": True,
+                    "enabled": False,
+                    "status": "disabled",
+                    "root": None,
+                    "writable": False,
+                    "notes_count": 0,
+                    "tags_count": 0,
+                    "avg_note_length": 0,
+                    "links": {"edges": 0, "nodes": 0},
+                    "recent_notes": [],
+                    "recent_daily": [],
+                    "templates": [],
+                    "templates_path": None,
+                    "message": "Módulo Obsidian não instalado.",
+                    "version": VERSION,
+                }
+                try:
+                    from pesquisai.obsidian import ObsidianMemory, ObsidianMemoryStatus
+                    mem = ObsidianMemory.from_env()
+                    if mem.status == ObsidianMemoryStatus.DISABLED:
+                        result["status"] = "disabled"
+                        result["message"] = (
+                            "Memória desativada. Defina PESQUISAI_OBSIDIAN_VAULT "
+                            "apontando para a pasta vault/ no Drive."
+                        )
+                    elif mem.status == ObsidianMemoryStatus.NO_VAULT:
+                        result["status"] = "no_vault"
+                        result["root"] = str(mem.root) if mem.root else None
+                        result["message"] = (
+                            "PESQUISAI_OBSIDIAN_VAULT definida, mas a pasta não existe. "
+                            "Crie a pasta vault/ no Google Drive."
+                        )
+                    elif mem.status == ObsidianMemoryStatus.READ_ONLY:
+                        result["status"] = "read_only"
+                        result["root"] = str(mem.root) if mem.root else None
+                        result["message"] = (
+                            "Vault existe, mas sem permissão de escrita. "
+                            f"Verifique as permissões de {mem.root}."
+                        )
+                    elif mem.status == ObsidianMemoryStatus.ERROR:
+                        result["status"] = "error"
+                        result["message"] = (
+                            f"Erro ao abrir vault: {mem.last_error or 'desconhecido'}"
+                        )
+                    elif mem.status == ObsidianMemoryStatus.READY:
+                        stats = mem.stats()
+                        # Notas recentes (top 5)
+                        recent = []
+                        try:
+                            for s in mem.search("", limit=5):
+                                n = s.note
+                                if n:
+                                    recent.append({
+                                        "path": n.path,
+                                        "title": n.metadata.title if n.metadata else n.path,
+                                        "tags": list(n.tags[:6]),
+                                        "length": len(n.body or ""),
+                                    })
+                        except Exception:
+                            pass
+                        # Daily notes recentes (top 3)
+                        recent_daily = []
+                        try:
+                            for n in mem.recent_daily_notes(limit=3):
+                                recent_daily.append({
+                                    "path": n.path,
+                                    "title": n.metadata.title if n.metadata else n.path,
+                                })
+                        except Exception:
+                            pass
+                        # Templates oficiais
+                        templates = []
+                        templates_path = None
+                        try:
+                            from pathlib import Path as _P
+                            # 1) skill instalada
+                            skill_tpl = _P.home() / ".agents" / "skills" / "obsidian-memory" / "templates"
+                            # 2) skills/obsidian-memory/templates (dev local)
+                            here = _P(__file__).resolve().parent
+                            dev_tpl = here.parent / "skills" / "obsidian-memory" / "templates"
+                            for cand in (skill_tpl, dev_tpl):
+                                if cand.is_dir():
+                                    templates_path = str(cand)
+                                    templates = sorted(
+                                        f.stem for f in cand.glob("*.md")
+                                    )
+                                    break
+                        except Exception:
+                            pass
+                        result.update({
+                            "enabled": True,
+                            "status": "ready",
+                            "root": stats.get("root"),
+                            "writable": True,
+                            "notes_count": stats.get("notes", 0),
+                            "tags_count": stats.get("tags", 0),
+                            "avg_note_length": stats.get("avg_note_length", 0),
+                            "links": stats.get("links", {"edges": 0, "nodes": 0}),
+                            "recent_notes": recent,
+                            "recent_daily": recent_daily,
+                            "templates": templates,
+                            "templates_path": templates_path,
+                            "message": "Memória ativa.",
+                        })
+                    else:
+                        result["status"] = str(mem.status.value)
+                        result["message"] = f"Status desconhecido: {mem.status.value}"
+                except ImportError:
+                    result["status"] = "module_unavailable"
+                    result["message"] = (
+                        "Módulo pesquisai.obsidian não encontrado. "
+                        "Verifique se o pacote foi instalado."
+                    )
+                except Exception as e:  # noqa: BLE001
+                    result["ok"] = False
+                    result["status"] = "error"
+                    result["message"] = f"Erro inesperado: {e!r}"
+                self._json(200, result)
+                return
+
+            # ════════════════════════════════════════════════════════════
+            # v0.5.1.4 — Memória Obsidian: navegar, ler, buscar, tags
+            # ════════════════════════════════════════════════════════════
+
+            if p == "/api/obsidian/note":
+                # GET /api/obsidian/note?path=foo/bar.md
+                # Lê o conteúdo cru (markdown com frontmatter) de uma nota.
+                q = urlparse(self.path).query
+                qp = parse_qs(q)
+                rel_path = (qp.get("path", [""])[0] or "").strip()
+                if not rel_path:
+                    self._json(400, {"error": "path obrigatório."})
+                    return
+                try:
+                    from pesquisai.obsidian import ObsidianMemory, ObsidianMemoryStatus
+                    mem = ObsidianMemory.from_env()
+                    if mem.status != ObsidianMemoryStatus.READY:
+                        self._json(409, {
+                            "ok": False,
+                            "error": f"Memória não está pronta (status={mem.status.value}).",
+                            "status": mem.status.value,
+                        })
+                        return
+                    note = mem.get(rel_path)
+                    if note is None:
+                        self._json(404, {"error": f"Nota não encontrada: {rel_path}"})
+                        return
+                    raw = note.to_markdown()
+                    self._json(200, {
+                        "ok": True,
+                        "path": note.path,
+                        "title": note.metadata.title,
+                        "tags": list(note.tags),
+                        "wikilinks": list(note.wikilinks),
+                        "is_pesquisai_generated": note.is_pesquisai_generated,
+                        "created": note.metadata.created.isoformat() if note.metadata.created else None,
+                        "updated": note.metadata.updated.isoformat() if note.metadata.updated else None,
+                        "body": note.body,
+                        "raw": raw,
+                        "metadata": note.metadata.to_dict(),
+                    })
+                except PermissionError as e:
+                    self._json(403, {"ok": False, "error": str(e)})
+                except FileNotFoundError as e:
+                    self._json(404, {"ok": False, "error": str(e)})
+                except Exception as e:  # noqa: BLE001
+                    self._json(500, {"ok": False, "error": f"Erro: {e!r}"})
+                return
+
+            if p == "/api/obsidian/tree":
+                # GET /api/obsidian/tree?subdir=research
+                # Retorna árvore de pastas com notas e metadados resumidos.
+                q = urlparse(self.path).query
+                qp = parse_qs(q)
+                subdir = (qp.get("subdir", [""])[0] or "").strip() or None
+                try:
+                    from pesquisai.obsidian import ObsidianMemory, ObsidianMemoryStatus
+                    mem = ObsidianMemory.from_env()
+                    if mem.status != ObsidianMemoryStatus.READY:
+                        self._json(409, {"ok": False, "error": f"status={mem.status.value}"})
+                        return
+                    assert mem._vault is not None
+                    tree: list[dict] = []
+                    base = (mem._vault.root / subdir) if subdir else mem._vault.root
+                    if not base.is_dir():
+                        self._json(200, {"ok": True, "tree": [], "subdir": subdir or ""})
+                        return
+                    # Agrupa por pasta de primeiro nível
+                    folders: dict[str, list[dict]] = {}
+                    for note in mem._vault.iter_notes(subdir=subdir):
+                        rel = note.path
+                        folder = str(Path(rel).parent) if "/" in rel else ""
+                        folders.setdefault(folder, []).append({
+                            "path": note.path,
+                            "title": note.metadata.title,
+                            "tags": list(note.tags)[:6],
+                            "length": len(note.body or ""),
+                            "updated": note.metadata.updated.isoformat() if note.metadata.updated else None,
+                            "is_pesquisai_generated": note.is_pesquisai_generated,
+                        })
+                    # Ordena pastas e notas
+                    for folder in sorted(folders):
+                        tree.append({
+                            "folder": folder,
+                            "notes": sorted(folders[folder], key=lambda n: n["title"].lower()),
+                        })
+                    self._json(200, {
+                        "ok": True,
+                        "root": str(mem._vault.root),
+                        "subdir": subdir or "",
+                        "tree": tree,
+                        "total": sum(len(t["notes"]) for t in tree),
+                    })
+                except Exception as e:  # noqa: BLE001
+                    self._json(500, {"ok": False, "error": f"Erro: {e!r}"})
+                return
+
+            if p == "/api/obsidian/search":
+                # GET /api/obsidian/search?q=foo&limit=20
+                q = urlparse(self.path).query
+                qp = parse_qs(q)
+                query = (qp.get("q", [""])[0] or "").strip()
+                try:
+                    limit = int(qp.get("limit", ["20"])[0])
+                except ValueError:
+                    limit = 20
+                limit = max(1, min(limit, 100))
+                try:
+                    from pesquisai.obsidian import ObsidianMemory, ObsidianMemoryStatus
+                    mem = ObsidianMemory.from_env()
+                    if mem.status != ObsidianMemoryStatus.READY:
+                        self._json(409, {"ok": False, "error": f"status={mem.status.value}"})
+                        return
+                    # Se query vazia, lista todas (top N por path)
+                    if not query:
+                        results = []
+                        for note in mem._vault.iter_notes():
+                            results.append({
+                                "path": note.path,
+                                "title": note.metadata.title,
+                                "snippet": (note.body or "")[:160].replace("\n", " "),
+                                "tags": list(note.tags)[:6],
+                                "score": 0.0,
+                                "matched_field": "all",
+                            })
+                        results.sort(key=lambda r: r["path"], reverse=True)
+                        results = results[:limit]
+                    else:
+                        sr = mem.search(query, limit=limit)
+                        results = [r.to_dict() for r in sr]
+                    self._json(200, {
+                        "ok": True,
+                        "query": query,
+                        "results": results,
+                        "count": len(results),
+                    })
+                except Exception as e:  # noqa: BLE001
+                    self._json(500, {"ok": False, "error": f"Erro: {e!r}"})
+                return
+
+            if p == "/api/obsidian/tags":
+                # GET /api/obsidian/tags — lista de tags com contagem
+                try:
+                    from pesquisai.obsidian import ObsidianMemory, ObsidianMemoryStatus
+                    mem = ObsidianMemory.from_env()
+                    if mem.status != ObsidianMemoryStatus.READY:
+                        self._json(409, {"ok": False, "error": f"status={mem.status.value}"})
+                        return
+                    summary = mem.tags_summary()
+                    # Ordena por contagem desc
+                    tags_list = sorted(
+                        [{"tag": t, "count": c} for t, c in summary.items()],
+                        key=lambda x: (-x["count"], x["tag"]),
+                    )
+                    self._json(200, {
+                        "ok": True,
+                        "tags": tags_list,
+                        "count": len(tags_list),
+                    })
+                except Exception as e:  # noqa: BLE001
+                    self._json(500, {"ok": False, "error": f"Erro: {e!r}"})
+                return
+
             self.send_error(404)
-        
+
         def do_POST(self):
             p = urlparse(self.path).path
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length)) if length else {}
-            
+
+            # ════════════════════════════════════════════════════════════
+            # v0.5.1.4 — Memória Obsidian: salvar, criar, deletar nota
+            # ════════════════════════════════════════════════════════════
+            if p == "/api/obsidian/note":
+                action = (body.get("action", "save") or "save").lower().strip()
+                try:
+                    from pesquisai.obsidian import ObsidianMemory, ObsidianMemoryStatus
+                    from pesquisai.obsidian.models import Note, NoteMetadata
+                    from pesquisai.obsidian.models import extract_wikilinks, extract_tags
+                    import datetime as _dt
+                    from dataclasses import replace as _dc_replace
+                    mem = ObsidianMemory.from_env()
+                    if mem.status != ObsidianMemoryStatus.READY:
+                        self._json(409, {"ok": False, "error": f"status={mem.status.value}"})
+                        return
+                    assert mem._vault is not None
+
+                    if action == "save":
+                        rel_path = (body.get("path", "") or "").strip()
+                        if not rel_path:
+                            self._json(400, {"ok": False, "error": "path obrigatório."})
+                            return
+                        force = bool(body.get("force", False))
+                        new_body = body.get("body", "")
+                        new_title = (body.get("title", "") or "").strip()
+                        new_tags_in = body.get("tags", []) or []
+                        new_tags = tuple(t.strip() for t in new_tags_in if t and str(t).strip())
+
+                        existing = mem.get(rel_path)
+                        today = _dt.date.today()
+                        if existing is not None:
+                            final_tags = new_tags or existing.metadata.tags
+                            updated_meta = _dc_replace(
+                                existing.metadata,
+                                title=new_title or existing.metadata.title,
+                                updated=today,
+                                tags=final_tags,
+                            )
+                            body_wikilinks = extract_wikilinks(new_body)
+                            body_tags = extract_tags(new_body)
+                            merged_tags = tuple(sorted(set(updated_meta.tags) | set(body_tags)))
+                            new_note = Note(
+                                path=existing.path,
+                                metadata=updated_meta,
+                                body=new_body,
+                                wikilinks=body_wikilinks,
+                                tags=merged_tags,
+                            )
+                            try:
+                                mem._vault.write(new_note, force=force)
+                            except PermissionError as e:
+                                self._json(403, {
+                                    "ok": False, "error": str(e),
+                                    "hint": "Nota humana: envie force=true para sobrescrever.",
+                                })
+                                return
+                        else:
+                            meta = NoteMetadata(
+                                title=new_title or Path(rel_path).stem,
+                                created=today,
+                                updated=today,
+                                tags=new_tags or ("pesquisai/draft",),
+                                created_by="pesquisai",
+                                status="draft",
+                            )
+                            body_wikilinks = extract_wikilinks(new_body)
+                            body_tags = extract_tags(new_body)
+                            merged_tags = tuple(sorted(set(meta.tags) | set(body_tags)))
+                            new_note = Note(
+                                path=rel_path,
+                                metadata=meta,
+                                body=new_body,
+                                wikilinks=body_wikilinks,
+                                tags=merged_tags,
+                            )
+                            mem._vault.write(new_note, force=force)
+                        if mem._searcher is not None:
+                            mem._searcher.invalidate()
+                        self._json(200, {
+                            "ok": True,
+                            "action": "save",
+                            "path": rel_path,
+                            "message": f"Nota '{rel_path}' salva.",
+                        })
+                        return
+
+                    if action == "create":
+                        rel_path = (body.get("path", "") or "").strip()
+                        if not rel_path:
+                            self._json(400, {"ok": False, "error": "path obrigatório."})
+                            return
+                        if mem._vault.exists(rel_path):
+                            self._json(409, {
+                                "ok": False,
+                                "error": f"Já existe: {rel_path}. Use action=save.",
+                            })
+                            return
+                        title = (body.get("title", "") or "").strip() or Path(rel_path).stem
+                        template = (body.get("template", "inbox") or "inbox").strip()
+                        tags_in = body.get("tags", []) or []
+                        tags = tuple(t.strip() for t in tags_in if t and str(t).strip())
+                        context = dict(body.get("context", {}) or {})
+                        context["title"] = title
+                        note = mem.create_note(
+                            rel_path, title=title, template=template,
+                            tags=tags, context=context,
+                        )
+                        if note is None:
+                            self._json(500, {"ok": False, "error": "Falha ao criar nota."})
+                            return
+                        if mem._searcher is not None:
+                            mem._searcher.invalidate()
+                        self._json(200, {
+                            "ok": True,
+                            "action": "create",
+                            "path": note.path,
+                            "title": note.metadata.title,
+                            "message": f"Nota '{note.path}' criada a partir do template '{template}'.",
+                        })
+                        return
+
+                    if action == "delete":
+                        rel_path = (body.get("path", "") or "").strip()
+                        if not rel_path:
+                            self._json(400, {"ok": False, "error": "path obrigatório."})
+                            return
+                        force = bool(body.get("force", False))
+                        try:
+                            deleted = mem._vault.delete(rel_path, force=force)
+                        except PermissionError as e:
+                            self._json(403, {
+                                "ok": False, "error": str(e),
+                                "hint": "Nota humana: envie force=true para deletar.",
+                            })
+                            return
+                        if not deleted:
+                            self._json(404, {
+                                "ok": False, "error": f"Nota não encontrada: {rel_path}",
+                            })
+                            return
+                        if mem._searcher is not None:
+                            mem._searcher.invalidate()
+                        self._json(200, {
+                            "ok": True,
+                            "action": "delete",
+                            "path": rel_path,
+                            "message": f"Nota '{rel_path}' movida para .trash/.",
+                        })
+                        return
+
+                    self._json(400, {"ok": False, "error": f"action inválida: {action}"})
+                    return
+                except PermissionError as e:
+                    self._json(403, {"ok": False, "error": str(e)})
+                except FileNotFoundError as e:
+                    self._json(404, {"ok": False, "error": str(e)})
+                except Exception as e:  # noqa: BLE001
+                    self._json(500, {"ok": False, "error": f"Erro: {e!r}"})
+                return
+
             if p == "/api/apikey":
                 provider = body.get("provider", "").strip()
                 env_var  = body.get("env", "").strip()

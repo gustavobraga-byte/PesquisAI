@@ -11,7 +11,7 @@ FROM python:3.11-slim
 
 LABEL org.opencontainers.image.title="PesquisAI"
 LABEL org.opencontainers.image.description="Agente de IA para Pesquisa Científica com foco em dados brasileiros"
-LABEL org.opencontainers.image.version="0.2.3"
+LABEL org.opencontainers.image.version="0.5.1"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.source="https://github.com/gustavobraga-byte/PesquisAI"
 

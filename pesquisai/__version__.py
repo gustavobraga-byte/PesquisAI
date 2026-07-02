@@ -23,7 +23,59 @@ Compatível com o PesquisAI principal (v0.2.1+).
 
 ═════════════════════════════════════════════════════════════════════════
 Histórico de versões:
-═════════════════════════════════════════════════════════════════════════
+════════════════════════════════════════════════════════════════════════
+  v0.5.1.4 — 🧠 Editor de Memória Obsidian no botão 🧠
+    v0.5.1.5 — 🔧 Botões não funcionavam (SyntaxError JS em string multilinha)
+            • NOVO split view no overlay de Memória: lista de notas
+              à esquerda + editor markdown com tabs Edit/Preview/Split
+              à direita
+            • 4 endpoints REST novos:
+              GET  /api/obsidian/note?path=...     — ler nota crua
+              GET  /api/obsidian/tree?subdir=...  — árvore agrupada
+              GET  /api/obsidian/search?q=...     — busca BM25
+              GET  /api/obsidian/tags             — tags com contagem
+            • POST /api/obsidian/note (3 actions):
+              action=save   — sobrescrever nota (force=true para humanas)
+              action=create — criar nova nota de template
+              action=delete — mover para .trash/ (force=true para humanas)
+            • Buscar (debounce 150ms), editar com dirty indicator, salvar
+              com confirmação, criar com diálogo de template, excluir
+              com confirmação
+            • Preview markdown via marked.js com destaque de [[wikilinks]]
+              e #tags; estilo obsidian-like
+            • 20 novas chaves i18n (memory.editor.*) em pt_BR, en_US,
+              es_ES, fr_FR
+            • Bugfix: from pathlib import Path (faltava — quebrava tree)
+  v0.5.1.3 — 🔌 Conectores de Provedor de IA não salvavam (confirmProvider)
+            • Bugfix: confirmProvider() crashava com TypeError antes de
+              salvar a API key
+            • Captura local de _selProv.id/env/name antes de closeProvider()
+            • Verifica r.ok e d.ok no fetch (antes: sempre "✅ Salvo!")
+            • closeProvider() movido para após sucesso
+            • Não altera o array PROVIDERS (opencode_go/zen compartilham
+              OPENCODE_API_KEY por design)
+  v0.5.1.2 — 🧠 Botão Memória Obsidian no topbar
+            • Overlay de Memória mostra status (ready/disabled/...) +
+              stats (notas, tags, links) + notas recentes + daily notes
+            • Endpoints: GET /api/obsidian (status)
+  v0.5.1  — 🤖 Obsidian Autopilot (salvamento autônomo)
+            • Módulo pesquisai.obsidian.autopilot (API de alto nível)
+            • run_fast.py chama auto_init() na inicialização
+            • Vault é CRIADO AUTOMATICAMENTE no Google Drive
+            • Daily note e MOC raiz criados automaticamente
+            • Sessão de log iniciada automaticamente
+            • AGENTS.md injetado com instruções de salvamento autônomo
+            • O agente SALVA SOZINHO — não espera o usuário pedir
+            • API: recall(), save(), save_finding(), end_session()
+  v0.5.0  — 🧠 Obsidian Second Brain (Long-Term Memory)
+            • Módulo pesquisai.obsidian (8 arquivos, ~1.500 linhas)
+            • Skill obsidian-memory (repositório git separado)
+            • 10 templates Obsidian (daily, research, literature, ...)
+            • Memória persistente entre sessões via vault no Google Drive
+            • Busca BM25 offline + backlinks + wikilinks + tags
+            • REGRA: vault SEMPRE no Google Drive (rejeita fora no Colab)
+            • 71 testes pytest (100% passing) + teste e2e validado
+            • Bugs corrigidos: update_note frozen + write_from_template dedup
   v0.4.0  — Release inicial com agente de pesquisa
   v0.4.1  — UI Fixes (Responsive + Theme + Language)
             • 6 media queries + hamburger menu
@@ -68,11 +120,11 @@ Histórico de versões:
 """
 
 # ── Versão semântica (SemVer) ──────────────────────────────────
-__version__: str = "0.4.2.3"
+__version__: str = "0.5.1.5"
 
 # ── Metadados do release ───────────────────────────────────────
-__release_date__: str = "2026-06-24"
-__codename__: str = "ses_106b hotfix (JS broken escapes — buttons restored)"
+__release_date__: str = "2026-07-01"
+__codename__: str = "obsidian memory editor (navigate + edit inside the 🧠 button)"
 
 # ── Identidade do projeto ──────────────────────────────────────
 __author__: str = "Gustavo Bastos Braga"
@@ -184,6 +236,12 @@ __api_endpoints__: list[str] = [
     "GET  /api/agents?lang=xx_XX",  # v0.4.2: serve AGENTS.md no idioma
     "POST /api/lang",               # NOVO v0.4.2.2: persiste idioma
     "GET  /api/lang",               # NOVO v0.4.2.2: lê idioma atual
+    "GET  /api/obsidian",           # v0.5.1.2: status da memória
+    "GET  /api/obsidian/note",      # NOVO v0.5.1.4: ler nota
+    "GET  /api/obsidian/tree",      # NOVO v0.5.1.4: árvore de pastas
+    "GET  /api/obsidian/search",    # NOVO v0.5.1.4: busca BM25
+    "GET  /api/obsidian/tags",      # NOVO v0.5.1.4: lista de tags
+    "POST /api/obsidian/note",      # NOVO v0.5.1.4: save/create/delete
 ]
 
 

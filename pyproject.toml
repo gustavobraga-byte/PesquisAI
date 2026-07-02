@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pesquisai-additions"
-version = "0.4.2.2"
-description = "PesquisAI v0.4.2.2 — ses_10a4+ polish (footer PC + skills + sessions + lang + version) + grant_finder + i18n (4 idiomas) + skills (grant-finder, meta-search-br)"
+version = "0.5.1"
+description = "PesquisAI v0.5.1 — obsidian autopilot (autonomous saving) + grant_finder + i18n (4 idiomas) + skills (grant-finder, meta-search-br, obsidian-memory)"
 authors = [
     { name = "Gustavo Bastos Braga", email = "gustavo.braga@ufv.br" },
 ]
@@ -26,6 +26,10 @@ keywords = [
     "fapemig",
     "ufv",
     "brazilian-research",
+    "obsidian",
+    "second-brain",
+    "persistent-memory",
+    "knowledge-graph",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -60,6 +64,9 @@ test = [
     "pytest-cov>=5.0",
     "requests-mock>=1.11",
 ]
+obsidian = [
+    "pyyaml>=6.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/gustavobraga-byte/PesquisAI"
@@ -85,7 +92,13 @@ packages = [
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-testpaths = ["grant_finder/tests", "i18n/tests", "skills/meta-search-br/tests"]
+testpaths = [
+    "grant_finder/tests",
+    "i18n/tests",
+    "skills/meta-search-br/tests",
+    "skills/obsidian-memory/tests",
+    "tests",
+]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -96,6 +109,7 @@ addopts = [
     "--tb=short",
     "--cov=grant_finder",
     "--cov=i18n",
+    "--cov=pesquisai/obsidian",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
@@ -108,7 +122,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 branch = true
-source = ["grant_finder", "i18n"]
+source = ["grant_finder", "i18n", "pesquisai/obsidian"]
 omit = [
     "*/tests/*",
     "*/__pycache__/*",
@@ -126,7 +140,7 @@ exclude_lines = [
 ]
 show_missing = true
 precision = 2
-fail_under = 70
+fail_under = 75
 
 [tool.ruff]
 line-length = 100

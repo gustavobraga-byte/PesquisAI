@@ -685,6 +685,12 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       <button class="tb-icon" onclick="openShortcuts()" title="Atalhos de Teclado" data-i18n-title="shortcuts.title">
         <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/></svg>
       </button>
+      <button class="tb-icon" onclick="openAgents()" title="Diretrizes do Agente" data-i18n-title="agents.title">
+        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h7"/></svg>
+      </button>
+      <button class="tb-icon" onclick="openMemory()" id="memory-btn" title="Memória Obsidian" data-i18n-title="memory.tooltip">
+        <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 3 1.5 5 3 7l1 1v3a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-3l1-1c1.5-2 3-4 3-7a7 7 0 0 0-7-7z"/><path d="M9 22h6"/><path d="M12 2v20"/></svg>
+      </button>
       <button class="tb-icon" onclick="toggleTheme()" id="theme-toggle" title="Alternar tema" data-theme="pesquisai" data-i18n-title="theme.toggle">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       </button>
@@ -739,6 +745,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     <button class="modal-close" onclick="openHealth(); toggleMobileMenu();">🩺 <span data-i18n="dashboard.title">Dashboard de Saúde</span></button>
     <button class="modal-close" onclick="openSessions(); toggleMobileMenu();">📜 <span data-i18n="sessions.title">Histórico de Sessões</span></button>
     <button class="modal-close" onclick="openShortcuts(); toggleMobileMenu();">⌨️ <span data-i18n="shortcuts.title">Atalhos de Teclado</span></button>
+    <button class="modal-close" onclick="openAgents(); toggleMobileMenu();">📋 <span data-i18n="agents.title">Diretrizes do Agente</span></button>
+    <button class="modal-close" onclick="openMemory(); toggleMobileMenu();">🧠 <span data-i18n="memory.title">Memória Obsidian</span></button>
     <button class="modal-close" onclick="toggleTheme(); toggleMobileMenu();">◑ <span data-i18n="theme.toggle">Alternar Tema</span></button>
     <button class="modal-close" onclick="toggleLangMenu();">🌐 <span data-i18n="languages.label">Idioma</span></button>
   </div>
@@ -855,6 +863,190 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
+  <!-- Modal de Diretrizes do Agente (v0.4.2 + markdown render v0.4.2.1) — HOTFIX v0.5.1.2 -->
+  <div id="agents-overlay" onclick="if(event.target===this)closeAgents()" style="position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+    <div id="agents-modal" class="modal-shell" style="border-radius:10px;padding:0;width:680px;max-width:94vw;max-height:88vh;box-shadow:0 28px 72px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;">
+      <div style="padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">📋</span>
+        <div style="flex:1;min-width:0;">
+          <div class="modal-title" style="margin-bottom:2px;" data-i18n="agents.title">Diretrizes do Agente</div>
+          <div style="font-size:10.5px;color:var(--ink-muted);" data-i18n="agents.subtitle">Regras e princípios do PesquisAI (AGENTS.md)</div>
+        </div>
+        <span id="agents-lang-badge" style="font-size:10px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;color:var(--ink-muted);font-family:'DM Mono',monospace;">PT-BR</span>
+        <button onclick="closeAgents()" class="modal-close" style="width:auto;padding:4px 10px;font-size:11px;" aria-label="Fechar">✕</button>
+      </div>
+      <div id="agents-content" class="markdown-body" style="flex:1;overflow-y:auto;padding:22px 26px;font-size:12.5px;line-height:1.65;color:var(--ink);background:transparent;" data-i18n="agents.loading">Carregando diretrizes…</div>
+      <div style="padding:10px 18px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.02);">
+        <button onclick="copyAgents()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="agents.copy">Copiar</button>
+        <button onclick="reloadAgents()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;">↻ <span data-i18n="ui.loading">Recarregar</span></button>
+        <div style="flex:1;"></div>
+        <a id="agents-source-link" href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/agents/AGENTS.pt.md" target="_blank" class="footer-link" style="font-size:10.5px;" data-i18n="agents.open_source">Ver fonte</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Memória Obsidian (v0.5.1.4 — navegar + editar) -->
+  <div id="memory-overlay" onclick="if(event.target===this)closeMemory()" style="position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:0;width:980px;max-width:96vw;max-height:92vh;box-shadow:0 28px 72px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;">
+      <!-- Header -->
+      <div style="padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">🧠</span>
+        <div style="flex:1;min-width:0;">
+          <div class="modal-title" style="margin-bottom:2px;" data-i18n="memory.title">Memória Obsidian</div>
+          <div id="memory-subtitle" style="font-size:10.5px;color:var(--ink-muted);" data-i18n="memory.subtitle">Camada de memória persistente do agente</div>
+        </div>
+        <span id="memory-status-badge" style="font-size:10px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;color:var(--ink-muted);font-family:'DM Mono',monospace;">…</span>
+        <span id="memory-dirty-indicator" style="display:none;font-size:10px;padding:2px 8px;background:var(--amber);color:#000;border-radius:3px;font-weight:600;">● <span data-i18n="memory.dirty">não salvo</span></span>
+        <button onclick="closeMemory()" class="modal-close" style="width:auto;padding:4px 10px;font-size:11px;" aria-label="Fechar">✕</button>
+      </div>
+
+      <!-- Split view: lista (esq) + editor (dir) -->
+      <div style="flex:1;display:flex;min-height:0;">
+        <!-- Coluna esquerda: busca + lista -->
+        <div id="memory-sidebar" style="width:300px;border-right:1px solid var(--line);display:flex;flex-direction:column;background:rgba(0,0,0,.18);">
+          <div style="padding:10px 12px;border-bottom:1px solid var(--line);">
+            <input id="memory-search-input" type="text" placeholder="🔍 Buscar…" data-i18n-placeholder="memory.search_placeholder" oninput="searchMemory(this.value)" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:6px 8px;font-size:11.5px;font-family:inherit;outline:none;" />
+          </div>
+          <div id="memory-list" style="flex:1;overflow-y:auto;padding:6px 8px;font-size:12px;">
+            <div class="modal-empty" data-i18n="ui.loading">Carregando…</div>
+          </div>
+          <div style="padding:8px 12px;border-top:1px solid var(--line);display:flex;gap:6px;align-items:center;font-size:10.5px;color:var(--ink-muted);">
+            <span id="memory-count">—</span>
+            <div style="flex:1;"></div>
+            <button onclick="openCreateNoteDialog()" class="modal-close" style="width:auto;padding:4px 8px;font-size:11px;" title="Nova nota" data-i18n-title="memory.new_note_title">+ <span data-i18n="memory.new_note">Nova</span></button>
+          </div>
+        </div>
+
+        <!-- Coluna direita: editor + preview -->
+        <div id="memory-editor-pane" style="flex:1;display:flex;flex-direction:column;min-width:0;">
+          <!-- Meta da nota -->
+          <div id="memory-note-meta" style="padding:10px 14px;border-bottom:1px solid var(--line);display:none;align-items:center;gap:8px;background:rgba(255,255,255,.02);">
+            <div style="flex:1;min-width:0;">
+              <input id="memory-note-title" type="text" placeholder="Título" data-i18n-placeholder="memory.note_title" oninput="markDirty()" style="width:100%;background:transparent;border:none;color:var(--ink);font-size:13px;font-weight:500;outline:none;font-family:inherit;" />
+              <div id="memory-note-path" style="font-size:10px;color:var(--ink-muted);font-family:'DM Mono',monospace;margin-top:2px;word-break:break-all;">—</div>
+            </div>
+            <div id="memory-note-tags-display" style="display:flex;flex-wrap:wrap;gap:3px;max-width:280px;"></div>
+          </div>
+
+          <!-- Tabs Edit/Preview -->
+          <div id="memory-editor-tabs" style="display:none;padding:6px 14px 0;border-bottom:1px solid var(--line);background:rgba(255,255,255,.01);">
+            <button id="memory-tab-edit" class="mem-tab active" onclick="switchMemoryTab('edit')" data-i18n="memory.tab_edit">Editar</button>
+            <button id="memory-tab-preview" class="mem-tab" onclick="switchMemoryTab('preview')" data-i18n="memory.tab_preview">Preview</button>
+            <button id="memory-tab-split" class="mem-tab" onclick="switchMemoryTab('split')" data-i18n="memory.tab_split">Dividido</button>
+          </div>
+
+          <!-- Editor + Preview -->
+          <div id="memory-editor-body" style="flex:1;display:flex;min-height:0;background:rgba(0,0,0,.2);">
+            <textarea id="memory-editor" spellcheck="false" oninput="onEditorInput()" style="flex:1;background:transparent;color:var(--ink);border:none;outline:none;resize:none;padding:14px;font-family:'DM Mono',monospace;font-size:12px;line-height:1.55;display:none;" data-i18n-placeholder="memory.body_placeholder" placeholder="Selecione uma nota à esquerda ou crie uma nova."></textarea>
+            <div id="memory-preview" style="flex:1;overflow-y:auto;padding:14px 18px;font-size:12.5px;line-height:1.6;color:var(--ink);display:none;"></div>
+            <div class="modal-empty" id="memory-editor-empty" style="margin:auto;color:var(--ink-muted);text-align:center;padding:20px;">
+              <div style="font-size:30px;margin-bottom:10px;opacity:.5;">🧠</div>
+              <div data-i18n="memory.empty_editor">Selecione uma nota na lista ou crie uma nova.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:10px 18px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.02);">
+        <button onclick="openMemory(true)" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="memory.refresh">↻ Atualizar</button>
+        <button onclick="openCreateNoteDialog()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="memory.new_note">+ Nova nota</button>
+        <div style="flex:1;"></div>
+        <button id="memory-btn-save" onclick="saveCurrentNote()" disabled style="width:auto;padding:5px 14px;font-size:11px;background:var(--green);color:#000;border:1px solid var(--green);border-radius:4px;font-weight:600;cursor:not-allowed;opacity:.4;" data-i18n="memory.save">💾 Salvar</button>
+        <button id="memory-btn-delete" onclick="deleteCurrentNote()" disabled style="width:auto;padding:5px 12px;font-size:11px;background:transparent;color:var(--red);border:1px solid var(--red);border-radius:4px;cursor:not-allowed;opacity:.4;" data-i18n="memory.delete">🗑 Excluir</button>
+        <a id="memory-open-drive" href="#" target="_blank" class="footer-link" style="font-size:10.5px;display:none;" data-i18n="memory.open_vault">Abrir Drive</a>
+        <button onclick="closeMemory()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="ui.close">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub-modal: criar nova nota (v0.5.1.4) -->
+  <div id="memory-new-overlay" onclick="if(event.target===this)closeCreateNoteDialog()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:100000;opacity:0;pointer-events:none;transition:opacity .15s;">
+    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:18px;width:420px;max-width:92vw;box-shadow:0 16px 40px rgba(0,0,0,.6);">
+      <div style="font-size:13px;font-weight:600;margin-bottom:14px;" data-i18n="memory.new_note_dialog_title">📝 Nova nota</div>
+      <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="memory.field_path">Caminho (ex: research/minha-nota.md)</label>
+      <input id="memory-new-path" type="text" placeholder="research/minha-nota.md" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;font-family:'DM Mono',monospace;outline:none;margin-bottom:10px;" />
+      <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="memory.field_title">Título</label>
+      <input id="memory-new-title" type="text" placeholder="Título da nota" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;outline:none;margin-bottom:10px;" />
+      <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="memory.field_template">Template</label>
+      <select id="memory-new-template" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;outline:none;margin-bottom:10px;">
+        <option value="inbox">inbox</option>
+      </select>
+      <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="memory.field_tags">Tags (separadas por vírgula, opcional)</label>
+      <input id="memory-new-tags" type="text" placeholder="pesquisai/research, foo/bar" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;outline:none;margin-bottom:14px;" />
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="closeCreateNoteDialog()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="ui.cancel">Cancelar</button>
+        <button onclick="submitCreateNote()" class="modal-close" style="width:auto;padding:5px 14px;font-size:11px;background:var(--accent);color:#000;border:1px solid var(--accent);border-radius:4px;font-weight:600;" data-i18n="memory.create">Criar</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* v0.5.1.4 — Editor de memória Obsidian */
+    .mem-tab {
+      background: transparent; color: var(--ink-muted); border: none;
+      border-bottom: 2px solid transparent; padding: 6px 12px; font-size: 11.5px;
+      cursor: pointer; font-family: inherit; transition: all .15s;
+    }
+    .mem-tab:hover { color: var(--ink); }
+    .mem-tab.active { color: var(--ink); border-bottom-color: var(--accent); }
+    .mem-note-item {
+      padding: 6px 8px; border-radius: 4px; cursor: pointer; margin-bottom: 2px;
+      transition: background .12s; border-left: 2px solid transparent;
+    }
+    .mem-note-item:hover { background: rgba(255,255,255,.04); }
+    .mem-note-item.active {
+      background: rgba(var(--accent-rgb, 99, 179, 237), .12);
+      border-left-color: var(--accent);
+    }
+    .mem-note-item .mem-note-title {
+      font-size: 12px; color: var(--ink); font-weight: 500;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .mem-note-item .mem-note-path {
+      font-size: 9.5px; color: var(--ink-muted); font-family: 'DM Mono', monospace;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .mem-note-item.human .mem-note-title::before {
+      content: '✎ '; color: var(--ink-muted);
+    }
+    .mem-folder-label {
+      font-size: 9.5px; color: var(--ink-muted); text-transform: uppercase;
+      letter-spacing: .05em; padding: 8px 4px 4px; font-weight: 600;
+    }
+    .mem-preview h1, .mem-preview h2, .mem-preview h3 {
+      color: var(--ink); margin: 0.6em 0 0.3em; font-weight: 600;
+    }
+    .mem-preview h1 { font-size: 17px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+    .mem-preview h2 { font-size: 15px; }
+    .mem-preview h3 { font-size: 13.5px; }
+    .mem-preview p { margin: 0.5em 0; }
+    .mem-preview code {
+      background: rgba(255,255,255,.06); padding: 1px 4px; border-radius: 3px;
+      font-family: 'DM Mono', monospace; font-size: 11.5px;
+    }
+    .mem-preview pre {
+      background: rgba(0,0,0,.3); padding: 8px 10px; border-radius: 4px;
+      overflow-x: auto; font-size: 11.5px;
+    }
+    .mem-preview pre code { background: transparent; padding: 0; }
+    .mem-preview blockquote {
+      border-left: 3px solid var(--accent); margin: 0.5em 0;
+      padding: 4px 10px; color: var(--ink-muted);
+    }
+    .mem-preview a { color: var(--accent); text-decoration: none; }
+    .mem-preview ul, .mem-preview ol { padding-left: 1.5em; margin: 0.4em 0; }
+    .mem-preview .wikilink {
+      background: rgba(var(--accent-rgb, 99, 179, 237), .1);
+      color: var(--accent); padding: 1px 5px; border-radius: 3px;
+      font-family: 'DM Mono', monospace; font-size: 11px;
+    }
+    .mem-preview .tag {
+      background: var(--accent-dim); color: var(--accent);
+      padding: 1px 6px; border-radius: 3px; font-size: 10.5px; margin-right: 3px;
+    }
+    .mem-preview hr { border: none; border-top: 1px solid var(--line); margin: 1em 0; }
+  </style>
   <script>
     // ════════════════════════════════════════════════════════════
     // PesquisAI v0.4.1 — Patch corretivo
@@ -1161,16 +1353,29 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       const key = document.getElementById("prov-key-input").value.trim();
       if (!key) { toast("⚠️ Insira a API key.", "err"); return; }
       if (!_selProv) { toast("⚠️ Selecione um provedor.", "err"); return; }
-      closeProvider();
+      // 🐛 HOTFIX v0.5.1.3 — guardar refs em variáveis locais ANTES de fechar overlay
+      // O bug original: closeProvider() setava _selProv = null, e a linha seguinte
+      // (_selProv.id no JSON.stringify) crashava com "Cannot read properties of null".
+      const provId = _selProv.id;
+      const provEnv = _selProv.env;
+      const provName = _selProv.name;
       toast("💾 Salvando…", "info");
       try {
-        await fetch(BASE + "/api/apikey", {
+        const r = await fetch(BASE + "/api/apikey", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ provider: _selProv.id, env: _selProv.env, apikey: key })
+          body: JSON.stringify({ provider: provId, env: provEnv, apikey: key })
         });
-        toast("✅ Salvo!", "ok");
-      } catch(e) { toast("❌ " + e.message, "err"); }
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && (d.ok !== false)) {
+          toast(`✅ ${provName} conectado!`, "ok");
+          closeProvider();
+        } else {
+          toast("❌ " + (d.error || `Erro HTTP ${r.status}`), "err");
+        }
+      } catch(e) {
+        toast("❌ " + e.message, "err");
+      }
     }
 
     async function openHealth() {
@@ -1199,6 +1404,574 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     function closeShortcuts() {
       const o = document.getElementById("shortcuts-overlay");
       o.style.opacity = "0"; o.style.pointerEvents = "none";
+    }
+
+    // ── Diretrizes do Agente (HOTFIX v0.5.1.2) ──────────────────
+    // Carrega o AGENTS.md no idioma atual do backend.
+    // Endpoint: GET /api/agents?lang=pt_BR
+    let _agentsCache = null;
+    let _agentsCacheLang = null;
+
+    async function openAgents() {
+      const overlay = document.getElementById("agents-overlay");
+      if (overlay) {
+        overlay.style.opacity = "1";
+        overlay.style.pointerEvents = "all";
+      }
+      await loadAgents();
+    }
+
+    function closeAgents() {
+      const overlay = document.getElementById("agents-overlay");
+      if (overlay) {
+        overlay.style.opacity = "0";
+        overlay.style.pointerEvents = "none";
+      }
+    }
+
+    async function loadAgents(forceReload = false) {
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const contentEl = document.getElementById("agents-content");
+      const badgeEl = document.getElementById("agents-lang-badge");
+      const sourceEl = document.getElementById("agents-source-link");
+      if (!contentEl) return;
+
+      const langShort = (_currentLang || "pt_BR").replace("_", "-");
+      if (badgeEl) badgeEl.textContent = langShort;
+      if (sourceEl) {
+        const code = (_currentLang || "pt_BR").split("_")[0];
+        sourceEl.href = "https://github.com/gustavobraga-byte/PesquisAI/blob/main/agents/AGENTS." + code + ".md";
+      }
+
+      if (!forceReload && _agentsCacheLang === _currentLang && _agentsCache) {
+        renderAgentsContent(contentEl, _agentsCache);
+        return;
+      }
+
+      contentEl.textContent = dict["agents.loading"] || "Carregando diretrizes…";
+
+      try {
+        const r = await fetch(BASE + "/api/agents?lang=" + encodeURIComponent(_currentLang));
+        const d = await r.json();
+        if (d.ok && d.content) {
+          _agentsCache = d.content;
+          _agentsCacheLang = _currentLang;
+          renderAgentsContent(contentEl, d.content);
+        } else {
+          contentEl.textContent = dict["agents.error"] || "Erro ao carregar diretrizes.";
+        }
+      } catch (e) {
+        contentEl.textContent = (dict["agents.error"] || "Erro") + " — " + e.message;
+      }
+    }
+
+    // P4 fix: renderiza o markdown do AGENTS.md usando marked.js + github-markdown-css
+    function renderAgentsContent(el, mdText) {
+      try {
+        if (typeof marked !== "undefined") {
+          marked.setOptions({ breaks: true, gfm: true, headerIds: true });
+          const _b = String.fromCharCode(92);
+          const _re = new RegExp(
+            "^---" + _b + "s*" + _b + "n[" + _b + "s" + _b + "S]*?" +
+            _b + "n---" + _b + "s*" + _b + "n"
+          );
+          const cleaned = mdText.replace(_re, "");
+          el.innerHTML = marked.parse(cleaned);
+        } else {
+          el.textContent = mdText;
+        }
+      } catch (e) {
+        el.textContent = mdText;
+        console.error("Erro ao renderizar markdown:", e);
+      }
+    }
+
+    function reloadAgents() {
+      _agentsCache = null;
+      _agentsCacheLang = null;
+      loadAgents(true);
+    }
+
+    async function copyAgents() {
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const text = _agentsCache || document.getElementById("agents-content").textContent || "";
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          document.body.removeChild(ta);
+        }
+        toast("✅ " + (dict["agents.copy_ok"] || "Diretrizes copiadas!"), "ok");
+      } catch (e) {
+        toast("❌ " + e.message, "err");
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => {
+        if (c === "&") return "&amp;";
+        if (c === "<") return "&lt;";
+        if (c === ">") return "&gt;";
+        if (c === '"') return "&quot;";
+        if (c === "'") return "&#39;";
+        return c;
+      });
+    }
+
+    // ── Memória Obsidian (v0.5.1.4 — navegar + editar) ────────
+    // Estado:
+    //   _memoryTree      — lista plana de notas carregada do /api/obsidian/tree
+    //   _memoryStatus    — {status, root, writable, notes_count, ...}
+    //   _memoryCurrent   — {path, body, title, tags, is_pesquisai, ...} da nota aberta
+    //   _memoryDirty     — true se o editor tem mudanças não salvas
+    //   _memorySearch    — termo de busca atual (filtro da sidebar)
+    //   _memoryTab       — 'edit' | 'preview' | 'split'
+    let _memoryTree = [];
+    let _memoryStatus = null;
+    let _memoryCurrent = null;
+    let _memoryDirty = false;
+    let _memorySearch = "";
+    let _memoryTab = "edit";
+
+    async function openMemory(force) {
+      const overlay = document.getElementById("memory-overlay");
+      if (overlay) {
+        overlay.style.opacity = "1";
+        overlay.style.pointerEvents = "all";
+      }
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const list = document.getElementById("memory-list");
+      if (list) {
+        list.innerHTML = '<div class="modal-empty" style="padding:14px;">' +
+          (dict["ui.loading"] || "Carregando…") + '</div>';
+      }
+      // Sempre recarrega o status e a árvore; cache apenas para
+      // o caso de força=false numa sessão recente (5 s).
+      try {
+        const [rStatus, rTree] = await Promise.all([
+          fetch(BASE + "/api/obsidian"),
+          fetch(BASE + "/api/obsidian/tree"),
+        ]);
+        const dStatus = await rStatus.json();
+        const dTree = await rTree.json();
+        _memoryStatus = dStatus;
+        _memoryTree = (dTree && dTree.tree) ? dTree.tree : [];
+        renderMemoryHeader(dStatus, dict);
+        renderMemorySidebar();
+        if (dStatus.status !== "ready") {
+          if (list) {
+            list.innerHTML = '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' +
+              escapeHtml(dStatus.message || dStatus.status) + '</div>';
+          }
+        }
+      } catch (e) {
+        if (list) {
+          list.innerHTML = '<div class="modal-empty" style="padding:14px;">❌ ' +
+            (dict["agents.error"] || "Erro") + ': ' + escapeHtml(e.message) + '</div>';
+        }
+      }
+    }
+
+    function closeMemory(force) {
+      // Se houver mudanças não salvas, pedir confirmação (a menos que force=true)
+      if (!force && _memoryDirty && _memoryCurrent) {
+        if (!confirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nFechar mesmo assim?")) {
+          return;
+        }
+      }
+      const overlay = document.getElementById("memory-overlay");
+      if (overlay) {
+        overlay.style.opacity = "0";
+        overlay.style.pointerEvents = "none";
+      }
+      _memoryDirty = false;
+      _memoryCurrent = null;
+      markDirty();
+    }
+
+    // ── Renderização: header (status badge + drive link) ───────────
+    function renderMemoryHeader(d, dict) {
+      const badge   = document.getElementById("memory-status-badge");
+      const driveLnk = document.getElementById("memory-open-drive");
+      const memBtn  = document.getElementById("memory-btn");
+      const sub     = document.getElementById("memory-subtitle");
+      if (!d) return;
+      const statusMap = {
+        ready:          { txt: dict["memory.status_ready"]     || "Ativa",            color: "var(--green)" },
+        disabled:       { txt: dict["memory.status_disabled"]  || "Desativada",       color: "var(--ink-muted)" },
+        no_vault:       { txt: dict["memory.status_no_vault"]  || "Sem vault",        color: "var(--amber)" },
+        read_only:      { txt: dict["memory.status_read_only"] || "Somente leitura",  color: "var(--amber)" },
+        error:          { txt: dict["memory.status_error"]     || "Erro",             color: "var(--red)" },
+        module_unavailable: { txt: dict["memory.status_error"] || "Módulo indisponível", color: "var(--red)" },
+      };
+      const st = statusMap[d.status] || { txt: d.status || "?", color: "var(--ink-muted)" };
+      if (badge) {
+        badge.textContent = st.txt;
+        badge.style.color = st.color;
+        badge.style.borderColor = st.color;
+      }
+      if (memBtn) {
+        memBtn.style.color = (d.status === "ready") ? "var(--green)" : st.color;
+      }
+      if (driveLnk) {
+        if (d.root && d.status === "ready") {
+          driveLnk.href = "https://drive.google.com/drive/my-drive";
+          driveLnk.title = d.root;
+          driveLnk.style.display = "";
+        } else {
+          driveLnk.style.display = "none";
+        }
+      }
+      if (sub && d.status === "ready" && d.notes_count != null) {
+        sub.textContent = (dict["memory.subtitle"] || "Camada de memória persistente do agente")
+          + " · " + d.notes_count + " " + (dict["memory.notes_count"] || "notas");
+      }
+    }
+
+    // ── Renderização: sidebar (lista de notas agrupadas por pasta) ──
+    function renderMemorySidebar() {
+      const list = document.getElementById("memory-list");
+      const cnt  = document.getElementById("memory-count");
+      if (!list) return;
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      // Filtra por busca
+      const q = (_memorySearch || "").toLowerCase().trim();
+      const filtered = [];
+      for (const folder of _memoryTree) {
+        const matches = [];
+        for (const n of folder.notes) {
+          if (!q) { matches.push(n); continue; }
+          if ((n.title || "").toLowerCase().includes(q) ||
+              (n.path || "").toLowerCase().includes(q) ||
+              (n.tags || []).some(t => (t || "").toLowerCase().includes(q))) {
+            matches.push(n);
+          }
+        }
+        if (matches.length) filtered.push({ folder: folder.folder, notes: matches });
+      }
+      const total = filtered.reduce((s, f) => s + f.notes.length, 0);
+      if (cnt) cnt.textContent = total + " " + (dict["memory.notes_count"] || "notas");
+      if (total === 0) {
+        list.innerHTML = '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' +
+          (q ? (dict["memory.no_results"] || "Nenhum resultado para '" + escapeHtml(q) + "'.") :
+               (dict["memory.no_notes"] || "Nenhuma nota ainda.")) + '</div>';
+        return;
+      }
+      let html = "";
+      for (const folder of filtered) {
+        const label = folder.folder || "📁 (raiz)";
+        html += '<div class="mem-folder-label">' + escapeHtml(label) + '</div>';
+        for (const n of folder.notes) {
+          const active = (_memoryCurrent && _memoryCurrent.path === n.path) ? " active" : "";
+          const human  = n.is_pesquisai_generated ? "" : " human";
+          const tagHtml = (n.tags || []).slice(0, 3).map(t =>
+            '<span style="display:inline-block;font-size:9px;padding:0 4px;background:var(--accent-dim);color:var(--accent);border-radius:2px;margin-right:2px;">#' + escapeHtml(String(t).replace(/^#/, "")) + '</span>'
+          ).join("");
+          html += `<div class="mem-note-item${active}${human}" onclick="loadMemoryNote('${n.path.replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\'")}')">` +
+               '<div class="mem-note-title">' + escapeHtml(n.title || n.path) + '</div>' +
+                  '<div class="mem-note-path">' + escapeHtml(n.path) + '</div>' +
+                  (tagHtml ? '<div style="margin-top:3px;">' + tagHtml + '</div>' : '') +
+                  '</div>';
+        }
+      }
+      list.innerHTML = html;
+    }
+
+    // ── Busca ──────────────────────────────────────────────────────
+    let _searchDebounce = null;
+    function searchMemory(q) {
+      if (_searchDebounce) clearTimeout(_searchDebounce);
+      _searchDebounce = setTimeout(() => {
+        _memorySearch = q;
+        renderMemorySidebar();
+      }, 150);
+    }
+
+    // ── Carregar nota no editor ───────────────────────────────────
+    async function loadMemoryNote(path) {
+      if (_memoryDirty && _memoryCurrent && _memoryCurrent.path !== path) {
+        if (!confirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nDescartar e abrir outra nota?")) {
+          return;
+        }
+      }
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const meta  = document.getElementById("memory-note-meta");
+      const tabs  = document.getElementById("memory-editor-tabs");
+      const ed    = document.getElementById("memory-editor");
+      const prev  = document.getElementById("memory-preview");
+      const empty = document.getElementById("memory-editor-empty");
+      const titleEl = document.getElementById("memory-note-title");
+      const pathEl  = document.getElementById("memory-note-path");
+      const tagsEl  = document.getElementById("memory-note-tags-display");
+      const btnSave = document.getElementById("memory-btn-save");
+      const btnDel  = document.getElementById("memory-btn-delete");
+      // UI: loading
+      if (titleEl) titleEl.value = "…";
+      if (pathEl)  pathEl.textContent = path;
+      if (tagsEl)  tagsEl.innerHTML = "";
+      if (ed)      ed.value = (dict["ui.loading"] || "Carregando…");
+      if (empty)   empty.style.display = "none";
+      try {
+        const r = await fetch(BASE + "/api/obsidian/note?path=" + encodeURIComponent(path));
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+          toast("❌ " + (d.error || r.status), "err");
+          ed.value = "";
+          if (empty) { empty.style.display = ""; empty.textContent = d.error || "Erro ao carregar nota."; }
+          return;
+        }
+        _memoryCurrent = {
+          path: d.path,
+          title: d.title,
+          tags: d.tags || [],
+          body: d.body || "",
+          is_pesquisai: d.is_pesquisai_generated,
+          metadata: d.metadata,
+        };
+        if (titleEl) titleEl.value = d.title || "";
+        if (pathEl)  pathEl.textContent = d.path;
+        if (tagsEl) {
+          tagsEl.innerHTML = (d.tags || []).map(t =>
+            '<span style="display:inline-block;font-size:9.5px;padding:1px 6px;background:var(--accent-dim);color:var(--accent);border-radius:3px;">#' + escapeHtml(String(t).replace(/^#/, "")) + '</span>'
+          ).join("") || '<span style="font-size:9.5px;color:var(--ink-muted);">— sem tags —</span>';
+        }
+        if (ed) ed.value = d.body || "";
+        if (meta) meta.style.display = "flex";
+        if (tabs) tabs.style.display = "block";
+        if (btnSave) { btnSave.disabled = false; btnSave.style.cursor = "pointer"; btnSave.style.opacity = "1"; }
+        if (btnDel)  { btnDel.disabled  = false; btnDel.style.cursor  = "pointer"; btnDel.style.opacity  = "1"; }
+        _memoryDirty = false;
+        markDirty();
+        switchMemoryTab(_memoryTab);
+        renderMemorySidebar(); // atualiza o item ativo
+      } catch (e) {
+        toast("❌ " + e.message, "err");
+      }
+    }
+
+    // ── Switch tab Edit / Preview / Split ──────────────────────────
+    function switchMemoryTab(t) {
+      _memoryTab = t;
+      const ed   = document.getElementById("memory-editor");
+      const prev = document.getElementById("memory-preview");
+      const tEdit = document.getElementById("memory-tab-edit");
+      const tPrev = document.getElementById("memory-tab-preview");
+      const tSpl  = document.getElementById("memory-tab-split");
+      [tEdit, tPrev, tSpl].forEach(b => b && b.classList.remove("active"));
+      if (t === "edit")   { tEdit && tEdit.classList.add("active"); ed.style.display = "";   prev.style.display = "none"; ed.style.flex = "1"; prev.style.flex = ""; }
+      if (t === "preview"){ tPrev && tPrev.classList.add("active"); ed.style.display = "none"; prev.style.display = "";   prev.style.flex = "1"; ed.style.flex = ""; renderPreview(); }
+      if (t === "split")  { tSpl  && tSpl.classList.add("active");  ed.style.display = "";   prev.style.display = "";   ed.style.flex = "1"; prev.style.flex = "1"; renderPreview(); }
+    }
+
+    function renderPreview() {
+      const ed = document.getElementById("memory-editor");
+      const prev = document.getElementById("memory-preview");
+      if (!ed || !prev) return;
+      const src = ed.value || "";
+      try {
+        // Usa marked.js se disponível; caso contrário, escapa como <pre>
+        if (typeof marked !== "undefined" && marked.parse) {
+          let html = marked.parse(src);
+          // Destaque de wikilinks [[nota]] e tags #tag
+          html = html.replace(/\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g,
+            (m, target, alias) => '<span class="wikilink">[[' + escapeHtml(alias || target) + ']]</span>');
+          html = html.replace(/(^|[\s(])#([a-zA-Z0-9_\-/]+)/g,
+            (m, p, t) => p + '<span class="tag">#' + escapeHtml(t) + '</span>');
+          prev.innerHTML = '<div class="mem-preview">' + html + '</div>';
+        } else {
+          prev.innerHTML = '<pre style="white-space:pre-wrap;font-family:DM Mono,monospace;font-size:11.5px;">' + escapeHtml(src) + '</pre>';
+        }
+      } catch (e) {
+        prev.innerHTML = '<pre>' + escapeHtml(src) + '</pre>';
+      }
+    }
+
+    // ── Editor: input → dirty ─────────────────────────────────────
+    function onEditorInput() {
+      if (!_memoryDirty) { _memoryDirty = true; markDirty(); }
+      if (_memoryTab === "split") renderPreview();
+    }
+
+    function markDirty() {
+      const ind = document.getElementById("memory-dirty-indicator");
+      const btnSave = document.getElementById("memory-btn-save");
+      if (ind) ind.style.display = _memoryDirty ? "" : "none";
+      if (btnSave) {
+        if (_memoryDirty && _memoryCurrent) {
+          btnSave.style.background = "var(--amber)";
+          btnSave.style.borderColor = "var(--amber)";
+          btnSave.style.color = "#000";
+        } else if (_memoryCurrent) {
+          btnSave.style.background = "var(--green)";
+          btnSave.style.borderColor = "var(--green)";
+          btnSave.style.color = "#000";
+        } else {
+          btnSave.style.background = "";
+          btnSave.style.borderColor = "";
+          btnSave.style.color = "";
+        }
+      }
+    }
+
+    // ── Salvar nota ───────────────────────────────────────────────
+    async function saveCurrentNote() {
+      if (!_memoryCurrent) { toast("⚠️ Nenhuma nota aberta.", "err"); return; }
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const ed = document.getElementById("memory-editor");
+      const titleEl = document.getElementById("memory-note-title");
+      const body = ed ? ed.value : "";
+      const title = titleEl ? titleEl.value : _memoryCurrent.title;
+      const btnSave = document.getElementById("memory-btn-save");
+      if (btnSave) { btnSave.disabled = true; btnSave.textContent = "…"; }
+      try {
+        const r = await fetch(BASE + "/api/obsidian/note", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "save",
+            path: _memoryCurrent.path,
+            title: title,
+            body: body,
+            tags: _memoryCurrent.tags,
+            force: !_memoryCurrent.is_pesquisai,
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+          toast("❌ " + (d.error || r.status) + (d.hint ? " · " + d.hint : ""), "err");
+          if (btnSave) { btnSave.disabled = false; btnSave.textContent = "💾 Salvar"; }
+          return;
+        }
+        _memoryCurrent.body = body;
+        _memoryCurrent.title = title;
+        _memoryCurrent.is_pesquisai = true; // após salvar vira do agente
+        _memoryDirty = false;
+        markDirty();
+        if (btnSave) {
+          btnSave.textContent = "✅ Salvo";
+          setTimeout(() => { btnSave.textContent = "💾 Salvar"; btnSave.disabled = false; }, 1500);
+        }
+        toast("✅ " + (d.message || "Nota salva."), "ok");
+        // Recarrega a árvore
+        openMemory(true);
+      } catch (e) {
+        toast("❌ " + e.message, "err");
+        if (btnSave) { btnSave.disabled = false; btnSave.textContent = "💾 Salvar"; }
+      }
+    }
+
+    // ── Excluir nota ──────────────────────────────────────────────
+    async function deleteCurrentNote() {
+      if (!_memoryCurrent) return;
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const ok = confirm("Mover '" + _memoryCurrent.path + "' para .trash/?");
+      if (!ok) return;
+      try {
+        const r = await fetch(BASE + "/api/obsidian/note", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "delete",
+            path: _memoryCurrent.path,
+            force: !_memoryCurrent.is_pesquisai,
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+          toast("❌ " + (d.error || r.status) + (d.hint ? " · " + d.hint : ""), "err");
+          return;
+        }
+        toast("🗑 " + (d.message || "Nota movida para .trash/."), "ok");
+        // Limpa editor
+        _memoryCurrent = null;
+        _memoryDirty = false;
+        const meta  = document.getElementById("memory-note-meta");
+        const tabs  = document.getElementById("memory-editor-tabs");
+        const ed    = document.getElementById("memory-editor");
+        const prev  = document.getElementById("memory-preview");
+        const empty = document.getElementById("memory-editor-empty");
+        const btnSave = document.getElementById("memory-btn-save");
+        const btnDel  = document.getElementById("memory-btn-delete");
+        if (meta) meta.style.display = "none";
+        if (tabs) tabs.style.display = "none";
+        if (ed)   ed.value = "";
+        if (prev) prev.innerHTML = "";
+        if (empty){ empty.style.display = ""; }
+        if (btnSave){ btnSave.disabled = true; btnSave.style.opacity = ".4"; btnSave.style.cursor = "not-allowed"; }
+        if (btnDel) { btnDel.disabled  = true; btnDel.style.opacity  = ".4"; btnDel.style.cursor  = "not-allowed"; }
+        markDirty();
+        openMemory(true);
+      } catch (e) {
+        toast("❌ " + e.message, "err");
+      }
+    }
+
+    // ── Diálogo de nova nota ──────────────────────────────────────
+    async function openCreateNoteDialog() {
+      if (_memoryDirty && _memoryCurrent) {
+        if (!confirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nContinuar?")) return;
+      }
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const overlay = document.getElementById("memory-new-overlay");
+      if (overlay) { overlay.style.opacity = "1"; overlay.style.pointerEvents = "all"; }
+      // Carrega templates disponíveis
+      const sel = document.getElementById("memory-new-template");
+      if (sel && _memoryStatus && _memoryStatus.templates && _memoryStatus.templates.length) {
+        sel.innerHTML = _memoryStatus.templates.map(t =>
+          '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>'
+        ).join("");
+      } else if (sel) {
+        sel.innerHTML = '<option value="inbox">inbox</option>';
+      }
+      const p = document.getElementById("memory-new-path");
+      if (p) { p.value = "inbox/" + new Date().toISOString().slice(0,10) + "-nova-nota.md"; p.focus(); p.select(); }
+      const t = document.getElementById("memory-new-title");
+      if (t) t.value = "";
+      const tg = document.getElementById("memory-new-tags");
+      if (tg) tg.value = "pesquisai/draft";
+    }
+
+    function closeCreateNoteDialog() {
+      const overlay = document.getElementById("memory-new-overlay");
+      if (overlay) { overlay.style.opacity = "0"; overlay.style.pointerEvents = "none"; }
+    }
+
+    async function submitCreateNote() {
+      const path = (document.getElementById("memory-new-path").value || "").trim();
+      const title = (document.getElementById("memory-new-title").value || "").trim();
+      const template = document.getElementById("memory-new-template").value || "inbox";
+      const tagsRaw = (document.getElementById("memory-new-tags").value || "").trim();
+      const tags = tagsRaw ? tagsRaw.split(",").map(s => s.trim()).filter(Boolean) : [];
+      if (!path) { toast("⚠️ Caminho obrigatório.", "err"); return; }
+      if (!path.endsWith(".md")) {
+        toast("⚠️ Caminho deve terminar com .md", "err"); return;
+      }
+      try {
+        const r = await fetch(BASE + "/api/obsidian/note", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "create", path, title, template, tags }),
+        });
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+          toast("❌ " + (d.error || r.status), "err");
+          return;
+        }
+        toast("✅ " + (d.message || "Nota criada."), "ok");
+        closeCreateNoteDialog();
+        await openMemory(true);
+        // Abre a nota recém-criada
+        if (d.path) loadMemoryNote(d.path);
+      } catch (e) {
+        toast("❌ " + e.message, "err");
+      }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -1341,7 +2114,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         openShortcuts();
       }
       if (e.key === "Escape") {
-        closeHealth(); closeSessions(); closeShortcuts();
+        closeHealth(); closeSessions(); closeShortcuts(); closeAgents(); closeMemory();  // v0.5.1.2
         closeProvider(); closeModal(); closeLangMenu();
         const mm = document.getElementById("mobile-menu");
         if (mm && mm.classList.contains("open")) toggleMobileMenu();
@@ -1407,6 +2180,54 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal recarregado com novo tema",
             "languages.label": "Idioma", "languages.switched_to": "Idioma alterado para",
             "success_messages.backup_saved": "Backup salvo",
+            # v0.5.1.2 — Memória Obsidian
+            "memory.title": "Memória Obsidian",
+            "memory.subtitle": "Camada de memória persistente do agente",
+            "memory.tooltip": "Memória Obsidian (segundo cérebro)",
+            "memory.status_ready": "🟢 Ativa",
+            "memory.status_disabled": "⚪ Desativada",
+            "memory.status_no_vault": "🟡 Sem vault",
+            "memory.status_read_only": "🟡 Somente leitura",
+            "memory.status_error": "🔴 Erro",
+            "memory.notes_count": "Notas",
+            "memory.notes_unit": "",
+            "memory.tags_count": "Tags",
+            "memory.links_count": "Wikilinks",
+            "memory.avg_len": "Tam. médio",
+            "memory.recent_daily": "Daily notes",
+            "memory.recent_notes": "Notas recentes",
+            "memory.no_notes": "Nenhuma nota ainda. O agente salvará aqui automaticamente.",
+            "memory.templates": "Templates",
+            "memory.open_vault": "Abrir Drive",
+            "memory.refresh": "Atualizar",
+            # v0.5.1.4 — Editor de notas (split view)
+            "memory.search_placeholder": "🔍 Buscar…",
+            "memory.new_note": "+ Nova nota",
+            "memory.new_note_title": "Nova nota",
+            "memory.new_note_dialog_title": "📝 Nova nota",
+            "memory.field_path": "Caminho (ex: research/minha-nota.md)",
+            "memory.field_title": "Título",
+            "memory.field_template": "Template",
+            "memory.field_tags": "Tags (separadas por vírgula, opcional)",
+            "memory.create": "Criar",
+            "memory.save": "💾 Salvar",
+            "memory.delete": "🗑 Excluir",
+            "memory.tab_edit": "Editar",
+            "memory.tab_preview": "Preview",
+            "memory.tab_split": "Dividido",
+            "memory.body_placeholder": "Selecione uma nota à esquerda ou crie uma nova.",
+            "memory.empty_editor": "Selecione uma nota na lista ou crie uma nova.",
+            "memory.dirty": "não salvo",
+            "memory.note_title": "Título",
+            "memory.no_results": "Nenhum resultado para a busca.",
+            # v0.5.1.2 hotfix — Diretrizes do Agente
+            "agents.title": "Diretrizes do Agente",
+            "agents.subtitle": "Regras e princípios do PesquisAI (AGENTS.md)",
+            "agents.loading": "Carregando diretrizes…",
+            "agents.error": "Erro ao carregar diretrizes do agente.",
+            "agents.copy_ok": "Diretrizes copiadas!",
+            "agents.copy": "Copiar",
+            "agents.open_source": "Ver fonte",
         },
         "en_US": {
             "ui.backup": "Save backup", "ui.restore": "Restore",
@@ -1431,6 +2252,54 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal reloaded with new theme",
             "languages.label": "Language", "languages.switched_to": "Language switched to",
             "success_messages.backup_saved": "Backup saved",
+            # v0.5.1.2 — Obsidian Memory
+            "memory.title": "Obsidian Memory",
+            "memory.subtitle": "Agent's persistent memory layer",
+            "memory.tooltip": "Obsidian Memory (second brain)",
+            "memory.status_ready": "🟢 Active",
+            "memory.status_disabled": "⚪ Disabled",
+            "memory.status_no_vault": "🟡 No vault",
+            "memory.status_read_only": "🟡 Read-only",
+            "memory.status_error": "🔴 Error",
+            "memory.notes_count": "Notes",
+            "memory.notes_unit": "",
+            "memory.tags_count": "Tags",
+            "memory.links_count": "Wikilinks",
+            "memory.avg_len": "Avg. length",
+            "memory.recent_daily": "Daily notes",
+            "memory.recent_notes": "Recent notes",
+            "memory.no_notes": "No notes yet. The agent will save here automatically.",
+            "memory.templates": "Templates",
+            "memory.open_vault": "Open Drive",
+            "memory.refresh": "Refresh",
+            # v0.5.1.4 — Note editor (split view)
+            "memory.search_placeholder": "🔍 Search…",
+            "memory.new_note": "+ New note",
+            "memory.new_note_title": "New note",
+            "memory.new_note_dialog_title": "📝 New note",
+            "memory.field_path": "Path (e.g. research/my-note.md)",
+            "memory.field_title": "Title",
+            "memory.field_template": "Template",
+            "memory.field_tags": "Tags (comma-separated, optional)",
+            "memory.create": "Create",
+            "memory.save": "💾 Save",
+            "memory.delete": "🗑 Delete",
+            "memory.tab_edit": "Edit",
+            "memory.tab_preview": "Preview",
+            "memory.tab_split": "Split",
+            "memory.body_placeholder": "Select a note on the left or create a new one.",
+            "memory.empty_editor": "Select a note from the list or create a new one.",
+            "memory.dirty": "unsaved",
+            "memory.note_title": "Title",
+            "memory.no_results": "No results for the search.",
+            # v0.5.1.2 hotfix — Agent Guidelines
+            "agents.title": "Agent Guidelines",
+            "agents.subtitle": "PesquisAI rules and principles (AGENTS.md)",
+            "agents.loading": "Loading guidelines…",
+            "agents.error": "Error loading agent guidelines.",
+            "agents.copy_ok": "Guidelines copied!",
+            "agents.copy": "Copy",
+            "agents.open_source": "View source",
         },
         "es_ES": {
             "ui.backup": "Guardar copia", "ui.restore": "Restaurar",
@@ -1455,6 +2324,54 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal recargado con nuevo tema",
             "languages.label": "Idioma", "languages.switched_to": "Idioma cambiado a",
             "success_messages.backup_saved": "Copia guardada",
+            # v0.5.1.2 — Memoria Obsidian
+            "memory.title": "Memoria Obsidian",
+            "memory.subtitle": "Capa de memoria persistente del agente",
+            "memory.tooltip": "Memoria Obsidian (segundo cerebro)",
+            "memory.status_ready": "🟢 Activa",
+            "memory.status_disabled": "⚪ Desactivada",
+            "memory.status_no_vault": "🟡 Sin vault",
+            "memory.status_read_only": "🟡 Solo lectura",
+            "memory.status_error": "🔴 Error",
+            "memory.notes_count": "Notas",
+            "memory.notes_unit": "",
+            "memory.tags_count": "Etiquetas",
+            "memory.links_count": "Wikienlaces",
+            "memory.avg_len": "Tam. medio",
+            "memory.recent_daily": "Daily notes",
+            "memory.recent_notes": "Notas recientes",
+            "memory.no_notes": "Aún no hay notas. El agente guardará aquí automáticamente.",
+            "memory.templates": "Plantillas",
+            "memory.open_vault": "Abrir Drive",
+            "memory.refresh": "Actualizar",
+            # v0.5.1.4 — Editor de notas (split view)
+            "memory.search_placeholder": "🔍 Buscar…",
+            "memory.new_note": "+ Nueva nota",
+            "memory.new_note_title": "Nueva nota",
+            "memory.new_note_dialog_title": "📝 Nueva nota",
+            "memory.field_path": "Ruta (ej: research/mi-nota.md)",
+            "memory.field_title": "Título",
+            "memory.field_template": "Plantilla",
+            "memory.field_tags": "Etiquetas (separadas por coma, opcional)",
+            "memory.create": "Crear",
+            "memory.save": "💾 Guardar",
+            "memory.delete": "🗑 Eliminar",
+            "memory.tab_edit": "Editar",
+            "memory.tab_preview": "Vista previa",
+            "memory.tab_split": "Dividido",
+            "memory.body_placeholder": "Selecciona una nota a la izquierda o crea una nueva.",
+            "memory.empty_editor": "Selecciona una nota de la lista o crea una nueva.",
+            "memory.dirty": "no guardado",
+            "memory.note_title": "Título",
+            "memory.no_results": "Sin resultados para la búsqueda.",
+            # v0.5.1.2 hotfix — Directrices del Agente
+            "agents.title": "Directrices del Agente",
+            "agents.subtitle": "Reglas y principios del PesquisAI (AGENTS.md)",
+            "agents.loading": "Cargando directrices…",
+            "agents.error": "Error al cargar las directrices del agente.",
+            "agents.copy_ok": "¡Directrices copiadas!",
+            "agents.copy": "Copiar",
+            "agents.open_source": "Ver fuente",
         },
         "fr_FR": {
             "ui.backup": "Sauvegarder", "ui.restore": "Restaurer",
@@ -1479,6 +2396,54 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal rechargé avec le nouveau thème",
             "languages.label": "Langue", "languages.switched_to": "Langue changée en",
             "success_messages.backup_saved": "Sauvegarde enregistrée",
+            # v0.5.1.2 — Mémoire Obsidian
+            "memory.title": "Mémoire Obsidian",
+            "memory.subtitle": "Couche de mémoire persistante de l'agent",
+            "memory.tooltip": "Mémoire Obsidian (deuxième cerveau)",
+            "memory.status_ready": "🟢 Active",
+            "memory.status_disabled": "⚪ Désactivée",
+            "memory.status_no_vault": "🟡 Pas de vault",
+            "memory.status_read_only": "🟡 Lecture seule",
+            "memory.status_error": "🔴 Erreur",
+            "memory.notes_count": "Notes",
+            "memory.notes_unit": "",
+            "memory.tags_count": "Étiquettes",
+            "memory.links_count": "Wikiliens",
+            "memory.avg_len": "Taille moy.",
+            "memory.recent_daily": "Daily notes",
+            "memory.recent_notes": "Notes récentes",
+            "memory.no_notes": "Aucune note pour l'instant. L'agent enregistrera ici automatiquement.",
+            "memory.templates": "Modèles",
+            "memory.open_vault": "Ouvrir Drive",
+            "memory.refresh": "Actualiser",
+            # v0.5.1.4 — Éditeur de notes (split view)
+            "memory.search_placeholder": "🔍 Rechercher…",
+            "memory.new_note": "+ Nouvelle note",
+            "memory.new_note_title": "Nouvelle note",
+            "memory.new_note_dialog_title": "📝 Nouvelle note",
+            "memory.field_path": "Chemin (ex: research/ma-note.md)",
+            "memory.field_title": "Titre",
+            "memory.field_template": "Modèle",
+            "memory.field_tags": "Étiquettes (séparées par virgule, optionnel)",
+            "memory.create": "Créer",
+            "memory.save": "💾 Enregistrer",
+            "memory.delete": "🗑 Supprimer",
+            "memory.tab_edit": "Éditer",
+            "memory.tab_preview": "Aperçu",
+            "memory.tab_split": "Divisé",
+            "memory.body_placeholder": "Sélectionnez une note à gauche ou créez-en une nouvelle.",
+            "memory.empty_editor": "Sélectionnez une note dans la liste ou créez-en une nouvelle.",
+            "memory.dirty": "non enregistré",
+            "memory.note_title": "Titre",
+            "memory.no_results": "Aucun résultat pour la recherche.",
+            # v0.5.1.2 hotfix — Directives de l'Agent
+            "agents.title": "Directives de l'Agent",
+            "agents.subtitle": "Règles et principes du PesquisAI (AGENTS.md)",
+            "agents.loading": "Chargement des directives…",
+            "agents.error": "Erreur lors du chargement des directives de l'agent.",
+            "agents.copy_ok": "Directives copiées !",
+            "agents.copy": "Copier",
+            "agents.open_source": "Voir la source",
         },
     }
 

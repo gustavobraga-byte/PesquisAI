@@ -71,6 +71,9 @@ Conjunto amplo de indicadores e datasets oficiais brasileiros, complementando as
 ### `skill-agrobr` · [@gustavobraga-byte](https://github.com/gustavobraga-byte)
 Dados do agronegócio brasileiro: produção agrícola, pecuária, comércio internacional do setor e cadastro ambiental rural (CAR).
 
+### `skill-obsidian-memory` · [@gustavobraga-byte](https://github.com/gustavobraga-byte)
+🧠 **Segundo cérebro do agente** — transforma um vault do Obsidian (no Google Drive do usuário) em memória persistente entre sessões. Inclui 10 templates (daily, research, literature, session, methodology, data-source, hypothesis, reference, project-moc, inbox), busca BM25 offline, backlinks, wikilinks e tags padronizadas `pesquisai/*`. Resolve a limitação "sem memória entre sessões" declarada no `AGENTS.md`.
+
 ---
 
 ## 🗺️ Roadmap
@@ -122,7 +125,9 @@ Google Colab
         ├── ufv-abnt
         ├── skill-analise-qualitativa
         ├── scientific-skills
+        ├── skill-obsidian-memory  ← 🧠 memória persistente (v0.5.0+)
         └── pesquisai (instruções do agente)
+            └── pesquisai.obsidian (módulo Python no Drive)
 ```
 
 As dependências são gerenciadas pelo [uv (Astral)](https://github.com/astral-sh/uv) para instalação ultrarrápida e ambientes reproduzíveis.
@@ -147,7 +152,7 @@ O PesquisAI:
 
 ```
 BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.2.1. Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão 0.5.1.5 Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -163,7 +168,7 @@ Verificar autenticidade em: http://sisppg.ufv.br
   title        = {{PesquisAI}: Agente de Intelig{\^e}ncia Artificial
                   para Pesquisa Cient{\'\i}fica},
   year         = {2026},
-  version      = {0.2.1},
+  version      = {0.5.1.5},
   institution  = {Universidade Federal de Vi{\c{c}}osa (UFV)},
   url          = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/}
 }

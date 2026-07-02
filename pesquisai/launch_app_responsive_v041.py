@@ -1,13 +1,22 @@
 """
-launch_app_responsive.py — Wrapper HTML responsivo + tema + idioma (v0.4.2.2).
+launch_app_responsive.py — Wrapper HTML responsivo + tema + idioma (v0.4.1).
 
 Este módulo SUBSTITUI o `create_wrapper_html` do launch_app.py do PesquisAI
 principal (https://github.com/gustavobraga-byte/PesquisAI/blob/main/pesquisai/launch_app.py)
-corrigindo os problemas reportados pelo usuário em 2026-06-23 e 2026-06-24.
+corrigindo 3 problemas reportados pelo usuário em 2026-06-23:
 
-═════════════════════════════════════════════════════════════════════════
-v0.4.1 — UI Fixes (3 correções originais)
-═════════════════════════════════════════════════════════════════════════
+  1. 🐛 Site NÃO responsivo
+     - Problema: o CSS original não tem media queries. Topbar de 8 botões
+       estoura em mobile, modais de 400-520px não cabem, sem hamburger menu.
+     - Correção: 5 breakpoints (mobile pequeno, mobile, tablet, tablet
+       portrait, desktop, landscape), hamburger drawer, modais fluidos,
+       touch targets ≥ 32-44px (Apple HIG / WCAG 2.5.5).
+
+  2. 🐛 Tema claro/escuro não recarrega o terminal
+
+Este módulo SUBSTITUI o `create_wrapper_html` do launch_app.py do PesquisAI
+principal (https://github.com/gustavobraga-byte/PesquisAI/blob/main/pesquisai/launch_app.py)
+corrigindo 3 problemas reportados pelo usuário em 2026-06-23:
 
   1. 🐛 Site NÃO responsivo
      - Problema: o CSS original não tem media queries. Topbar de 8 botões
@@ -21,155 +30,16 @@ v0.4.1 — UI Fixes (3 correções originais)
        wrapper) mas NÃO recarrega o iframe do ttyd. O terminal continua
        renderizado com o tema antigo.
      - Correção: após aplicar tema na UI, recarregar o iframe do terminal
-       (fr.src = "about:blank" → 3.5s → fr.src = origSrc + "?t=...").
+       (fr.src = "about:blank" → 3.5s → fr.src = origSrc + "?t=..."),
+       mesmo padrão usado em confirmProvider()/restoreSession().
 
   3. 🐛 Alteração de idioma sem opção na interface
      - Problema: o módulo i18n existe (4 idiomas, JSONs completos) mas
        não há seletor na topbar. O usuário não tem como trocar idioma.
      - Correção: dropdown na topbar com 🇧🇷 🇺🇸 🇪🇸 🇫🇷, persistência em
-       cookie `pesquisai_lang`, query param `?lang=xx_XX`.
-
-═════════════════════════════════════════════════════════════════════════
-v0.4.2 — Footer Responsivo + AGENTS.md Multilíngue (2 correções adicionais)
-═════════════════════════════════════════════════════════════════════════
-
-  4. 🐛 Rodapé NÃO responsivo
-     - Problema: o rodapé original (#footer) tem `display: flex` SEM
-       `flex-wrap`. Em mobile, 8+ itens (PesquisAI, email, GitHub, UFV,
-       Provedor, OpenCode) transbordam horizontalmente. O `#terminal-frame`
-       também tem altura fixa (`calc(100% - 90px)`) que não considera
-       o rodapé que pode crescer em 2 linhas.
-     - Correção:
-       • `flex-wrap: wrap` no #footer (e `overflow: hidden` no root)
-       • 2 linhas lógicas (.footer-row-1 + .footer-row-2) com `display:
-         contents` em desktop (invisível) e linhas reais em mobile
-       • Media queries específicas: separa UFV/OpenCode em landscape,
-         esconde GitHub em <480px, ajusta altura do terminal dinamicamente
-       • `#terminal-frame` agora usa `calc(100vh - 90px)` (corrigido de
-         `calc(100% - 90px)`) + ajuste por breakpoint
-
-  5. 🐛 Troca de idioma NÃO troca o AGENTS.md
-     - Problema: o sistema troca strings da UI (data-i18n) mas o
-       arquivo `agents/AGENTS.xx_XX.md` (regras de integridade científica)
-       continua sendo exibido no idioma original. Pesquisador que troca
-       para inglês continua lendo regras em português.
-     - Correção:
-       • Novo endpoint backend `GET /api/agents?lang=xx_XX` que serve
-         o conteúdo do `agents/AGENTS.<lang>.md` apropriado
-       • Novo modal "📋 Diretrizes do Agente" na UI (botão na topbar)
-       • Cache client-side por idioma (1 chamada até troca de idioma)
-       • Invalidação automática do cache em `setLang()` + recarregamento
-         se o modal estiver aberto
-       • Botões: 📋 Copiar, ↻ Recarregar, 🔗 Ver fonte (link pro GitHub)
-       • Badge do idioma atual no header do modal (PT-BR, EN-US, etc.)
-
-═════════════════════════════════════════════════════════════════════════
-v0.4.2.1 — Sessão ses_10a4 (3 correções adicionais da sessão do usuário)
-═════════════════════════════════════════════════════════════════════════
-
-  6. 🐛 Tema CLARO: textos invisíveis nos modais (Dashboard de Saúde,
-     Atalhos, Sessões, Provedor)
-     - Problema: 6 modais tinham `background:#181b1e` (cor escura FIXA),
-       enquanto a cor do texto (`var(--ink-muted)`) passava a cinza
-       escuro no tema claro → resultado: cinza escuro em fundo escuro
-       = invisível.
-     - Correção:
-       • Nova classe `.modal-shell` que usa variáveis CSS (`--modal-bg`,
-         `--modal-border`) responsivas ao tema
-       • `html.theme-light .modal-shell` define `--modal-bg: #ffffff` e
-         sombra mais suave
-       • Inputs (`session-search`, `prov-key-input`) ganham estilo para
-         tema claro
-       • Botões `.modal-close` e itens de lista (`.backup-item:hover`,
-         `.session-item:hover`) também tem contraste corrigido
-
-  7. 🐛 Dashboard de Saúde não carrega
-     - Problema: `openHealth()` só abria o overlay visual, sem fazer
-       fetch em `/api/health` nem popular a lista. Usuário clicava no
-       ícone e só via "Carregando diagnóstico…".
-     - Correção:
-       • `openHealth()` agora faz `fetch(BASE + "/api/health")`
-       • Nova função `renderHealth(d)` popula `#health-list` com linhas
-         de status (✓/✗) para cada verificação (Drive, ttyd, OpenCode,
-         keys, skills, ffmpeg, disco, versão)
-
-  8. 🐛 Modal de Diretrizes mostra MD cru (sem formatação)
-     - Problema: o conteúdo era injetado com `.textContent`, exibindo
-       os caracteres `#`, `**`, `|`, `---` do markdown como texto puro.
-     - Correção:
-       • Adicionado `marked.js` (CDN) + `github-markdown-css` ao `<head>`
-       • Nova função `renderAgentsContent(el, md)` usa `marked.parse()`
-         para converter markdown → HTML formatado
-       • CSS customizado (#agents-content.markdown-body) preserva as
-         cores de tema (accent, ink, ink-muted) e fontes (Syne para
-         títulos, DM Mono para código/corpo)
-       • Remove frontmatter YAML do conteúdo antes de renderizar
-
-═════════════════════════════════════════════════════════════════════════
-v0.4.2.2 — Ses_10a4+ Polish (6 correções adicionais da sessão do usuário)
-═════════════════════════════════════════════════════════════════════════
-
-   9. 🖥️ Footer PC: provedor e "Powered by OpenCode" alinhados à DIREITA
-      - Problema: no desktop, o segundo grupo do rodapé (provedor + OpenCode)
-        ficava colado à esquerda junto com a marca e contatos. Em PC, deveria
-        estar à DIREITA.
-      - Correção: `@media (min-width: 768px)` faz `.footer-row-2` virar
-        `display: flex` com `margin-left: auto`, empurrando-o para a direita.
-        Mobile preserva o layout de 2 linhas.
-
-  10. 🧩 Skills: `grant-finder` e `meta-search-br` em `skills/` com clone URL
-      - Problema: as 2 skills extras existiam (grant_finder/ na raiz,
-        skills/meta-search-br/) mas sem READMEs padronizados nem links de clone.
-      - Correção: criadas READMEs + SKILL.md + __init__.py com `__clone_url__`
-        apontando para `https://github.com/gustavobraga-byte/grant-finder` e
-        `https://github.com/gustavobraga-byte/meta-search-br`.
-
-  11. 📜 Histórico de sessão não carregava
-      - Problema: `openSessions()` só abria o overlay, sem fetch nem
-        render da lista. Usuário via "Carregando sessões…" para sempre.
-      - Correção: `openSessions()` agora faz `await fetch("/api/sessions")`
-        e popula `#session-list` com sessões clicáveis (id, título, data,
-        contagem de mensagens). `filterSessions()` filtra em tempo real.
-        Cada item chama `restoreSession(id)` que faz POST em `/api/restore`.
-
-  12. 🌍 Saudação inicial do ttyd no idioma selecionado
-      - Problema: ttyd sempre recebia `--prompt 'oi'` genérico. Trocar
-        idioma não mudava a saudação inicial.
-      - Correção: `start_ttyd(lang)` usa `get_greeting(lang)` para saudação
-        específica por idioma. Endpoint `POST /api/lang` reinicia o ttyd
-        automaticamente ao trocar idioma. Idioma persistido em
-        `~/.config/pesquisai_lang`.
-
-  13. 📦 `__version__.py` MOVIDO para `pesquisai/__version__.py`
-      - Problema: arquivo de versão estava na raiz (`/__version__.py`),
-        quebrando `from .__version__ import VERSION`.
-      - Correção: movido para `pesquisai/__version__.py`, bumpado para
-        v0.4.2.2, com fallback de versão hardcoded se o módulo não for
-        encontrado.
-
-   14. 🧹 AGENTS.md multilíngues padronizados
-       - Problema: francês tinha `[lien]` em todos os 3 outros idiomas; pt/en/es
-         tinham `[link/enlace]` só para o francês. Padrão inconsistente.
-       - Correção: removido todo "- [link/lien/enlace](...)" das 4 variantes.
-         Formato final: `- `agents/AGENTS.<lang>.md` (nome do idioma)`.
-
-═════════════════════════════════════════════════════════════════════════
-v0.4.2.5 — Bugfix Rolagem Mobile via ttyd (1 correção crítica)
-═════════════════════════════════════════════════════════════════════════
-
-  15. 📱 Rolagem E zoom NÃO funcionam no mobile quando opencode é injetado via ttyd
-      - Problema: a versão responsiva do wrapper funciona (topbar, footer,
-        modais rolam), MAS o conteúdo DENTRO do iframe do ttyd (o terminal
-        xterm.js com a TUI do opencode) NÃO rola e NÃO faz zoom no mobile.
-      - Causa-raiz REAL: o xterm.js dentro do ttyd só rola via eventos `wheel`
-        (desktop). Em mobile, `wheel` não existe — são eventos `touchmove`. O
-        ttyd upstream NÃO converte touch→wheel. Nenhum CSS no wrapper resolve
-        isso porque o problema está DENTRO da página do ttyd (porta 8000).
-      - Correção (injeção de JS no HTML do ttyd via flag --index):
-        Ver `launch_app.py`: função `_prepare_ttyd_touch_index()` busca o HTML
-        do ttyd, injeta script com touch handlers (scroll + pinch-zoom), e
-        reinicia o ttyd com `--index`. O script injetado manipula
-        `.xterm-viewport.scrollTop` (scroll) e CSS `zoom` (pinch-to-zoom).
+       cookie `pesquisai_lang`, query param `?lang=xx_XX`, atualização
+       do atributo <html lang="..."> e das strings visíveis (toasts,
+       modais, botões).
 
 Instalação:
     Editar ``pesquisai/launch_app.py`` e substituir a função
@@ -183,9 +53,8 @@ OU (preferível, evita editar o original):
     def create_wrapper_html(terminal_url, drive_url):
         return _create(terminal_url, drive_url)
 
-Compatibilidade: PesquisAI v0.2.1+ (usa /api/theme, /api/lang, /api/agents,
-/api/backup, /api/restore, /api/apikey, /api/run_terminal, /api/health,
-/api/sessions).
+Compatibilidade: PesquisAI v0.2.1+ (usa /api/theme, /api/lang, /api/backup,
+/api/restore, /api/apikey, /api/run_terminal, /api/health, /api/sessions).
 """
 
 from __future__ import annotations
@@ -197,22 +66,11 @@ from typing import Optional
 
 # Imports resilientes (funciona dentro do pacote e standalone)
 try:
-    from .constants import WRAPPER_DIR
+    from .constants import WRAPPER_DIR, VERSION
     from .jokes import next_joke
-    # v0.4.2.2: __version__ foi MOVIDO para pesquisai/__version__.py
-    try:
-        from .__version__ import __version__ as VERSION, get_greeting
-    except ImportError:
-        VERSION = "0.4.2.2"
-        def get_greeting(lang: str = "pt_BR") -> str:
-            # Fallback v0.4.2.2: saudação curta + dica entre parênteses
-            return "Olá! (Dica: A partir de agora responda em português brasileiro.)"
 except ImportError:
     WRAPPER_DIR = "/tmp/pesquisai-wrapper"
-    VERSION = "0.4.2.2"
-    def get_greeting(lang: str = "pt_BR") -> str:
-        # Fallback v0.4.2.2: saudação curta + dica entre parênteses
-        return "Olá! (Dica: A partir de agora responda em português brasileiro.)"
+    VERSION = "0.4.1"
     def next_joke(category: str = "aleatorio") -> str:
         return "💻 (standalone mode) carregando..."
 
@@ -273,9 +131,6 @@ RESPONSIVE_CSS: str = """
     .footer-link { font-size: 10px; }
     .footer-sep { margin: 0 8px; }
     .modal-600 { width: 90vw; max-width: 600px; }
-    /* Footer: quebra em 2 linhas se necessário */
-    #footer { gap: 4px 8px; height: auto; min-height: 40px; padding: 6px 12px; }
-    #footer .footer-ufv { display: none; }
   }
 
   /* === Mobile (480px – 767px): hamburger + ícones essenciais === */
@@ -289,40 +144,17 @@ RESPONSIVE_CSS: str = """
     .tb-icon { width: 32px; height: 32px; }
     .tb-icon svg { width: 14px; height: 14px; }
     .hamburger { display: inline-flex; }
-    /* FOOTER: layout em 2 colunas empilhadas, sem overflow */
-    #footer {
-      padding: 6px 10px;
-      height: auto;
-      min-height: 56px;
-      flex-wrap: wrap;
-      gap: 4px 8px;
-      font-size: 10.5px;
-      align-items: center;
-      justify-content: space-between;
-    }
-    #footer .footer-row-1 {
-      display: flex; align-items: center; gap: 6px;
-      flex: 1 1 100%;
-      flex-wrap: wrap;
-    }
-    #footer .footer-row-2 {
-      display: flex; align-items: center; gap: 6px;
-      flex: 1 1 100%;
-      justify-content: space-between;
-    }
-    .footer-brand { display: inline-flex; }
-    .footer-link { font-size: 10px; }
-    .footer-link svg { width: 10px; height: 10px; }
-    .footer-sep { display: none; }  /* separadores somem em mobile */
-    .footer-ufv { display: none; }  /* UFV some em mobile */
-    .btn-provider { padding: 0 6px; font-size: 9px; height: 22px; }
-    .footer-oc { font-size: 9.5px; }
+    #footer { padding: 0 8px; height: 36px; }
+    .footer-brand { display: none; }
+    .footer-sep { margin: 0 6px; }
+    .footer-link { font-size: 9.5px; }
+    .btn-provider { padding: 0 6px; font-size: 9px; height: 20px; }
+    .footer-oc { display: none; }
     /* terminal: ocupa mais espaço em mobile */
-    #terminal-frame { height: calc(100vh - 50px - 56px) !important; touch-action: pan-y !important; }
+    #terminal-frame { height: calc(100vh - 50px - 36px) !important; }
     /* modais: largura quase total */
     #modal, #provider-overlay > div, #health-overlay > div,
-    #sessions-overlay > div, #shortcuts-overlay > div, #lang-overlay > div,
-    #agents-overlay > div {
+    #sessions-overlay > div, #shortcuts-overlay > div, #lang-overlay > div {
       width: 95vw !important; max-width: 95vw !important;
       padding: 16px !important;
     }
@@ -344,71 +176,22 @@ RESPONSIVE_CSS: str = """
     .tb-icon { width: 30px; height: 30px; }
     .tb-icon svg { width: 13px; height: 13px; }
     .mobile-menu { width: 100vw; max-width: 100vw; }
-    /* FOOTER: compacto, só essenciais */
-    #footer {
-      padding: 5px 8px;
-      min-height: 52px;
-      font-size: 9.5px;
-      gap: 3px 6px;
-    }
-    #footer .footer-row-1 { gap: 4px; }
-    .footer-link { font-size: 9.5px; }
+    #footer { font-size: 9px; }
     .footer-link svg { width: 9px; height: 9px; }
-    /* esconde GitHub link, mantém só email */
-    .footer-link-footer-github { display: none; }
-    /* terminal */
-    #terminal-frame { height: calc(100vh - 50px - 52px) !important; touch-action: pan-y !important; }
   }
 
   /* === Landscape em mobile (altura < 500px) === */
   @media (max-height: 500px) and (orientation: landscape) {
     #topbar { height: 40px; }
     .logo { font-size: 12px; }
-    /* FOOTER: 1 linha só, sem UFV/OpenCode */
-    #footer {
-      height: 30px; min-height: 30px;
-      padding: 0 10px; font-size: 9px;
-      flex-wrap: nowrap;
-    }
-    .footer-row-2 { display: none; }
-    .footer-ufv { display: none; }
-    #terminal-frame { height: calc(100vh - 40px - 30px) !important; touch-action: pan-y !important; }
+    #footer { height: 28px; font-size: 9px; }
+    #terminal-frame { height: calc(100vh - 40px - 28px) !important; }
   }
 
   /* === Tablet/iPad portrait: esconde UFV footer === */
   @media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
     .tb-btn { padding: 0 8px; }
-    .footer-ufv { display: none; }
-  }
-
-  /* === FOOTER: regras universais para evitar overflow === */
-  /* (v0.4.2: rodapé responsivo — flex-wrap + classes utilitárias) */
-  #footer {
-    overflow: hidden;
-  }
-  .footer-link, .footer-brand, .footer-oc, .footer-ufv {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
-  }
-  .footer-row-1, .footer-row-2 {
-    display: contents;  /* em desktop, ignora os wrappers e usa flex direto */
-  }
-  /* Em mobile (≤767px) os wrappers viram linhas reais (regra acima sobrescreve) */
-
-  /* v0.4.2.2: em DESKTOP, .footer-row-2 vira flex item e vai para a DIREITA
-     (botão de provedor + "Powered by OpenCode" alinhados à direita)
-     O `display: contents` acima é sobrescrito dentro do media query abaixo
-     para que `margin-left: auto` funcione. */
-  @media (min-width: 768px) {
-    .footer-row-1 { display: flex; align-items: center; gap: 6px; }
-    .footer-row-2 {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-left: auto;   /* empurra row-2 (provedor + OpenCode) à direita */
-    }
+    .footer-sep:nth-of-type(3) { display: none; }
   }
 
   /* === Acessibilidade: foco visível em todos os botões === */
@@ -524,119 +307,6 @@ RESPONSIVE_CSS: str = """
   }
   #theme-toggle[data-theme="pesquisai-light"] svg circle { fill: currentColor; }
 
-  /* === Modal shells (v0.4.2.1: respondem ao tema) === */
-  .modal-shell {
-    background: var(--modal-bg, #181b1e);
-    border: 1px solid var(--modal-border, rgba(255,255,255,.1));
-    color: var(--ink);
-  }
-  html.theme-light .modal-shell {
-    --modal-bg: #ffffff;
-    --modal-border: rgba(0,0,0,.12);
-    box-shadow: 0 28px 72px rgba(0,0,0,.18);
-  }
-  /* Inputs/buttons dentro dos modais no tema claro */
-  html.theme-light input.session-search,
-  html.theme-light #prov-key-input {
-    background: var(--surface, #f5f6f7) !important;
-    border: 1px solid var(--line) !important;
-    color: var(--ink) !important;
-  }
-  html.theme-light .modal-close {
-    background: var(--surface, #f5f6f7) !important;
-    color: var(--ink) !important;
-  }
-  html.theme-light .modal-close:hover {
-    background: var(--accent-dim) !important;
-  }
-  /* Sessões/itens com hover legível em tema claro */
-  html.theme-light .backup-item:hover,
-  html.theme-light .session-item:hover {
-    background: var(--accent-dim) !important;
-    color: var(--ink) !important;
-  }
-
-  /* === Renderização Markdown no modal de Diretrizes (v0.4.2.1) === */
-  #agents-content.markdown-body {
-    /* Resetar estilos default do github-markdown-css */
-    background: transparent !important;
-    color: var(--ink) !important;
-    font-family: "DM Mono", monospace !important;
-  }
-  #agents-content.markdown-body h1,
-  #agents-content.markdown-body h2,
-  #agents-content.markdown-body h3,
-  #agents-content.markdown-body h4 {
-    color: var(--ink);
-    border-bottom-color: var(--line);
-    font-family: "Syne", sans-serif;
-    margin-top: 1.2em;
-    margin-bottom: 0.6em;
-  }
-  #agents-content.markdown-body h1 { font-size: 18px; }
-  #agents-content.markdown-body h2 { font-size: 15px; }
-  #agents-content.markdown-body h3 { font-size: 13.5px; }
-  #agents-content.markdown-body h4 { font-size: 12.5px; }
-  #agents-content.markdown-body a { color: var(--accent); }
-  #agents-content.markdown-body code {
-    background: var(--accent-dim);
-    color: var(--accent);
-    padding: 1px 6px;
-    border-radius: 3px;
-    font-size: 11.5px;
-  }
-  #agents-content.markdown-body pre {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    padding: 12px 14px;
-    overflow-x: auto;
-  }
-  #agents-content.markdown-body pre code {
-    background: transparent;
-    color: var(--ink);
-    padding: 0;
-    font-size: 11px;
-  }
-  #agents-content.markdown-body table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 0.8em 0;
-    font-size: 11.5px;
-  }
-  #agents-content.markdown-body th,
-  #agents-content.markdown-body td {
-    border: 1px solid var(--line);
-    padding: 6px 10px;
-    text-align: left;
-  }
-  #agents-content.markdown-body th {
-    background: var(--accent-dim);
-    color: var(--accent);
-    font-weight: 700;
-  }
-  #agents-content.markdown-body blockquote {
-    border-left: 3px solid var(--accent);
-    background: var(--accent-dim);
-    margin: 0.6em 0;
-    padding: 6px 14px;
-    color: var(--ink-muted);
-    border-radius: 0 4px 4px 0;
-  }
-  #agents-content.markdown-body hr {
-    border: 0;
-    border-top: 1px solid var(--line);
-    margin: 1.2em 0;
-  }
-  #agents-content.markdown-body ul,
-  #agents-content.markdown-body ol {
-    padding-left: 1.6em;
-    margin: 0.5em 0;
-  }
-  #agents-content.markdown-body li { margin: 0.2em 0; }
-  #agents-content.markdown-body strong { color: var(--ink); font-weight: 700; }
-  #agents-content.markdown-body em { color: var(--ink-muted); }
-
   /* === Toasts em viewport pequeno === */
   @media (max-height: 500px) {
     #toast { bottom: 36px; right: 8px; }
@@ -659,22 +329,14 @@ SUPPORTED_LANGUAGES: list[dict[str, str]] = [
 
 
 def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
-    """Cria a versão v0.4.2.1 do wrapper HTML do PesquisAI.
+    """Cria a versão v0.4.1 do wrapper HTML do PesquisAI.
 
     Versão drop-in que substitui o HTML estático do launch_app.py por
-    um layout adaptativo com 8 correções aplicadas:
+    um layout adaptativo com 3 correções aplicadas:
 
-      v0.4.1:
-        1. Responsividade completa (5 breakpoints + hamburger)
-        2. toggleTheme() que recarrega o iframe do ttyd
-        3. Seletor de idioma na topbar (4 idiomas, cookie, query param)
-      v0.4.2:
-        4. Rodapé responsivo (flex-wrap + 2 linhas + media queries)
-        5. Modal de Diretrizes com AGENTS.md multilíngue (endpoint + cache)
-      v0.4.2.1 (ses_10a4):
-        6. Tema CLARO: contraste corrigido nos modais (.modal-shell)
-        7. openHealth() faz fetch em /api/health e popula dashboard
-        8. Modal de Diretrizes renderiza markdown (marked.js)
+      1. Responsividade completa (5 breakpoints + hamburger)
+      2. toggleTheme() que recarrega o iframe do ttyd
+      3. Seletor de idioma na topbar (4 idiomas, cookie, query param)
 
     Args:
         terminal_url: URL do terminal ttyd.
@@ -697,9 +359,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
-  <!-- Renderizador de Markdown para o modal de Diretrizes (v0.4.2.1) -->
-  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.1/github-markdown.min.css">
   <script>
     // ═══════════════════════════════════════════════════════════
     // 🛡️ ANTI-FLASH: aplica tema ANTES de qualquer renderização
@@ -764,11 +423,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       font-family: "DM Mono", monospace;
       overflow: hidden;
       -webkit-tap-highlight-color: transparent;
-      /* v0.4.2.5: rolagem mobile via ttyd — evita bounce/refresh do browser
-         e garante que gestos de toque não sejam descartados pelo body. */
-      overscroll-behavior: none;
-      touch-action: pan-y;
-      -webkit-touch-callout: none;
     }
 
     /* Touch: target mínimo 32x44 px (Apple HIG / WCAG 2.5.5) */
@@ -857,9 +511,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     }
     #modal-overlay.open { opacity: 1; pointer-events: all; }
     #modal {
-      background: var(--modal-bg, #181b1e);
-      border: 1px solid var(--line);
-      color: var(--ink);
+      background: #181b1e; border: 1px solid rgba(255,255,255,.1);
       border-radius: 8px; padding: 24px; width: 400px; max-width: 90vw;
       box-shadow: 0 24px 64px rgba(0,0,0,.6);
     }
@@ -898,43 +550,37 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     #terminal-frame {
       position: absolute;
       inset: 50px 0 40px 0;
-      width: 100%; height: calc(100vh - 90px);
+      width: 100%; height: calc(100% - 90px);
       border: none;
-      /* v0.4.2.5: não bloquear touch — os handlers são injetados no HTML do ttyd via --index */
-      overscroll-behavior: contain;
     }
 
     #footer {
       position: fixed; inset: auto 0 0 0;
-      min-height: 40px; height: 40px;
+      height: 40px;
       background: var(--rail);
       border-top: 1px solid var(--line);
-      display: flex; align-items: center; flex-wrap: wrap;
-      padding: 6px 18px; gap: 0 12px;
+      display: flex; align-items: center;
+      padding: 0 18px; gap: 0;
       font-size: 10.5px; color: var(--ink-muted);
       z-index: 9999;
-      overflow: hidden;
     }
     .footer-brand {
       font-family: "Syne", sans-serif; font-weight: 700;
       font-size: 11px; color: var(--ink);
-      margin-right: 6px;
+      margin-right: 14px;
     }
-    .footer-sep { width:1px; height:16px; background:var(--line); margin:0 6px; flex-shrink:0; }
+    .footer-sep { width:1px; height:16px; background:var(--line); margin:0 12px; flex-shrink:0; }
     .footer-link {
       color: var(--ink-muted); text-decoration: none;
       letter-spacing: .03em;
       transition: color .15s;
-      display: inline-flex; align-items: center;
-      max-width: 100%;
     }
     .footer-link:hover { color: var(--accent); }
-    .footer-link svg { width:11px; height:11px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:-.15em; margin-right:4px; flex-shrink:0; }
-    .footer-right { margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap: wrap; }
+    .footer-link svg { width:11px; height:11px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:-.15em; margin-right:4px; }
+    .footer-right { margin-left:auto; display:flex; align-items:center; gap:12px; }
     .footer-oc { color:var(--ink-muted); letter-spacing:.03em; }
     .footer-oc a { color:var(--ink-muted); text-decoration:none; }
     .footer-oc a:hover { color:var(--accent); }
-    .footer-ufv { color: var(--ink-muted); }
 
     .btn-provider {
       display: inline-flex; align-items: center; gap: 5px;
@@ -1030,9 +676,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
 
     <div class="tb-icons">
-      <button class="tb-icon" onclick="openAgents()" title="Diretrizes do Agente" data-i18n-title="agents.title">
-        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h7"/></svg>
-      </button>
       <button class="tb-icon" onclick="openHealth()" title="Dashboard de Saúde" data-i18n-title="dashboard.title">
         <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
       </button>
@@ -1041,6 +684,12 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       </button>
       <button class="tb-icon" onclick="openShortcuts()" title="Atalhos de Teclado" data-i18n-title="shortcuts.title">
         <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/></svg>
+      </button>
+      <button class="tb-icon" onclick="openAgents()" title="Diretrizes do Agente" data-i18n-title="agents.title">
+        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h7"/></svg>
+      </button>
+      <button class="tb-icon" onclick="openMemory()" id="memory-btn" title="Memória Obsidian" data-i18n-title="memory.tooltip">
+        <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 3 1.5 5 3 7l1 1v3a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-3l1-1c1.5-2 3-4 3-7a7 7 0 0 0-7-7z"/><path d="M9 22h6"/><path d="M12 2v20"/></svg>
       </button>
       <button class="tb-icon" onclick="toggleTheme()" id="theme-toggle" title="Alternar tema" data-theme="pesquisai" data-i18n-title="theme.toggle">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
@@ -1093,10 +742,11 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       <span data-i18n="providers.title">+ provedor</span>
     </button>
     <div style="height:1px;background:var(--line);margin:8px 0;"></div>
-    <button class="modal-close" onclick="openAgents(); toggleMobileMenu();">📋 <span data-i18n="agents.title">Diretrizes do Agente</span></button>
     <button class="modal-close" onclick="openHealth(); toggleMobileMenu();">🩺 <span data-i18n="dashboard.title">Dashboard de Saúde</span></button>
     <button class="modal-close" onclick="openSessions(); toggleMobileMenu();">📜 <span data-i18n="sessions.title">Histórico de Sessões</span></button>
     <button class="modal-close" onclick="openShortcuts(); toggleMobileMenu();">⌨️ <span data-i18n="shortcuts.title">Atalhos de Teclado</span></button>
+    <button class="modal-close" onclick="openAgents(); toggleMobileMenu();">📋 <span data-i18n="agents.title">Diretrizes do Agente</span></button>
+    <button class="modal-close" onclick="openMemory(); toggleMobileMenu();">🧠 <span data-i18n="memory.title">Memória Obsidian</span></button>
     <button class="modal-close" onclick="toggleTheme(); toggleMobileMenu();">◑ <span data-i18n="theme.toggle">Alternar Tema</span></button>
     <button class="modal-close" onclick="toggleLangMenu();">🌐 <span data-i18n="languages.label">Idioma</span></button>
   </div>
@@ -1112,35 +762,32 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   allow="clipboard-read; clipboard-write"
   tabindex="0"
   autofocus
-  style="width:100%; height:calc(100vh - 90px); border:none; outline:none;">
+  style="width:100%; height:calc(100% - 90px); border:none; outline:none;">
 </iframe>
 
   <div id="footer">
-    <!-- LINHA 1: marca + contatos (v0.4.2: separado em row-1/row-2 para mobile) -->
-    <div class="footer-row-1">
-      <span class="footer-brand">PesquisAI</span>
-      <span class="footer-sep"></span>
-      <a href="mailto:gustavo.braga@ufv.br" class="footer-link" data-i18n-title="footer.email_title" title="Contato por e-mail">
-        <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-        <span data-i18n="footer.email">gustavo.braga@ufv.br</span>
-      </a>
-      <span class="footer-sep"></span>
-      <a href="https://github.com/gustavobraga-byte/PesquisAI" target="_blank" class="footer-link footer-link-footer-github" data-i18n-title="footer.github_title" title="Repositório no GitHub">
-        <svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
-        <span data-i18n="footer.github">GitHub</span>
-      </a>
-      <span class="footer-sep"></span>
-      <span class="footer-ufv" data-i18n="footer.ufv">UFV · Viçosa, MG - Brasil</span>
-    </div>
+    <span class="footer-brand">PesquisAI</span>
+    <span class="footer-sep"></span>
+    <a href="mailto:gustavo.braga@ufv.br" class="footer-link">
+      <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+      gustavo.braga@ufv.br
+    </a>
+    <span class="footer-sep"></span>
+    <a href="https://github.com/gustavobraga-byte/PesquisAI" target="_blank" class="footer-link">
+      <svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+      GitHub
+    </a>
+    <span class="footer-sep"></span>
+    <span style="color:var(--ink-muted)">UFV · Viçosa, MG - Brasil</span>
 
-    <!-- LINHA 2: provedor + OpenCode -->
-    <div class="footer-row-2">
-      <button class="btn-provider" onclick="connectProvider()" data-i18n-title="providers.title" title="Conectar novo provedor de IA">
+    <div class="footer-right">
+      <button class="btn-provider" onclick="connectProvider()" title="Conectar novo provedor de IA">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
         <span data-i18n="providers.title">+ provedor</span>
       </button>
+      <span class="footer-sep"></span>
       <span class="footer-oc">
-        <span data-i18n="footer.powered_by">Powered by</span> <a href="https://opencode.ai" target="_blank">OpenCode</a>
+        Powered by <a href="https://opencode.ai" target="_blank">OpenCode</a>
       </span>
     </div>
   </div>
@@ -1158,7 +805,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   </div>
 
   <div id="provider-overlay" onclick="if(event.target===this)closeProvider()" style="position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div class="modal-shell" style="border-radius:10px;padding:24px;width:480px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
+    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:480px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div id="prov-step1">
         <div class="modal-title">🔌 <span data-i18n="providers.title">Conectar Provedor de IA</span></div>
         <p style="font-size:11.5px;color:var(--ink-muted);margin-bottom:14px;line-height:1.6;" data-i18n="providers.select">Selecione o provedor para configurar a API key:</p>
@@ -1180,7 +827,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   </div>
 
   <div id="health-overlay" onclick="if(event.target===this)closeHealth()" style="position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div class="modal-shell" style="border-radius:10px;padding:24px;width:440px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
+    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:440px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div class="modal-title">🩺 <span data-i18n="dashboard.title">Dashboard de Saúde</span></div>
       <div id="health-list" style="max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;">
         <div class="modal-empty" data-i18n="ui.loading">Carregando diagnóstico…</div>
@@ -1190,7 +837,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   </div>
 
   <div id="sessions-overlay" onclick="if(event.target===this)closeSessions()" style="position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div class="modal-shell" style="border-radius:10px;padding:24px;width:520px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
+    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:520px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div class="modal-title">📜 <span data-i18n="sessions.title">Histórico de Sessões</span></div>
       <input id="session-search" class="session-search" placeholder="🔍 Buscar por id ou conteúdo…" oninput="filterSessions()" data-i18n-placeholder="sessions.search_placeholder">
       <div id="session-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;">
@@ -1201,7 +848,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   </div>
 
   <div id="shortcuts-overlay" onclick="if(event.target===this)closeShortcuts()" style="position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div class="modal-shell" style="border-radius:10px;padding:24px;width:420px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
+    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:420px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div class="modal-title">⌨️ <span data-i18n="shortcuts.title">Atalhos de Teclado</span></div>
       <div style="border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;">
         <div class="shortcut-row"><span data-i18n="shortcuts.copy">Copiar seleção</span><span class="shortcut-key" data-i18n="shortcuts.copy_hint">Segure o Shift e selecione</span></div>
@@ -1216,7 +863,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
-  <!-- Modal de Diretrizes do Agente (v0.4.2 + markdown render v0.4.2.1) -->
+  <!-- Modal de Diretrizes do Agente (v0.4.2 + markdown render v0.4.2.1) — HOTFIX v0.5.1.2 -->
   <div id="agents-overlay" onclick="if(event.target===this)closeAgents()" style="position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
     <div id="agents-modal" class="modal-shell" style="border-radius:10px;padding:0;width:680px;max-width:94vw;max-height:88vh;box-shadow:0 28px 72px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;">
       <div style="padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;">
@@ -1238,6 +885,168 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
+  <!-- Modal de Memória Obsidian (v0.5.1.4 — navegar + editar) -->
+  <div id="memory-overlay" onclick="if(event.target===this)closeMemory()" style="position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:0;width:980px;max-width:96vw;max-height:92vh;box-shadow:0 28px 72px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;">
+      <!-- Header -->
+      <div style="padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">🧠</span>
+        <div style="flex:1;min-width:0;">
+          <div class="modal-title" style="margin-bottom:2px;" data-i18n="memory.title">Memória Obsidian</div>
+          <div id="memory-subtitle" style="font-size:10.5px;color:var(--ink-muted);" data-i18n="memory.subtitle">Camada de memória persistente do agente</div>
+        </div>
+        <span id="memory-status-badge" style="font-size:10px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;color:var(--ink-muted);font-family:'DM Mono',monospace;">…</span>
+        <span id="memory-dirty-indicator" style="display:none;font-size:10px;padding:2px 8px;background:var(--amber);color:#000;border-radius:3px;font-weight:600;">● <span data-i18n="memory.dirty">não salvo</span></span>
+        <button onclick="closeMemory()" class="modal-close" style="width:auto;padding:4px 10px;font-size:11px;" aria-label="Fechar">✕</button>
+      </div>
+
+      <!-- Split view: lista (esq) + editor (dir) -->
+      <div style="flex:1;display:flex;min-height:0;">
+        <!-- Coluna esquerda: busca + lista -->
+        <div id="memory-sidebar" style="width:300px;border-right:1px solid var(--line);display:flex;flex-direction:column;background:rgba(0,0,0,.18);">
+          <div style="padding:10px 12px;border-bottom:1px solid var(--line);">
+            <input id="memory-search-input" type="text" placeholder="🔍 Buscar…" data-i18n-placeholder="memory.search_placeholder" oninput="searchMemory(this.value)" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:6px 8px;font-size:11.5px;font-family:inherit;outline:none;" />
+          </div>
+          <div id="memory-list" style="flex:1;overflow-y:auto;padding:6px 8px;font-size:12px;">
+            <div class="modal-empty" data-i18n="ui.loading">Carregando…</div>
+          </div>
+          <div style="padding:8px 12px;border-top:1px solid var(--line);display:flex;gap:6px;align-items:center;font-size:10.5px;color:var(--ink-muted);">
+            <span id="memory-count">—</span>
+            <div style="flex:1;"></div>
+            <button onclick="openCreateNoteDialog()" class="modal-close" style="width:auto;padding:4px 8px;font-size:11px;" title="Nova nota" data-i18n-title="memory.new_note_title">+ <span data-i18n="memory.new_note">Nova</span></button>
+          </div>
+        </div>
+
+        <!-- Coluna direita: editor + preview -->
+        <div id="memory-editor-pane" style="flex:1;display:flex;flex-direction:column;min-width:0;">
+          <!-- Meta da nota -->
+          <div id="memory-note-meta" style="padding:10px 14px;border-bottom:1px solid var(--line);display:none;align-items:center;gap:8px;background:rgba(255,255,255,.02);">
+            <div style="flex:1;min-width:0;">
+              <input id="memory-note-title" type="text" placeholder="Título" data-i18n-placeholder="memory.note_title" oninput="markDirty()" style="width:100%;background:transparent;border:none;color:var(--ink);font-size:13px;font-weight:500;outline:none;font-family:inherit;" />
+              <div id="memory-note-path" style="font-size:10px;color:var(--ink-muted);font-family:'DM Mono',monospace;margin-top:2px;word-break:break-all;">—</div>
+            </div>
+            <div id="memory-note-tags-display" style="display:flex;flex-wrap:wrap;gap:3px;max-width:280px;"></div>
+          </div>
+
+          <!-- Tabs Edit/Preview -->
+          <div id="memory-editor-tabs" style="display:none;padding:6px 14px 0;border-bottom:1px solid var(--line);background:rgba(255,255,255,.01);">
+            <button id="memory-tab-edit" class="mem-tab active" onclick="switchMemoryTab('edit')" data-i18n="memory.tab_edit">Editar</button>
+            <button id="memory-tab-preview" class="mem-tab" onclick="switchMemoryTab('preview')" data-i18n="memory.tab_preview">Preview</button>
+            <button id="memory-tab-split" class="mem-tab" onclick="switchMemoryTab('split')" data-i18n="memory.tab_split">Dividido</button>
+          </div>
+
+          <!-- Editor + Preview -->
+          <div id="memory-editor-body" style="flex:1;display:flex;min-height:0;background:rgba(0,0,0,.2);">
+            <textarea id="memory-editor" spellcheck="false" oninput="onEditorInput()" style="flex:1;background:transparent;color:var(--ink);border:none;outline:none;resize:none;padding:14px;font-family:'DM Mono',monospace;font-size:12px;line-height:1.55;display:none;" data-i18n-placeholder="memory.body_placeholder" placeholder="Selecione uma nota à esquerda ou crie uma nova."></textarea>
+            <div id="memory-preview" style="flex:1;overflow-y:auto;padding:14px 18px;font-size:12.5px;line-height:1.6;color:var(--ink);display:none;"></div>
+            <div class="modal-empty" id="memory-editor-empty" style="margin:auto;color:var(--ink-muted);text-align:center;padding:20px;">
+              <div style="font-size:30px;margin-bottom:10px;opacity:.5;">🧠</div>
+              <div data-i18n="memory.empty_editor">Selecione uma nota na lista ou crie uma nova.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:10px 18px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.02);">
+        <button onclick="openMemory(true)" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="memory.refresh">↻ Atualizar</button>
+        <button onclick="openCreateNoteDialog()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="memory.new_note">+ Nova nota</button>
+        <div style="flex:1;"></div>
+        <button id="memory-btn-save" onclick="saveCurrentNote()" disabled style="width:auto;padding:5px 14px;font-size:11px;background:var(--green);color:#000;border:1px solid var(--green);border-radius:4px;font-weight:600;cursor:not-allowed;opacity:.4;" data-i18n="memory.save">💾 Salvar</button>
+        <button id="memory-btn-delete" onclick="deleteCurrentNote()" disabled style="width:auto;padding:5px 12px;font-size:11px;background:transparent;color:var(--red);border:1px solid var(--red);border-radius:4px;cursor:not-allowed;opacity:.4;" data-i18n="memory.delete">🗑 Excluir</button>
+        <a id="memory-open-drive" href="#" target="_blank" class="footer-link" style="font-size:10.5px;display:none;" data-i18n="memory.open_vault">Abrir Drive</a>
+        <button onclick="closeMemory()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="ui.close">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub-modal: criar nova nota (v0.5.1.4) -->
+  <div id="memory-new-overlay" onclick="if(event.target===this)closeCreateNoteDialog()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:100000;opacity:0;pointer-events:none;transition:opacity .15s;">
+    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:18px;width:420px;max-width:92vw;box-shadow:0 16px 40px rgba(0,0,0,.6);">
+      <div style="font-size:13px;font-weight:600;margin-bottom:14px;" data-i18n="memory.new_note_dialog_title">📝 Nova nota</div>
+      <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="memory.field_path">Caminho (ex: research/minha-nota.md)</label>
+      <input id="memory-new-path" type="text" placeholder="research/minha-nota.md" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;font-family:'DM Mono',monospace;outline:none;margin-bottom:10px;" />
+      <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="memory.field_title">Título</label>
+      <input id="memory-new-title" type="text" placeholder="Título da nota" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;outline:none;margin-bottom:10px;" />
+      <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="memory.field_template">Template</label>
+      <select id="memory-new-template" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;outline:none;margin-bottom:10px;">
+        <option value="inbox">inbox</option>
+      </select>
+      <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="memory.field_tags">Tags (separadas por vírgula, opcional)</label>
+      <input id="memory-new-tags" type="text" placeholder="pesquisai/research, foo/bar" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;outline:none;margin-bottom:14px;" />
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="closeCreateNoteDialog()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="ui.cancel">Cancelar</button>
+        <button onclick="submitCreateNote()" class="modal-close" style="width:auto;padding:5px 14px;font-size:11px;background:var(--accent);color:#000;border:1px solid var(--accent);border-radius:4px;font-weight:600;" data-i18n="memory.create">Criar</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* v0.5.1.4 — Editor de memória Obsidian */
+    .mem-tab {
+      background: transparent; color: var(--ink-muted); border: none;
+      border-bottom: 2px solid transparent; padding: 6px 12px; font-size: 11.5px;
+      cursor: pointer; font-family: inherit; transition: all .15s;
+    }
+    .mem-tab:hover { color: var(--ink); }
+    .mem-tab.active { color: var(--ink); border-bottom-color: var(--accent); }
+    .mem-note-item {
+      padding: 6px 8px; border-radius: 4px; cursor: pointer; margin-bottom: 2px;
+      transition: background .12s; border-left: 2px solid transparent;
+    }
+    .mem-note-item:hover { background: rgba(255,255,255,.04); }
+    .mem-note-item.active {
+      background: rgba(var(--accent-rgb, 99, 179, 237), .12);
+      border-left-color: var(--accent);
+    }
+    .mem-note-item .mem-note-title {
+      font-size: 12px; color: var(--ink); font-weight: 500;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .mem-note-item .mem-note-path {
+      font-size: 9.5px; color: var(--ink-muted); font-family: 'DM Mono', monospace;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .mem-note-item.human .mem-note-title::before {
+      content: '✎ '; color: var(--ink-muted);
+    }
+    .mem-folder-label {
+      font-size: 9.5px; color: var(--ink-muted); text-transform: uppercase;
+      letter-spacing: .05em; padding: 8px 4px 4px; font-weight: 600;
+    }
+    .mem-preview h1, .mem-preview h2, .mem-preview h3 {
+      color: var(--ink); margin: 0.6em 0 0.3em; font-weight: 600;
+    }
+    .mem-preview h1 { font-size: 17px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+    .mem-preview h2 { font-size: 15px; }
+    .mem-preview h3 { font-size: 13.5px; }
+    .mem-preview p { margin: 0.5em 0; }
+    .mem-preview code {
+      background: rgba(255,255,255,.06); padding: 1px 4px; border-radius: 3px;
+      font-family: 'DM Mono', monospace; font-size: 11.5px;
+    }
+    .mem-preview pre {
+      background: rgba(0,0,0,.3); padding: 8px 10px; border-radius: 4px;
+      overflow-x: auto; font-size: 11.5px;
+    }
+    .mem-preview pre code { background: transparent; padding: 0; }
+    .mem-preview blockquote {
+      border-left: 3px solid var(--accent); margin: 0.5em 0;
+      padding: 4px 10px; color: var(--ink-muted);
+    }
+    .mem-preview a { color: var(--accent); text-decoration: none; }
+    .mem-preview ul, .mem-preview ol { padding-left: 1.5em; margin: 0.4em 0; }
+    .mem-preview .wikilink {
+      background: rgba(var(--accent-rgb, 99, 179, 237), .1);
+      color: var(--accent); padding: 1px 5px; border-radius: 3px;
+      font-family: 'DM Mono', monospace; font-size: 11px;
+    }
+    .mem-preview .tag {
+      background: var(--accent-dim); color: var(--accent);
+      padding: 1px 6px; border-radius: 3px; font-size: 10.5px; margin-right: 3px;
+    }
+    .mem-preview hr { border: none; border-top: 1px solid var(--line); margin: 1em 0; }
+  </style>
   <script>
     // ════════════════════════════════════════════════════════════
     // PesquisAI v0.4.1 — Patch corretivo
@@ -1334,39 +1143,22 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       // Persiste no backend (se disponível) + recarrega para aplicar
       // traduções do backend também
       setCookie(LANG_COOKIE, lang);
-      // v0.4.2.2: chama /api/lang POST que reinicia o ttyd com saudação
-      // no novo idioma (ao invés de --prompt "oi" genérico)
       try {
         fetch(BASE + "/api/lang", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ lang: lang })
-        }).then(r => r.json()).then(d => {
-          if (d && d.ok) {
-            // Mostra a saudação como toast
-            const dict2 = I18N[lang] || I18N["pt_BR"];
-            toast("🤖 " + (d.greeting || ""), "ok");
-          }
         }).catch(() => {});
       } catch (e) {}
       // Aplica imediatamente o que dá (UI strings)
       applyLang(lang);
-      // Invalida o cache do AGENTS.md para que recarregue no novo idioma
-      // (v0.4.2: troca de AGENTS.md por idioma)
-      _agentsCache = null;
-      _agentsCacheLang = null;
-      // Se o modal de Diretrizes estiver aberto, recarrega o conteúdo
-      const agentsOverlay = document.getElementById("agents-overlay");
-      if (agentsOverlay && agentsOverlay.style.opacity === "1") {
-        loadAgents(true);
-      }
       // Toast feedback
       const dict = I18N[lang] || I18N["pt_BR"];
       toast("🌐 " + (dict["languages.switched_to"] || lang), "info");
       // Fecha menu
       closeLangMenu();
       // Recarrega para que backend traduza também (toasts, modais completos)
-      setTimeout(() => location.reload(), 1200);
+      setTimeout(() => location.reload(), 700);
     }
 
     function buildLangMenu() {
@@ -1561,220 +1353,45 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       const key = document.getElementById("prov-key-input").value.trim();
       if (!key) { toast("⚠️ Insira a API key.", "err"); return; }
       if (!_selProv) { toast("⚠️ Selecione um provedor.", "err"); return; }
-      closeProvider();
+      // 🐛 HOTFIX v0.5.1.3 — guardar refs em variáveis locais ANTES de fechar overlay
+      // O bug original: closeProvider() setava _selProv = null, e a linha seguinte
+      // (_selProv.id no JSON.stringify) crashava com "Cannot read properties of null".
+      const provId = _selProv.id;
+      const provEnv = _selProv.env;
+      const provName = _selProv.name;
       toast("💾 Salvando…", "info");
       try {
-        await fetch(BASE + "/api/apikey", {
+        const r = await fetch(BASE + "/api/apikey", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ provider: _selProv.id, env: _selProv.env, apikey: key })
+          body: JSON.stringify({ provider: provId, env: provEnv, apikey: key })
         });
-        toast("✅ Salvo!", "ok");
-      } catch(e) { toast("❌ " + e.message, "err"); }
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && (d.ok !== false)) {
+          toast(`✅ ${provName} conectado!`, "ok");
+          closeProvider();
+        } else {
+          toast("❌ " + (d.error || `Erro HTTP ${r.status}`), "err");
+        }
+      } catch(e) {
+        toast("❌ " + e.message, "err");
+      }
     }
 
     async function openHealth() {
       const overlay = document.getElementById("health-overlay");
-      const list = document.getElementById("health-list");
-      const dict = I18N[_currentLang] || I18N["pt_BR"];
       overlay.style.opacity = "1"; overlay.style.pointerEvents = "all";
-      // P3 fix: buscar diagnóstico do backend e popular a lista
-      if (list) {
-        list.innerHTML = '<div class="modal-empty">' + (dict["ui.loading"] || "Carregando…") + '</div>';
-      }
-      try {
-        const r = await fetch(BASE + "/api/health");
-        const d = await r.json();
-        renderHealth(d);
-      } catch (e) {
-        if (list) {
-          list.innerHTML = '<div class="modal-empty">❌ ' +
-            (dict["agents.error"] || "Erro") + ': ' + e.message + '</div>';
-        }
-      }
     }
     function closeHealth() {
       const o = document.getElementById("health-overlay");
       o.style.opacity = "0"; o.style.pointerEvents = "none";
     }
 
-    // P3: renderiza o JSON do /api/health em linhas com badges de status
-    function renderHealth(d) {
-      const list = document.getElementById("health-list");
-      if (!list) return;
-      if (!d || !d.ok || !d.checks) {
-        list.innerHTML = '<div class="modal-empty">⚠️ ' +
-          (d && d.error ? d.error : "Sem dados do diagnóstico") + '</div>';
-        return;
-      }
-      const c = d.checks;
-      const ROWS = [
-        ["drive_mounted",       "Drive montado",     c.drive_mounted],
-        ["backup_dir_exists",   "Backup dir",        c.backup_dir_exists],
-        ["ttyd_alive",          "Terminal (ttyd)",   c.ttyd_alive],
-        ["opencode_found",      "OpenCode binário",  c.opencode_found],
-        ["keys_store_exists",   "Keys store",        c.keys_store_exists],
-        ["encryption_key_exists","Chave cifra",      c.encryption_key_exists],
-        ["ffmpeg_ok",           "ffmpeg",            c.ffmpeg_ok],
-      ];
-      // Conta skills carregadas
-      const skillCount = c.skills_count || (c.skills_loaded ? c.skills_loaded.length : 0);
-      ROWS.push(["skills_count", "Skills carregadas", skillCount, skillCount + " disponíveis"]);
-      // Keys carregadas
-      ROWS.push(["keys_loaded", "API keys em env",
-        (c.keys_loaded_count || 0) > 0,
-        (c.keys_loaded_count || 0) + " ativas: " + (c.keys_loaded || []).join(", ")]);
-      // Disco
-      if (c.disk_free_mb >= 0) {
-        const freeGb = (c.disk_free_mb / 1024).toFixed(1);
-        const totalGb = (c.disk_total_mb / 1024).toFixed(1);
-        ROWS.push(["disk", "Espaço em disco",
-          c.disk_free_mb > 500, freeGb + " GB livres de " + totalGb + " GB"]);
-      }
-      // Versão
-      if (d.version) {
-        ROWS.push(["version", "PesquisAI", true, "v" + d.version]);
-      }
-
-      list.innerHTML = ROWS.map(r => {
-        const key = r[0], label = r[1], ok = r[2], meta = r[3];
-        const badge = ok === true ? "health-ok" : (ok === false ? "health-fail" : "health-warn");
-        const symbol = ok === true ? "✓" : (ok === false ? "✗" : "·");
-        const value = meta !== undefined ? meta : (ok ? "ok" : "falha");
-        return '<div class="health-row">' +
-               '<span>' + label + '</span>' +
-               '<span class="health-status ' + badge + '">' + symbol + ' ' + value + '</span>' +
-               '</div>';
-      }).join("");
-    }
-
     let _allSessions = [];
-    // v0.4.2.2: openSessions() agora faz fetch em /api/sessions
-    // (antes só abria o overlay sem carregar a lista)
     async function openSessions() {
       const overlay = document.getElementById("sessions-overlay");
-      const list = document.getElementById("session-list");
-      const dict = I18N[_currentLang] || I18N["pt_BR"];
-      if (overlay) {
-        overlay.style.opacity = "1";
-        overlay.style.pointerEvents = "all";
-      }
-      // Mostra estado de carregamento
-      if (list) {
-        list.innerHTML = '<div class="modal-empty">' +
-          (dict["ui.loading"] || "Carregando sessões…") + '</div>';
-      }
-      // Filtro de busca — mantém o valor digitado
-      const search = document.getElementById("session-search");
-      const q = (search && search.value || "").trim().toLowerCase();
-      try {
-        const r = await fetch(BASE + "/api/sessions");
-        const d = await r.json();
-        const sessions = d.sessions || [];
-        _allSessions = sessions;
-        renderSessions(sessions, q);
-      } catch (e) {
-        if (list) {
-          list.innerHTML = '<div class="modal-empty">❌ ' +
-            (dict["agents.error"] || "Erro") + ': ' + e.message + '</div>';
-        }
-      }
+      overlay.style.opacity = "1"; overlay.style.pointerEvents = "all";
     }
-
-    function renderSessions(sessions, query) {
-      const list = document.getElementById("session-list");
-      const dict = I18N[_currentLang] || I18N["pt_BR"];
-      if (!list) return;
-      const filtered = (query
-        ? sessions.filter(s => {
-            const id = (s.id || s.session_id || s.name || "").toLowerCase();
-            const title = (s.title || s.summary || "").toLowerCase();
-            return id.includes(query) || title.includes(query);
-          })
-        : sessions);
-      if (!filtered.length) {
-        list.innerHTML = '<div class="modal-empty">' +
-          (query
-            ? (dict["sessions.empty_filtered"] || "Nenhuma sessão corresponde ao filtro.")
-            : (dict["sessions.empty"] || "Nenhuma sessão encontrada.")) +
-          '</div>';
-        return;
-      }
-      list.innerHTML = filtered.map(s => {
-        const id = s.id || s.session_id || s.name || "(sem id)";
-        const title = s.title || s.summary || "";
-        const created = s.created_at || s.created || s.updated_at || "";
-        const messages = s.message_count || s.messages || s.messages_count || "";
-        const meta = [created, messages ? (messages + " msgs") : ""].filter(Boolean).join(" · ");
-        return '<div class="session-item" data-session-id="' + escapeHtml(String(id)) + '" title="' +
-          (dict["sessions.click_to_restore"] || "Clique para restaurar") + '">' +
-          '<div style="display:flex;flex-direction:column;gap:2px;min-width:0;">' +
-            '<span style="font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
-              escapeHtml(id) + '</span>' +
-            (title ? '<span style="font-size:10.5px;color:var(--ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
-              escapeHtml(title) + '</span>' : '') +
-          '</div>' +
-          (meta ? '<span class="ses-meta">' + escapeHtml(meta) + '</span>' : '') +
-        '</div>';
-      }).join("");
-    }
-
-    function filterSessions() {
-      const search = document.getElementById("session-search");
-      const q = (search && search.value || "").trim().toLowerCase();
-      renderSessions(_allSessions, q);
-    }
-
-    // Event delegation: cliques em .session-item chamam restoreSession(id)
-    document.addEventListener("click", (ev) => {
-      const item = ev.target.closest(".session-item");
-      if (item && item.dataset.sessionId) {
-        ev.preventDefault();
-        restoreSession(item.dataset.sessionId);
-      }
-    });
-
-    async function restoreSession(sessionId) {
-      if (!sessionId) return;
-      if (!confirm("Restaurar sessão " + chr(34) + sessionId + chr(34) + " ?")) return;
-      const dict = I18N[_currentLang] || I18N["pt_BR"];
-      toast(dict["ui.exporting"] || "Restaurando sessão…", "info");
-      try {
-        const r = await fetch(BASE + "/api/restore", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sessionId })
-        });
-        const d = await r.json();
-        if (d.ok || d.imported) {
-          toast("✅ Sessão restaurada!", "ok");
-        } else {
-          toast("❌ " + (d.error || "Falha ao restaurar."), "err");
-        }
-      } catch (e) {
-        toast("❌ " + e.message, "err");
-      }
-    }
-
-    function escapeHtml(s) {
-      const map = {
-        amp: "&amp;",
-        lt:  "&lt;",
-        gt:  "&gt;",
-        quot: "&quot;",
-        apos: "&#39;",
-        "0":  "&#39;"
-      };
-      return String(s).replace(/[&<>"']/g, c => {
-        if (c === "&") return "&amp;";
-        if (c === "<") return "&lt;";
-        if (c === ">") return "&gt;";
-        if (c === '"') return "&quot;";
-        if (c === "'") return "&#39;";
-        return c;
-      });
-    }
-
     function closeSessions() {
       const o = document.getElementById("sessions-overlay");
       o.style.opacity = "0"; o.style.pointerEvents = "none";
@@ -1789,7 +1406,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       o.style.opacity = "0"; o.style.pointerEvents = "none";
     }
 
-    // ── Modal de Diretrizes do Agente (v0.4.2) ─────────────────
+    // ── Diretrizes do Agente (HOTFIX v0.5.1.2) ──────────────────
     // Carrega o AGENTS.md no idioma atual do backend.
     // Endpoint: GET /api/agents?lang=pt_BR
     let _agentsCache = null;
@@ -1819,7 +1436,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       const sourceEl = document.getElementById("agents-source-link");
       if (!contentEl) return;
 
-      // Atualiza badge do idioma + link da fonte
       const langShort = (_currentLang || "pt_BR").replace("_", "-");
       if (badgeEl) badgeEl.textContent = langShort;
       if (sourceEl) {
@@ -1827,7 +1443,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         sourceEl.href = "https://github.com/gustavobraga-byte/PesquisAI/blob/main/agents/AGENTS." + code + ".md";
       }
 
-      // Cache: 1 chamada por idioma até forceReload
       if (!forceReload && _agentsCacheLang === _currentLang && _agentsCache) {
         renderAgentsContent(contentEl, _agentsCache);
         return;
@@ -1851,16 +1466,11 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     }
 
     // P4 fix: renderiza o markdown do AGENTS.md usando marked.js + github-markdown-css
-    // (substitui textContent cru por HTML formatado)
     function renderAgentsContent(el, mdText) {
       try {
         if (typeof marked !== "undefined") {
-          // Configurações do marked
           marked.setOptions({ breaks: true, gfm: true, headerIds: true });
-          // Remove o frontmatter YAML (entre --- e ---) para não poluir a renderização.
-          // Constrói a regex via String.fromCharCode para evitar SyntaxWarning
-          // quando py_compile lê este arquivo como string Python.
-          const _b = String.fromCharCode(92);  // caractere barra invertida
+          const _b = String.fromCharCode(92);
           const _re = new RegExp(
             "^---" + _b + "s*" + _b + "n[" + _b + "s" + _b + "S]*?" +
             _b + "n---" + _b + "s*" + _b + "n"
@@ -1868,7 +1478,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
           const cleaned = mdText.replace(_re, "");
           el.innerHTML = marked.parse(cleaned);
         } else {
-          // Fallback se CDN do marked falhar: mostra como texto pré-formatado
           el.textContent = mdText;
         }
       } catch (e) {
@@ -1890,7 +1499,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         if (navigator.clipboard && navigator.clipboard.writeText) {
           await navigator.clipboard.writeText(text);
         } else {
-          // Fallback para browsers antigos
           const ta = document.createElement("textarea");
           ta.value = text;
           ta.style.position = "fixed";
@@ -1901,6 +1509,466 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
           document.body.removeChild(ta);
         }
         toast("✅ " + (dict["agents.copy_ok"] || "Diretrizes copiadas!"), "ok");
+      } catch (e) {
+        toast("❌ " + e.message, "err");
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => {
+        if (c === "&") return "&amp;";
+        if (c === "<") return "&lt;";
+        if (c === ">") return "&gt;";
+        if (c === '"') return "&quot;";
+        if (c === "'") return "&#39;";
+        return c;
+      });
+    }
+
+    // ── Memória Obsidian (v0.5.1.4 — navegar + editar) ────────
+    // Estado:
+    //   _memoryTree      — lista plana de notas carregada do /api/obsidian/tree
+    //   _memoryStatus    — {status, root, writable, notes_count, ...}
+    //   _memoryCurrent   — {path, body, title, tags, is_pesquisai, ...} da nota aberta
+    //   _memoryDirty     — true se o editor tem mudanças não salvas
+    //   _memorySearch    — termo de busca atual (filtro da sidebar)
+    //   _memoryTab       — 'edit' | 'preview' | 'split'
+    let _memoryTree = [];
+    let _memoryStatus = null;
+    let _memoryCurrent = null;
+    let _memoryDirty = false;
+    let _memorySearch = "";
+    let _memoryTab = "edit";
+
+    async function openMemory(force) {
+      const overlay = document.getElementById("memory-overlay");
+      if (overlay) {
+        overlay.style.opacity = "1";
+        overlay.style.pointerEvents = "all";
+      }
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const list = document.getElementById("memory-list");
+      if (list) {
+        list.innerHTML = '<div class="modal-empty" style="padding:14px;">' +
+          (dict["ui.loading"] || "Carregando…") + '</div>';
+      }
+      // Sempre recarrega o status e a árvore; cache apenas para
+      // o caso de força=false numa sessão recente (5 s).
+      try {
+        const [rStatus, rTree] = await Promise.all([
+          fetch(BASE + "/api/obsidian"),
+          fetch(BASE + "/api/obsidian/tree"),
+        ]);
+        const dStatus = await rStatus.json();
+        const dTree = await rTree.json();
+        _memoryStatus = dStatus;
+        _memoryTree = (dTree && dTree.tree) ? dTree.tree : [];
+        renderMemoryHeader(dStatus, dict);
+        renderMemorySidebar();
+        if (dStatus.status !== "ready") {
+          if (list) {
+            list.innerHTML = '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' +
+              escapeHtml(dStatus.message || dStatus.status) + '</div>';
+          }
+        }
+      } catch (e) {
+        if (list) {
+          list.innerHTML = '<div class="modal-empty" style="padding:14px;">❌ ' +
+            (dict["agents.error"] || "Erro") + ': ' + escapeHtml(e.message) + '</div>';
+        }
+      }
+    }
+
+    function closeMemory(force) {
+      // Se houver mudanças não salvas, pedir confirmação (a menos que force=true)
+      if (!force && _memoryDirty && _memoryCurrent) {
+        if (!confirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nFechar mesmo assim?")) {
+          return;
+        }
+      }
+      const overlay = document.getElementById("memory-overlay");
+      if (overlay) {
+        overlay.style.opacity = "0";
+        overlay.style.pointerEvents = "none";
+      }
+      _memoryDirty = false;
+      _memoryCurrent = null;
+      markDirty();
+    }
+
+    // ── Renderização: header (status badge + drive link) ───────────
+    function renderMemoryHeader(d, dict) {
+      const badge   = document.getElementById("memory-status-badge");
+      const driveLnk = document.getElementById("memory-open-drive");
+      const memBtn  = document.getElementById("memory-btn");
+      const sub     = document.getElementById("memory-subtitle");
+      if (!d) return;
+      const statusMap = {
+        ready:          { txt: dict["memory.status_ready"]     || "Ativa",            color: "var(--green)" },
+        disabled:       { txt: dict["memory.status_disabled"]  || "Desativada",       color: "var(--ink-muted)" },
+        no_vault:       { txt: dict["memory.status_no_vault"]  || "Sem vault",        color: "var(--amber)" },
+        read_only:      { txt: dict["memory.status_read_only"] || "Somente leitura",  color: "var(--amber)" },
+        error:          { txt: dict["memory.status_error"]     || "Erro",             color: "var(--red)" },
+        module_unavailable: { txt: dict["memory.status_error"] || "Módulo indisponível", color: "var(--red)" },
+      };
+      const st = statusMap[d.status] || { txt: d.status || "?", color: "var(--ink-muted)" };
+      if (badge) {
+        badge.textContent = st.txt;
+        badge.style.color = st.color;
+        badge.style.borderColor = st.color;
+      }
+      if (memBtn) {
+        memBtn.style.color = (d.status === "ready") ? "var(--green)" : st.color;
+      }
+      if (driveLnk) {
+        if (d.root && d.status === "ready") {
+          driveLnk.href = "https://drive.google.com/drive/my-drive";
+          driveLnk.title = d.root;
+          driveLnk.style.display = "";
+        } else {
+          driveLnk.style.display = "none";
+        }
+      }
+      if (sub && d.status === "ready" && d.notes_count != null) {
+        sub.textContent = (dict["memory.subtitle"] || "Camada de memória persistente do agente")
+          + " · " + d.notes_count + " " + (dict["memory.notes_count"] || "notas");
+      }
+    }
+
+    // ── Renderização: sidebar (lista de notas agrupadas por pasta) ──
+    function renderMemorySidebar() {
+      const list = document.getElementById("memory-list");
+      const cnt  = document.getElementById("memory-count");
+      if (!list) return;
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      // Filtra por busca
+      const q = (_memorySearch || "").toLowerCase().trim();
+      const filtered = [];
+      for (const folder of _memoryTree) {
+        const matches = [];
+        for (const n of folder.notes) {
+          if (!q) { matches.push(n); continue; }
+          if ((n.title || "").toLowerCase().includes(q) ||
+              (n.path || "").toLowerCase().includes(q) ||
+              (n.tags || []).some(t => (t || "").toLowerCase().includes(q))) {
+            matches.push(n);
+          }
+        }
+        if (matches.length) filtered.push({ folder: folder.folder, notes: matches });
+      }
+      const total = filtered.reduce((s, f) => s + f.notes.length, 0);
+      if (cnt) cnt.textContent = total + " " + (dict["memory.notes_count"] || "notas");
+      if (total === 0) {
+        list.innerHTML = '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' +
+          (q ? (dict["memory.no_results"] || "Nenhum resultado para '" + escapeHtml(q) + "'.") :
+               (dict["memory.no_notes"] || "Nenhuma nota ainda.")) + '</div>';
+        return;
+      }
+      let html = "";
+      for (const folder of filtered) {
+        const label = folder.folder || "📁 (raiz)";
+        html += '<div class="mem-folder-label">' + escapeHtml(label) + '</div>';
+        for (const n of folder.notes) {
+          const active = (_memoryCurrent && _memoryCurrent.path === n.path) ? " active" : "";
+          const human  = n.is_pesquisai_generated ? "" : " human";
+          const tagHtml = (n.tags || []).slice(0, 3).map(t =>
+            '<span style="display:inline-block;font-size:9px;padding:0 4px;background:var(--accent-dim);color:var(--accent);border-radius:2px;margin-right:2px;">#' + escapeHtml(String(t).replace(/^#/, "")) + '</span>'
+          ).join("");
+          html += `<div class="mem-note-item${active}${human}" onclick="loadMemoryNote('${n.path.replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\'")}')">` +
+               '<div class="mem-note-title">' + escapeHtml(n.title || n.path) + '</div>' +
+                  '<div class="mem-note-path">' + escapeHtml(n.path) + '</div>' +
+                  (tagHtml ? '<div style="margin-top:3px;">' + tagHtml + '</div>' : '') +
+                  '</div>';
+        }
+      }
+      list.innerHTML = html;
+    }
+
+    // ── Busca ──────────────────────────────────────────────────────
+    let _searchDebounce = null;
+    function searchMemory(q) {
+      if (_searchDebounce) clearTimeout(_searchDebounce);
+      _searchDebounce = setTimeout(() => {
+        _memorySearch = q;
+        renderMemorySidebar();
+      }, 150);
+    }
+
+    // ── Carregar nota no editor ───────────────────────────────────
+    async function loadMemoryNote(path) {
+      if (_memoryDirty && _memoryCurrent && _memoryCurrent.path !== path) {
+        if (!confirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nDescartar e abrir outra nota?")) {
+          return;
+        }
+      }
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const meta  = document.getElementById("memory-note-meta");
+      const tabs  = document.getElementById("memory-editor-tabs");
+      const ed    = document.getElementById("memory-editor");
+      const prev  = document.getElementById("memory-preview");
+      const empty = document.getElementById("memory-editor-empty");
+      const titleEl = document.getElementById("memory-note-title");
+      const pathEl  = document.getElementById("memory-note-path");
+      const tagsEl  = document.getElementById("memory-note-tags-display");
+      const btnSave = document.getElementById("memory-btn-save");
+      const btnDel  = document.getElementById("memory-btn-delete");
+      // UI: loading
+      if (titleEl) titleEl.value = "…";
+      if (pathEl)  pathEl.textContent = path;
+      if (tagsEl)  tagsEl.innerHTML = "";
+      if (ed)      ed.value = (dict["ui.loading"] || "Carregando…");
+      if (empty)   empty.style.display = "none";
+      try {
+        const r = await fetch(BASE + "/api/obsidian/note?path=" + encodeURIComponent(path));
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+          toast("❌ " + (d.error || r.status), "err");
+          ed.value = "";
+          if (empty) { empty.style.display = ""; empty.textContent = d.error || "Erro ao carregar nota."; }
+          return;
+        }
+        _memoryCurrent = {
+          path: d.path,
+          title: d.title,
+          tags: d.tags || [],
+          body: d.body || "",
+          is_pesquisai: d.is_pesquisai_generated,
+          metadata: d.metadata,
+        };
+        if (titleEl) titleEl.value = d.title || "";
+        if (pathEl)  pathEl.textContent = d.path;
+        if (tagsEl) {
+          tagsEl.innerHTML = (d.tags || []).map(t =>
+            '<span style="display:inline-block;font-size:9.5px;padding:1px 6px;background:var(--accent-dim);color:var(--accent);border-radius:3px;">#' + escapeHtml(String(t).replace(/^#/, "")) + '</span>'
+          ).join("") || '<span style="font-size:9.5px;color:var(--ink-muted);">— sem tags —</span>';
+        }
+        if (ed) ed.value = d.body || "";
+        if (meta) meta.style.display = "flex";
+        if (tabs) tabs.style.display = "block";
+        if (btnSave) { btnSave.disabled = false; btnSave.style.cursor = "pointer"; btnSave.style.opacity = "1"; }
+        if (btnDel)  { btnDel.disabled  = false; btnDel.style.cursor  = "pointer"; btnDel.style.opacity  = "1"; }
+        _memoryDirty = false;
+        markDirty();
+        switchMemoryTab(_memoryTab);
+        renderMemorySidebar(); // atualiza o item ativo
+      } catch (e) {
+        toast("❌ " + e.message, "err");
+      }
+    }
+
+    // ── Switch tab Edit / Preview / Split ──────────────────────────
+    function switchMemoryTab(t) {
+      _memoryTab = t;
+      const ed   = document.getElementById("memory-editor");
+      const prev = document.getElementById("memory-preview");
+      const tEdit = document.getElementById("memory-tab-edit");
+      const tPrev = document.getElementById("memory-tab-preview");
+      const tSpl  = document.getElementById("memory-tab-split");
+      [tEdit, tPrev, tSpl].forEach(b => b && b.classList.remove("active"));
+      if (t === "edit")   { tEdit && tEdit.classList.add("active"); ed.style.display = "";   prev.style.display = "none"; ed.style.flex = "1"; prev.style.flex = ""; }
+      if (t === "preview"){ tPrev && tPrev.classList.add("active"); ed.style.display = "none"; prev.style.display = "";   prev.style.flex = "1"; ed.style.flex = ""; renderPreview(); }
+      if (t === "split")  { tSpl  && tSpl.classList.add("active");  ed.style.display = "";   prev.style.display = "";   ed.style.flex = "1"; prev.style.flex = "1"; renderPreview(); }
+    }
+
+    function renderPreview() {
+      const ed = document.getElementById("memory-editor");
+      const prev = document.getElementById("memory-preview");
+      if (!ed || !prev) return;
+      const src = ed.value || "";
+      try {
+        // Usa marked.js se disponível; caso contrário, escapa como <pre>
+        if (typeof marked !== "undefined" && marked.parse) {
+          let html = marked.parse(src);
+          // Destaque de wikilinks [[nota]] e tags #tag
+          html = html.replace(/\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g,
+            (m, target, alias) => '<span class="wikilink">[[' + escapeHtml(alias || target) + ']]</span>');
+          html = html.replace(/(^|[\s(])#([a-zA-Z0-9_\-/]+)/g,
+            (m, p, t) => p + '<span class="tag">#' + escapeHtml(t) + '</span>');
+          prev.innerHTML = '<div class="mem-preview">' + html + '</div>';
+        } else {
+          prev.innerHTML = '<pre style="white-space:pre-wrap;font-family:DM Mono,monospace;font-size:11.5px;">' + escapeHtml(src) + '</pre>';
+        }
+      } catch (e) {
+        prev.innerHTML = '<pre>' + escapeHtml(src) + '</pre>';
+      }
+    }
+
+    // ── Editor: input → dirty ─────────────────────────────────────
+    function onEditorInput() {
+      if (!_memoryDirty) { _memoryDirty = true; markDirty(); }
+      if (_memoryTab === "split") renderPreview();
+    }
+
+    function markDirty() {
+      const ind = document.getElementById("memory-dirty-indicator");
+      const btnSave = document.getElementById("memory-btn-save");
+      if (ind) ind.style.display = _memoryDirty ? "" : "none";
+      if (btnSave) {
+        if (_memoryDirty && _memoryCurrent) {
+          btnSave.style.background = "var(--amber)";
+          btnSave.style.borderColor = "var(--amber)";
+          btnSave.style.color = "#000";
+        } else if (_memoryCurrent) {
+          btnSave.style.background = "var(--green)";
+          btnSave.style.borderColor = "var(--green)";
+          btnSave.style.color = "#000";
+        } else {
+          btnSave.style.background = "";
+          btnSave.style.borderColor = "";
+          btnSave.style.color = "";
+        }
+      }
+    }
+
+    // ── Salvar nota ───────────────────────────────────────────────
+    async function saveCurrentNote() {
+      if (!_memoryCurrent) { toast("⚠️ Nenhuma nota aberta.", "err"); return; }
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const ed = document.getElementById("memory-editor");
+      const titleEl = document.getElementById("memory-note-title");
+      const body = ed ? ed.value : "";
+      const title = titleEl ? titleEl.value : _memoryCurrent.title;
+      const btnSave = document.getElementById("memory-btn-save");
+      if (btnSave) { btnSave.disabled = true; btnSave.textContent = "…"; }
+      try {
+        const r = await fetch(BASE + "/api/obsidian/note", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "save",
+            path: _memoryCurrent.path,
+            title: title,
+            body: body,
+            tags: _memoryCurrent.tags,
+            force: !_memoryCurrent.is_pesquisai,
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+          toast("❌ " + (d.error || r.status) + (d.hint ? " · " + d.hint : ""), "err");
+          if (btnSave) { btnSave.disabled = false; btnSave.textContent = "💾 Salvar"; }
+          return;
+        }
+        _memoryCurrent.body = body;
+        _memoryCurrent.title = title;
+        _memoryCurrent.is_pesquisai = true; // após salvar vira do agente
+        _memoryDirty = false;
+        markDirty();
+        if (btnSave) {
+          btnSave.textContent = "✅ Salvo";
+          setTimeout(() => { btnSave.textContent = "💾 Salvar"; btnSave.disabled = false; }, 1500);
+        }
+        toast("✅ " + (d.message || "Nota salva."), "ok");
+        // Recarrega a árvore
+        openMemory(true);
+      } catch (e) {
+        toast("❌ " + e.message, "err");
+        if (btnSave) { btnSave.disabled = false; btnSave.textContent = "💾 Salvar"; }
+      }
+    }
+
+    // ── Excluir nota ──────────────────────────────────────────────
+    async function deleteCurrentNote() {
+      if (!_memoryCurrent) return;
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const ok = confirm("Mover '" + _memoryCurrent.path + "' para .trash/?");
+      if (!ok) return;
+      try {
+        const r = await fetch(BASE + "/api/obsidian/note", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "delete",
+            path: _memoryCurrent.path,
+            force: !_memoryCurrent.is_pesquisai,
+          }),
+        });
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+          toast("❌ " + (d.error || r.status) + (d.hint ? " · " + d.hint : ""), "err");
+          return;
+        }
+        toast("🗑 " + (d.message || "Nota movida para .trash/."), "ok");
+        // Limpa editor
+        _memoryCurrent = null;
+        _memoryDirty = false;
+        const meta  = document.getElementById("memory-note-meta");
+        const tabs  = document.getElementById("memory-editor-tabs");
+        const ed    = document.getElementById("memory-editor");
+        const prev  = document.getElementById("memory-preview");
+        const empty = document.getElementById("memory-editor-empty");
+        const btnSave = document.getElementById("memory-btn-save");
+        const btnDel  = document.getElementById("memory-btn-delete");
+        if (meta) meta.style.display = "none";
+        if (tabs) tabs.style.display = "none";
+        if (ed)   ed.value = "";
+        if (prev) prev.innerHTML = "";
+        if (empty){ empty.style.display = ""; }
+        if (btnSave){ btnSave.disabled = true; btnSave.style.opacity = ".4"; btnSave.style.cursor = "not-allowed"; }
+        if (btnDel) { btnDel.disabled  = true; btnDel.style.opacity  = ".4"; btnDel.style.cursor  = "not-allowed"; }
+        markDirty();
+        openMemory(true);
+      } catch (e) {
+        toast("❌ " + e.message, "err");
+      }
+    }
+
+    // ── Diálogo de nova nota ──────────────────────────────────────
+    async function openCreateNoteDialog() {
+      if (_memoryDirty && _memoryCurrent) {
+        if (!confirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nContinuar?")) return;
+      }
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const overlay = document.getElementById("memory-new-overlay");
+      if (overlay) { overlay.style.opacity = "1"; overlay.style.pointerEvents = "all"; }
+      // Carrega templates disponíveis
+      const sel = document.getElementById("memory-new-template");
+      if (sel && _memoryStatus && _memoryStatus.templates && _memoryStatus.templates.length) {
+        sel.innerHTML = _memoryStatus.templates.map(t =>
+          '<option value="' + escapeHtml(t) + '">' + escapeHtml(t) + '</option>'
+        ).join("");
+      } else if (sel) {
+        sel.innerHTML = '<option value="inbox">inbox</option>';
+      }
+      const p = document.getElementById("memory-new-path");
+      if (p) { p.value = "inbox/" + new Date().toISOString().slice(0,10) + "-nova-nota.md"; p.focus(); p.select(); }
+      const t = document.getElementById("memory-new-title");
+      if (t) t.value = "";
+      const tg = document.getElementById("memory-new-tags");
+      if (tg) tg.value = "pesquisai/draft";
+    }
+
+    function closeCreateNoteDialog() {
+      const overlay = document.getElementById("memory-new-overlay");
+      if (overlay) { overlay.style.opacity = "0"; overlay.style.pointerEvents = "none"; }
+    }
+
+    async function submitCreateNote() {
+      const path = (document.getElementById("memory-new-path").value || "").trim();
+      const title = (document.getElementById("memory-new-title").value || "").trim();
+      const template = document.getElementById("memory-new-template").value || "inbox";
+      const tagsRaw = (document.getElementById("memory-new-tags").value || "").trim();
+      const tags = tagsRaw ? tagsRaw.split(",").map(s => s.trim()).filter(Boolean) : [];
+      if (!path) { toast("⚠️ Caminho obrigatório.", "err"); return; }
+      if (!path.endsWith(".md")) {
+        toast("⚠️ Caminho deve terminar com .md", "err"); return;
+      }
+      try {
+        const r = await fetch(BASE + "/api/obsidian/note", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "create", path, title, template, tags }),
+        });
+        const d = await r.json();
+        if (!r.ok || !d.ok) {
+          toast("❌ " + (d.error || r.status), "err");
+          return;
+        }
+        toast("✅ " + (d.message || "Nota criada."), "ok");
+        closeCreateNoteDialog();
+        await openMemory(true);
+        // Abre a nota recém-criada
+        if (d.path) loadMemoryNote(d.path);
       } catch (e) {
         toast("❌ " + e.message, "err");
       }
@@ -2046,7 +2114,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         openShortcuts();
       }
       if (e.key === "Escape") {
-        closeHealth(); closeSessions(); closeShortcuts(); closeAgents();
+        closeHealth(); closeSessions(); closeShortcuts(); closeAgents(); closeMemory();  // v0.5.1.2
         closeProvider(); closeModal(); closeLangMenu();
         const mm = document.getElementById("mobile-menu");
         if (mm && mm.classList.contains("open")) toggleMobileMenu();
@@ -2073,9 +2141,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       loadInitialTheme();
       // 3. Aplica keys no ambiente
       fetch(BASE + "/api/apikey/apply", { method: "POST" }).catch(() => {});
-      // v0.4.2.5: touch handlers (scroll + pinch-zoom) são injetados
-      // diretamente no HTML do ttyd via --index (ver launch_app.py).
-      // Nada a fazer aqui no wrapper — o iframe carrega o HTML custom.
     });
   </script>
 </body>
@@ -2105,9 +2170,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "providers.var": "Variável",
             "sessions.title": "Histórico de Sessões",
             "sessions.search_placeholder": "🔍 Buscar por id ou conteúdo…",
-            "sessions.empty": "Nenhuma sessão encontrada.",
-            "sessions.empty_filtered": "Nenhuma sessão corresponde ao filtro.",
-            "sessions.click_to_restore": "Clique para restaurar",
             "shortcuts.title": "Atalhos de Teclado",
             "shortcuts.copy": "Copiar seleção", "shortcuts.copy_hint": "Segure o Shift e selecione",
             "shortcuts.interrupt": "Interromper comando", "shortcuts.paste": "Colar (Chrome)",
@@ -2118,12 +2180,47 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal recarregado com novo tema",
             "languages.label": "Idioma", "languages.switched_to": "Idioma alterado para",
             "success_messages.backup_saved": "Backup salvo",
-            "footer.email": "gustavo.braga@ufv.br",
-            "footer.github": "GitHub",
-            "footer.ufv": "UFV · Viçosa, MG - Brasil",
-            "footer.powered_by": "Powered by",
-            "footer.email_title": "Contato por e-mail",
-            "footer.github_title": "Repositório no GitHub",
+            # v0.5.1.2 — Memória Obsidian
+            "memory.title": "Memória Obsidian",
+            "memory.subtitle": "Camada de memória persistente do agente",
+            "memory.tooltip": "Memória Obsidian (segundo cérebro)",
+            "memory.status_ready": "🟢 Ativa",
+            "memory.status_disabled": "⚪ Desativada",
+            "memory.status_no_vault": "🟡 Sem vault",
+            "memory.status_read_only": "🟡 Somente leitura",
+            "memory.status_error": "🔴 Erro",
+            "memory.notes_count": "Notas",
+            "memory.notes_unit": "",
+            "memory.tags_count": "Tags",
+            "memory.links_count": "Wikilinks",
+            "memory.avg_len": "Tam. médio",
+            "memory.recent_daily": "Daily notes",
+            "memory.recent_notes": "Notas recentes",
+            "memory.no_notes": "Nenhuma nota ainda. O agente salvará aqui automaticamente.",
+            "memory.templates": "Templates",
+            "memory.open_vault": "Abrir Drive",
+            "memory.refresh": "Atualizar",
+            # v0.5.1.4 — Editor de notas (split view)
+            "memory.search_placeholder": "🔍 Buscar…",
+            "memory.new_note": "+ Nova nota",
+            "memory.new_note_title": "Nova nota",
+            "memory.new_note_dialog_title": "📝 Nova nota",
+            "memory.field_path": "Caminho (ex: research/minha-nota.md)",
+            "memory.field_title": "Título",
+            "memory.field_template": "Template",
+            "memory.field_tags": "Tags (separadas por vírgula, opcional)",
+            "memory.create": "Criar",
+            "memory.save": "💾 Salvar",
+            "memory.delete": "🗑 Excluir",
+            "memory.tab_edit": "Editar",
+            "memory.tab_preview": "Preview",
+            "memory.tab_split": "Dividido",
+            "memory.body_placeholder": "Selecione uma nota à esquerda ou crie uma nova.",
+            "memory.empty_editor": "Selecione uma nota na lista ou crie uma nova.",
+            "memory.dirty": "não salvo",
+            "memory.note_title": "Título",
+            "memory.no_results": "Nenhum resultado para a busca.",
+            # v0.5.1.2 hotfix — Diretrizes do Agente
             "agents.title": "Diretrizes do Agente",
             "agents.subtitle": "Regras e princípios do PesquisAI (AGENTS.md)",
             "agents.loading": "Carregando diretrizes…",
@@ -2145,9 +2242,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "providers.var": "Variable",
             "sessions.title": "Session History",
             "sessions.search_placeholder": "🔍 Search by id or content…",
-            "sessions.empty": "No sessions found.",
-            "sessions.empty_filtered": "No sessions match the filter.",
-            "sessions.click_to_restore": "Click to restore",
             "shortcuts.title": "Keyboard Shortcuts",
             "shortcuts.copy": "Copy selection", "shortcuts.copy_hint": "Hold Shift and select",
             "shortcuts.interrupt": "Interrupt command", "shortcuts.paste": "Paste (Chrome)",
@@ -2158,12 +2252,47 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal reloaded with new theme",
             "languages.label": "Language", "languages.switched_to": "Language switched to",
             "success_messages.backup_saved": "Backup saved",
-            "footer.email": "gustavo.braga@ufv.br",
-            "footer.github": "GitHub",
-            "footer.ufv": "UFV · Viçosa, MG - Brazil",
-            "footer.powered_by": "Powered by",
-            "footer.email_title": "Contact by email",
-            "footer.github_title": "Repository on GitHub",
+            # v0.5.1.2 — Obsidian Memory
+            "memory.title": "Obsidian Memory",
+            "memory.subtitle": "Agent's persistent memory layer",
+            "memory.tooltip": "Obsidian Memory (second brain)",
+            "memory.status_ready": "🟢 Active",
+            "memory.status_disabled": "⚪ Disabled",
+            "memory.status_no_vault": "🟡 No vault",
+            "memory.status_read_only": "🟡 Read-only",
+            "memory.status_error": "🔴 Error",
+            "memory.notes_count": "Notes",
+            "memory.notes_unit": "",
+            "memory.tags_count": "Tags",
+            "memory.links_count": "Wikilinks",
+            "memory.avg_len": "Avg. length",
+            "memory.recent_daily": "Daily notes",
+            "memory.recent_notes": "Recent notes",
+            "memory.no_notes": "No notes yet. The agent will save here automatically.",
+            "memory.templates": "Templates",
+            "memory.open_vault": "Open Drive",
+            "memory.refresh": "Refresh",
+            # v0.5.1.4 — Note editor (split view)
+            "memory.search_placeholder": "🔍 Search…",
+            "memory.new_note": "+ New note",
+            "memory.new_note_title": "New note",
+            "memory.new_note_dialog_title": "📝 New note",
+            "memory.field_path": "Path (e.g. research/my-note.md)",
+            "memory.field_title": "Title",
+            "memory.field_template": "Template",
+            "memory.field_tags": "Tags (comma-separated, optional)",
+            "memory.create": "Create",
+            "memory.save": "💾 Save",
+            "memory.delete": "🗑 Delete",
+            "memory.tab_edit": "Edit",
+            "memory.tab_preview": "Preview",
+            "memory.tab_split": "Split",
+            "memory.body_placeholder": "Select a note on the left or create a new one.",
+            "memory.empty_editor": "Select a note from the list or create a new one.",
+            "memory.dirty": "unsaved",
+            "memory.note_title": "Title",
+            "memory.no_results": "No results for the search.",
+            # v0.5.1.2 hotfix — Agent Guidelines
             "agents.title": "Agent Guidelines",
             "agents.subtitle": "PesquisAI rules and principles (AGENTS.md)",
             "agents.loading": "Loading guidelines…",
@@ -2185,9 +2314,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "providers.var": "Variable",
             "sessions.title": "Historial de Sesiones",
             "sessions.search_placeholder": "🔍 Buscar por id o contenido…",
-            "sessions.empty": "No se encontraron sesiones.",
-            "sessions.empty_filtered": "Ninguna sesión coincide con el filtro.",
-            "sessions.click_to_restore": "Clic para restaurar",
             "shortcuts.title": "Atajos de Teclado",
             "shortcuts.copy": "Copiar selección", "shortcuts.copy_hint": "Mantenga Shift y seleccione",
             "shortcuts.interrupt": "Interrumpir comando", "shortcuts.paste": "Pegar (Chrome)",
@@ -2198,12 +2324,47 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal recargado con nuevo tema",
             "languages.label": "Idioma", "languages.switched_to": "Idioma cambiado a",
             "success_messages.backup_saved": "Copia guardada",
-            "footer.email": "gustavo.braga@ufv.br",
-            "footer.github": "GitHub",
-            "footer.ufv": "UFV · Viçosa, MG - Brasil",
-            "footer.powered_by": "Desarrollado con",
-            "footer.email_title": "Contacto por correo",
-            "footer.github_title": "Repositorio en GitHub",
+            # v0.5.1.2 — Memoria Obsidian
+            "memory.title": "Memoria Obsidian",
+            "memory.subtitle": "Capa de memoria persistente del agente",
+            "memory.tooltip": "Memoria Obsidian (segundo cerebro)",
+            "memory.status_ready": "🟢 Activa",
+            "memory.status_disabled": "⚪ Desactivada",
+            "memory.status_no_vault": "🟡 Sin vault",
+            "memory.status_read_only": "🟡 Solo lectura",
+            "memory.status_error": "🔴 Error",
+            "memory.notes_count": "Notas",
+            "memory.notes_unit": "",
+            "memory.tags_count": "Etiquetas",
+            "memory.links_count": "Wikienlaces",
+            "memory.avg_len": "Tam. medio",
+            "memory.recent_daily": "Daily notes",
+            "memory.recent_notes": "Notas recientes",
+            "memory.no_notes": "Aún no hay notas. El agente guardará aquí automáticamente.",
+            "memory.templates": "Plantillas",
+            "memory.open_vault": "Abrir Drive",
+            "memory.refresh": "Actualizar",
+            # v0.5.1.4 — Editor de notas (split view)
+            "memory.search_placeholder": "🔍 Buscar…",
+            "memory.new_note": "+ Nueva nota",
+            "memory.new_note_title": "Nueva nota",
+            "memory.new_note_dialog_title": "📝 Nueva nota",
+            "memory.field_path": "Ruta (ej: research/mi-nota.md)",
+            "memory.field_title": "Título",
+            "memory.field_template": "Plantilla",
+            "memory.field_tags": "Etiquetas (separadas por coma, opcional)",
+            "memory.create": "Crear",
+            "memory.save": "💾 Guardar",
+            "memory.delete": "🗑 Eliminar",
+            "memory.tab_edit": "Editar",
+            "memory.tab_preview": "Vista previa",
+            "memory.tab_split": "Dividido",
+            "memory.body_placeholder": "Selecciona una nota a la izquierda o crea una nueva.",
+            "memory.empty_editor": "Selecciona una nota de la lista o crea una nueva.",
+            "memory.dirty": "no guardado",
+            "memory.note_title": "Título",
+            "memory.no_results": "Sin resultados para la búsqueda.",
+            # v0.5.1.2 hotfix — Directrices del Agente
             "agents.title": "Directrices del Agente",
             "agents.subtitle": "Reglas y principios del PesquisAI (AGENTS.md)",
             "agents.loading": "Cargando directrices…",
@@ -2225,9 +2386,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "providers.var": "Variable",
             "sessions.title": "Historique des sessions",
             "sessions.search_placeholder": "🔍 Rechercher par id ou contenu…",
-            "sessions.empty": "Aucune session trouvée.",
-            "sessions.empty_filtered": "Aucune session ne correspond au filtre.",
-            "sessions.click_to_restore": "Cliquer pour restaurer",
             "shortcuts.title": "Raccourcis clavier",
             "shortcuts.copy": "Copier la sélection", "shortcuts.copy_hint": "Maintenez Shift et sélectionnez",
             "shortcuts.interrupt": "Interrompre la commande", "shortcuts.paste": "Coller (Chrome)",
@@ -2238,12 +2396,47 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal rechargé avec le nouveau thème",
             "languages.label": "Langue", "languages.switched_to": "Langue changée en",
             "success_messages.backup_saved": "Sauvegarde enregistrée",
-            "footer.email": "gustavo.braga@ufv.br",
-            "footer.github": "GitHub",
-            "footer.ufv": "UFV · Viçosa, MG - Brésil",
-            "footer.powered_by": "Alimenté par",
-            "footer.email_title": "Contact par e-mail",
-            "footer.github_title": "Dépôt sur GitHub",
+            # v0.5.1.2 — Mémoire Obsidian
+            "memory.title": "Mémoire Obsidian",
+            "memory.subtitle": "Couche de mémoire persistante de l'agent",
+            "memory.tooltip": "Mémoire Obsidian (deuxième cerveau)",
+            "memory.status_ready": "🟢 Active",
+            "memory.status_disabled": "⚪ Désactivée",
+            "memory.status_no_vault": "🟡 Pas de vault",
+            "memory.status_read_only": "🟡 Lecture seule",
+            "memory.status_error": "🔴 Erreur",
+            "memory.notes_count": "Notes",
+            "memory.notes_unit": "",
+            "memory.tags_count": "Étiquettes",
+            "memory.links_count": "Wikiliens",
+            "memory.avg_len": "Taille moy.",
+            "memory.recent_daily": "Daily notes",
+            "memory.recent_notes": "Notes récentes",
+            "memory.no_notes": "Aucune note pour l'instant. L'agent enregistrera ici automatiquement.",
+            "memory.templates": "Modèles",
+            "memory.open_vault": "Ouvrir Drive",
+            "memory.refresh": "Actualiser",
+            # v0.5.1.4 — Éditeur de notes (split view)
+            "memory.search_placeholder": "🔍 Rechercher…",
+            "memory.new_note": "+ Nouvelle note",
+            "memory.new_note_title": "Nouvelle note",
+            "memory.new_note_dialog_title": "📝 Nouvelle note",
+            "memory.field_path": "Chemin (ex: research/ma-note.md)",
+            "memory.field_title": "Titre",
+            "memory.field_template": "Modèle",
+            "memory.field_tags": "Étiquettes (séparées par virgule, optionnel)",
+            "memory.create": "Créer",
+            "memory.save": "💾 Enregistrer",
+            "memory.delete": "🗑 Supprimer",
+            "memory.tab_edit": "Éditer",
+            "memory.tab_preview": "Aperçu",
+            "memory.tab_split": "Divisé",
+            "memory.body_placeholder": "Sélectionnez une note à gauche ou créez-en une nouvelle.",
+            "memory.empty_editor": "Sélectionnez une note dans la liste ou créez-en une nouvelle.",
+            "memory.dirty": "non enregistré",
+            "memory.note_title": "Titre",
+            "memory.no_results": "Aucun résultat pour la recherche.",
+            # v0.5.1.2 hotfix — Directives de l'Agent
             "agents.title": "Directives de l'Agent",
             "agents.subtitle": "Règles et principes du PesquisAI (AGENTS.md)",
             "agents.loading": "Chargement des directives…",

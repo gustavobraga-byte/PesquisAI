@@ -60,6 +60,7 @@ SKILL_REGISTRY: list[SkillEntry] = [
     ("https://github.com/gustavobraga-byte/skill_agrobr.git", "agrobr", False),
     ("https://github.com/gustavobraga-byte/grant-finder.git", "grant-finder", False),
     ("https://github.com/gustavobraga-byte/meta-search-br.git", "meta-search-br", False),
+    ("https://github.com/gustavobraga-byte/skill-obsidian-memory.git", "obsidian-memory", False),
 ]
 
 # Mapeamento de /tmp/skill_<nome> → diretório final em SKILLS_DIR
@@ -73,9 +74,47 @@ SKILL_MAPPINGS: list[tuple[str, str]] = [
     ("/tmp/skill_agrobr", "agrobr"),
     ("/tmp/skill_grant-finder", "grant-finder"),
     ("/tmp/skill_meta-search-br", "meta-search-br"),
+    ("/tmp/skill_obsidian-memory", "obsidian-memory"),
 ]
 
 # Skills que o sistema considera ESSENCIAIS para funcionar
 ESSENTIAL_SKILLS: set[str] = {
     name for _, name, required in SKILL_REGISTRY if required
 }
+
+# ── Obsidian Second-Brain (v0.5.0+) ───────────────────────────
+# REGRA: o vault DEVE ficar no Google Drive do usuário.
+# Caminho padrão: /content/drive/My Drive/PesquisAI/vault/
+OBSIDIAN_VAULT_ENV: str = "PESQUISAI_OBSIDIAN_VAULT"
+OBSIDIAN_DEFAULT_VAULT: str = "/content/drive/My Drive/PesquisAI/vault"
+OBSIDIAN_DEFAULT_SUBDIR: str = "vault"
+
+# Caminhos reconhecidos como "Google Drive" pelo discovery
+OBSIDIAN_DRIVE_PREFIXES: tuple[str, ...] = (
+    "/content/drive/",
+    "/content/drive/.colab/",
+    "/Volumes/GoogleDrive/",
+    "/mnt/gdrive/",
+    "/mnt/google-drive/",
+    "G:/Meu Drive/",
+    "G:/My Drive/",
+)
+
+# Configurações de comportamento
+OBSIDIAN_AUTO_LOG_SESSIONS: bool = True
+OBSIDIAN_AUTO_DAILY: bool = True
+OBSIDIAN_CONTEXT_BRIEF: bool = True
+OBSIDIAN_CONTEXT_BRIEF_MAX_CHARS: int = 4000
+OBSIDIAN_PROTECT_HUMAN_NOTES: bool = True
+OBSIDIAN_REQUIRE_DRIVE: bool = True  # rejeita fora do Drive no Colab
+
+# Tags oficiais da taxonomia pesquisai/*
+OBSIDIAN_OFFICIAL_TAGS: frozenset[str] = frozenset({
+    "pesquisai/ibge", "pesquisai/datasus", "pesquisai/agrobr",
+    "pesquisai/dados-brasil", "pesquisai/capes", "pesquisai/sucupira",
+    "pesquisai/daily", "pesquisai/research", "pesquisai/literature",
+    "pesquisai/session", "pesquisai/methodology", "pesquisai/datasource",
+    "pesquisai/hypothesis", "pesquisai/reference", "pesquisai/moc",
+    "pesquisai/inbox", "pesquisai/draft", "pesquisai/review",
+    "pesquisai/published", "pesquisai/archived",
+})
