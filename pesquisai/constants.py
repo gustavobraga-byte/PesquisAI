@@ -61,6 +61,7 @@ SKILL_REGISTRY: list[SkillEntry] = [
     ("https://github.com/gustavobraga-byte/grant-finder.git", "grant-finder", False),
     ("https://github.com/gustavobraga-byte/meta-search-br.git", "meta-search-br", False),
     ("https://github.com/gustavobraga-byte/skill-obsidian-memory.git", "obsidian-memory", False),
+    ("https://github.com/gustavobraga-byte/Memorial_ufv.git", "memorial", False),
 ]
 
 # Mapeamento de /tmp/skill_<nome> → diretório final em SKILLS_DIR
@@ -75,6 +76,7 @@ SKILL_MAPPINGS: list[tuple[str, str]] = [
     ("/tmp/skill_grant-finder", "grant-finder"),
     ("/tmp/skill_meta-search-br", "meta-search-br"),
     ("/tmp/skill_obsidian-memory", "obsidian-memory"),
+    ("/tmp/skill_memorial", "memorial"),
 ]
 
 # Skills que o sistema considera ESSENCIAIS para funcionar

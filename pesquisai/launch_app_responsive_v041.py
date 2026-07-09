@@ -126,9 +126,9 @@ RESPONSIVE_CSS: str = """
   /* === Tablet (768px – 1023px): topbar condensado === */
   @media (max-width: 1023px) {
     #topbar { padding: 0 12px; gap: 8px; height: 50px; }
-    .tb-btn { padding: 0 10px; font-size: 10.5px; }
+    .tb-btn { padding: 0 10px; font-size: 11px; }
     .logo-tag { display: none; }
-    .footer-link { font-size: 10px; }
+    .footer-link { font-size: 11px; }
     .footer-sep { margin: 0 8px; }
     .modal-600 { width: 90vw; max-width: 600px; }
   }
@@ -147,7 +147,7 @@ RESPONSIVE_CSS: str = """
     #footer { padding: 0 8px; height: 36px; }
     .footer-brand { display: none; }
     .footer-sep { margin: 0 6px; }
-    .footer-link { font-size: 9.5px; }
+    .footer-link { font-size: 11px; }
     .btn-provider { padding: 0 6px; font-size: 9px; height: 20px; }
     .footer-oc { display: none; }
     /* terminal: ocupa mais espaço em mobile */
@@ -205,7 +205,7 @@ RESPONSIVE_CSS: str = """
   .lang-btn {
     display: inline-flex; align-items: center; gap: 4px;
     padding: 0 8px; height: 30px;
-    font-family: "DM Mono", monospace; font-size: 11px;
+    font-family: var(--font-sans); font-size: 11px;
     font-weight: 500; letter-spacing: .03em;
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -217,7 +217,7 @@ RESPONSIVE_CSS: str = """
   .lang-btn:hover {
     background: var(--accent-dim);
     color: var(--accent);
-    border-color: rgba(79,195,247,.4);
+    border-color: rgba(var(--accent-rgb),.4);
   }
   .lang-btn:active { transform: scale(.96); }
   .lang-btn .lang-flag { font-size: 13px; line-height: 1; }
@@ -255,7 +255,7 @@ RESPONSIVE_CSS: str = """
     border: 0;
     border-radius: var(--radius);
     color: var(--ink);
-    font-family: "DM Mono", monospace;
+    font-family: var(--font-sans);
     font-size: 12px;
     text-align: left;
     cursor: pointer;
@@ -283,9 +283,10 @@ RESPONSIVE_CSS: str = """
     --surface:    #f5f6f7;
     --rail:       #ffffff;
     --line:       rgba(0,0,0,.1);
-    --accent:     #0288d1;
-    --accent-dim: rgba(2,136,209,.1);
-    --accent-glow:rgba(2,136,209,.2);
+    --accent:     #157a73;
+    --accent-dim: rgba(21,122,115,.10);
+    --accent-glow:rgba(21,122,115,.18);
+    --accent-rgb: 21,122,115;
     --green:      #2e7d32;
     --green-dim:  rgba(46,125,50,.1);
     --amber:      #e65100;
@@ -294,6 +295,8 @@ RESPONSIVE_CSS: str = """
     --red-dim:    rgba(198,40,40,.1);
     background:   #f5f6f7;
     color:        #1f262a;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   }}
 
   /* === Indicador de tema ativo (NOVO em v0.4.1) === */
@@ -311,7 +314,12 @@ RESPONSIVE_CSS: str = """
   @media (max-height: 500px) {
     #toast { bottom: 36px; right: 8px; }
   }
-</style>
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+          transition-duration: .001ms !important; scroll-behavior: auto !important; }
+    }
+  </style>
 """
 
 
@@ -357,8 +365,14 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   <meta name="theme-color" content="#0d0f10">
   <title>PesquisAI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+  <!-- github-markdown-css: estilização markdown para o modal de Diretrizes -->
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css" as="style">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css">
+  <!-- marked.js: preload para acelerar renderização de markdown -->
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" as="script">
   <script>
     // ═══════════════════════════════════════════════════════════
     // 🛡️ ANTI-FLASH: aplica tema ANTES de qualquer renderização
@@ -400,13 +414,14 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
 
     :root {
       --ink:        #e8e6e0;
-      --ink-muted:  #8a8780;
+      --ink-muted:  #9a9790;
       --surface:    #0d0f10;
       --rail:       #151819;
       --line:       rgba(255,255,255,.07);
-      --accent:     #4fc3f7;
-      --accent-dim: rgba(79,195,247,.12);
-      --accent-glow:rgba(79,195,247,.22);
+      --accent:     #46a39b;
+      --accent-dim: rgba(var(--accent-rgb),.12);
+      --accent-glow:rgba(var(--accent-rgb),.22);
+      --accent-rgb: 70,163,155;
       --green:      #5dba7e;
       --green-dim:  rgba(93,186,126,.12);
       --amber:      #e8b84b;
@@ -414,13 +429,15 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       --red:        #e07070;
       --red-dim:    rgba(224,112,112,.12);
       --radius:     5px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
     }
 
     html, body {
       height: 100%; width: 100%;
       background: var(--surface);
       color: var(--ink);
-      font-family: "DM Mono", monospace;
+      font-family: var(--font-sans);
       overflow: hidden;
       -webkit-tap-highlight-color: transparent;
     }
@@ -436,13 +453,6 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       display: flex; align-items: center;
       padding: 0 18px; gap: 14px;
       z-index: 9999;
-    }
-    #topbar::after {
-      content: "";
-      position: absolute; inset: 0;
-      background: repeating-linear-gradient(0deg, transparent, transparent 2px,
-        rgba(0,0,0,.05) 2px, rgba(0,0,0,.05) 4px);
-      pointer-events: none;
     }
 
     .logo { display: flex; align-items: baseline; gap: 2px; }
@@ -469,7 +479,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     .tb-btn {
       display: inline-flex; align-items: center; gap: 7px;
       padding: 0 13px; height: 30px;
-      font-family: "DM Mono", monospace; font-size: 11px;
+      font-family: var(--font-sans); font-size: 11px;
       font-weight: 500; letter-spacing: .04em;
       border-radius: var(--radius); cursor: pointer;
       border: 1px solid; transition: background .15s, transform .1s, border-color .15s;
@@ -478,8 +488,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     .tb-btn:active { transform: scale(.96); }
     .tb-btn svg { width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
 
-    .btn-drive  { color:var(--accent); background:var(--accent-dim); border-color:rgba(79,195,247,.25); }
-    .btn-drive:hover  { background:var(--accent-glow); border-color:rgba(79,195,247,.5); }
+    .btn-drive  { color:var(--accent); background:var(--accent-dim); border-color:rgba(var(--accent-rgb),.25); }
+    .btn-drive:hover  { background:var(--accent-glow); border-color:rgba(var(--accent-rgb),.5); }
 
     .btn-backup { color:var(--green); background:var(--green-dim); border-color:rgba(93,186,126,.25); }
     .btn-backup:hover { background:rgba(93,186,126,.2); border-color:rgba(93,186,126,.5); }
@@ -490,7 +500,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     #toast {
       position: fixed; bottom: 58px; right: 18px;
       padding: 9px 16px; border-radius: var(--radius);
-      font-size: 12px; font-family: "DM Mono", monospace;
+      font-size: 12px; font-family: var(--font-sans);
       display: flex; align-items: center; gap: 8px;
       opacity: 0; transform: translateY(6px);
       transition: opacity .22s, transform .22s;
@@ -500,11 +510,11 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     #toast.show { opacity: 1; transform: translateY(0); }
     #toast.ok    { background:rgba(93,186,126,.15);  border-color:rgba(93,186,126,.35);  color:var(--green); }
     #toast.err   { background:rgba(224,112,112,.15); border-color:rgba(224,112,112,.35); color:var(--red);   }
-    #toast.info  { background:var(--accent-dim);     border-color:rgba(79,195,247,.35);  color:var(--accent);}
+    #toast.info  { background:var(--accent-dim);     border-color:rgba(var(--accent-rgb),.35);  color:var(--accent);}
 
     #modal-overlay {
       position: fixed; inset: 0;
-      background: rgba(0,0,0,.65); backdrop-filter: blur(3px);
+      background: rgba(0,0,0,.72);
       display: flex; align-items: center; justify-content: center;
       z-index: 99999; opacity: 0; pointer-events: none;
       transition: opacity .2s;
@@ -533,7 +543,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     .backup-item:last-child { border-bottom: none; }
     .backup-item:hover { background: rgba(255,255,255,.04); color: var(--ink); }
     .backup-item .restore-lbl {
-      font-size: 10px; padding: 2px 8px;
+      font-size: 11px; padding: 2px 8px;
       background: var(--amber-dim); color: var(--amber);
       border: 1px solid rgba(232,184,75,.3); border-radius: 3px;
     }
@@ -542,10 +552,20 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       display: block; width: 100%; padding: 8px;
       background: rgba(255,255,255,.05); border: 1px solid var(--line);
       border-radius: var(--radius); color: var(--ink-muted);
-      font-family: "DM Mono", monospace; font-size: 12px;
+      font-family: var(--font-sans); font-size: 12px;
       cursor: pointer; transition: background .15s;
     }
     .modal-close:hover { background: rgba(255,255,255,.1); }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 8px 14px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--line);
+      border-radius: var(--radius); color: var(--ink-muted);
+      font-family: var(--font-sans); font-size: 12px;
+      cursor: pointer; transition: background .15s, border-color .15s, color .15s;
+      white-space: nowrap;
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,.08); color: var(--ink); }
 
     #terminal-frame {
       position: absolute;
@@ -561,7 +581,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       border-top: 1px solid var(--line);
       display: flex; align-items: center;
       padding: 0 18px; gap: 0;
-      font-size: 10.5px; color: var(--ink-muted);
+      font-size: 11px; color: var(--ink-muted);
       z-index: 9999;
     }
     .footer-brand {
@@ -585,11 +605,11 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     .btn-provider {
       display: inline-flex; align-items: center; gap: 5px;
       padding: 0 10px; height: 24px;
-      font-family: "DM Mono", monospace; font-size: 10px;
+      font-family: var(--font-sans); font-size: 11px;
       font-weight: 500; letter-spacing: .03em;
       border-radius: var(--radius); cursor: pointer;
-      border: 1px solid rgba(79,195,247,.18);
-      color: rgba(79,195,247,.55);
+      border: 1px solid rgba(var(--accent-rgb),.18);
+      color: rgba(var(--accent-rgb),.55);
       background: transparent;
       transition: background .15s, color .15s, border-color .15s;
       white-space: nowrap;
@@ -597,7 +617,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     .btn-provider:hover {
       background: var(--accent-dim);
       color: var(--accent);
-      border-color: rgba(79,195,247,.4);
+      border-color: rgba(var(--accent-rgb),.4);
     }
     .btn-provider:active { transform: scale(.96); }
     .btn-provider svg { width:10px; height:10px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
@@ -612,7 +632,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     }
     .tb-icon:hover {
       background:var(--accent-dim); color:var(--accent);
-      border-color:rgba(79,195,247,.4);
+      border-color:rgba(var(--accent-rgb),.4);
     }
     .tb-icon:active { transform: scale(.94); }
     .tb-icon svg { width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
@@ -634,10 +654,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       display:block; width:100%; padding:8px 10px; margin-bottom:10px;
       box-sizing:border-box; background:rgba(255,255,255,.04);
       border:1px solid var(--line); border-radius:var(--radius);
-      color:var(--ink); font-family:'DM Mono',monospace; font-size:11px;
+      color:var(--ink); font-family:var(--font-sans); font-size:11px;
       outline:none; transition:border-color .15s;
     }
-    .session-search:focus { border-color:rgba(79,195,247,.4); }
+    .session-search:focus { border-color:rgba(var(--accent-rgb),.4); }
     .session-item {
       display:flex; align-items:center; justify-content:space-between;
       padding:9px 12px; font-size:11.5px; color:var(--ink-muted);
@@ -655,9 +675,9 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     }
     .shortcut-row:last-child { border-bottom:none; }
     .shortcut-key {
-      font-family:'DM Mono',monospace; font-size:10.5px; font-weight:600;
+      font-family:var(--font-sans); font-size:10.5px; font-weight:600;
       padding:2px 8px; background:var(--accent-dim); color:var(--accent);
-      border:1px solid rgba(79,195,247,.25); border-radius:3px;
+      border:1px solid rgba(var(--accent-rgb),.25); border-radius:3px;
     }
   </style>
   {RESPONSIVE_CSS}
@@ -688,7 +708,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       <button class="tb-icon" onclick="openAgents()" title="Diretrizes do Agente" data-i18n-title="agents.title">
         <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h7"/></svg>
       </button>
-      <button class="tb-icon" onclick="openMemory()" id="memory-btn" title="Memória Obsidian" data-i18n-title="memory.tooltip">
+      <button class="tb-icon" onclick="openMemory()" id="memory-btn" title="Memória PesquisAI" data-i18n-title="memory.tooltip">
         <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 3 1.5 5 3 7l1 1v3a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-3l1-1c1.5-2 3-4 3-7a7 7 0 0 0-7-7z"/><path d="M9 22h6"/><path d="M12 2v20"/></svg>
       </button>
       <button class="tb-icon" onclick="toggleTheme()" id="theme-toggle" title="Alternar tema" data-theme="pesquisai" data-i18n-title="theme.toggle">
@@ -746,7 +766,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     <button class="modal-close" onclick="openSessions(); toggleMobileMenu();">📜 <span data-i18n="sessions.title">Histórico de Sessões</span></button>
     <button class="modal-close" onclick="openShortcuts(); toggleMobileMenu();">⌨️ <span data-i18n="shortcuts.title">Atalhos de Teclado</span></button>
     <button class="modal-close" onclick="openAgents(); toggleMobileMenu();">📋 <span data-i18n="agents.title">Diretrizes do Agente</span></button>
-    <button class="modal-close" onclick="openMemory(); toggleMobileMenu();">🧠 <span data-i18n="memory.title">Memória Obsidian</span></button>
+    <button class="modal-close" onclick="openMemory(); toggleMobileMenu();">🧠 <span data-i18n="memory.title">Memória PesquisAI</span></button>
     <button class="modal-close" onclick="toggleTheme(); toggleMobileMenu();">◑ <span data-i18n="theme.toggle">Alternar Tema</span></button>
     <button class="modal-close" onclick="toggleLangMenu();">🌐 <span data-i18n="languages.label">Idioma</span></button>
   </div>
@@ -779,6 +799,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </a>
     <span class="footer-sep"></span>
     <span style="color:var(--ink-muted)">UFV · Viçosa, MG - Brasil</span>
+    <span class="footer-sep"></span>
 
     <div class="footer-right">
       <button class="btn-provider" onclick="connectProvider()" title="Conectar novo provedor de IA">
@@ -804,29 +825,30 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
-  <div id="provider-overlay" onclick="if(event.target===this)closeProvider()" style="position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+  <div id="provider-overlay" onclick="if(event.target===this)closeProvider()" style="position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
     <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:480px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div id="prov-step1">
         <div class="modal-title">🔌 <span data-i18n="providers.title">Conectar Provedor de IA</span></div>
         <p style="font-size:11.5px;color:var(--ink-muted);margin-bottom:14px;line-height:1.6;" data-i18n="providers.select">Selecione o provedor para configurar a API key:</p>
+        <input id="prov-search" type="text" placeholder="Buscar provedor…" data-i18n-placeholder="providers.search" oninput="filterProviders(this.value)" style="display:block;width:100%;padding:8px 12px;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink);font-family:var(--font-sans);font-size:12px;outline:none;margin-bottom:12px;" />
         <div id="prov-list" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;"></div>
-        <button onclick="closeProvider()" style="display:block;width:100%;padding:8px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink-muted);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;" data-i18n="ui.cancel">Cancelar</button>
+        <button onclick="closeProvider()" style="display:block;width:100%;padding:8px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink-muted);font-family:var(--font-sans);font-size:12px;cursor:pointer;" data-i18n="ui.cancel">Cancelar</button>
       </div>
       <div id="prov-step2" style="display:none;">
         <div class="modal-title">🔑 <span id="prov-name-title"></span></div>
-        <p style="font-size:11px;color:var(--ink-muted);margin-bottom:14px;line-height:1.5;"><span data-i18n="providers.var">Variável</span>: <code id="prov-env-code" style="color:var(--accent);background:rgba(79,195,247,.08);padding:1px 6px;border-radius:3px;font-size:11px;"></code></p>
+        <p style="font-size:11px;color:var(--ink-muted);margin-bottom:14px;line-height:1.5;"><span data-i18n="providers.var">Variável</span>: <code id="prov-env-code" style="color:var(--accent);background:rgba(var(--accent-rgb),.08);padding:1px 6px;border-radius:3px;font-size:11px;"></code></p>
         <label style="display:block;font-size:10.5px;color:var(--ink-muted);margin-bottom:6px;letter-spacing:.05em;" data-i18n="providers.api_key">API KEY</label>
-        <input id="prov-key-input" type="password" placeholder="Cole sua key aqui…" autocomplete="off" style="display:block;width:100%;padding:9px 12px;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink);font-family:'DM Mono',monospace;font-size:12px;outline:none;margin-bottom:14px;transition:border-color .15s;" onfocus="this.style.borderColor='rgba(79,195,247,.4)'" onblur="this.style.borderColor='var(--line)'" onkeydown="if(event.key==='Enter')confirmProvider()"/>
+        <input id="prov-key-input" type="password" placeholder="Cole sua key aqui…" autocomplete="off" style="display:block;width:100%;padding:9px 12px;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink);font-family:var(--font-sans);font-size:12px;outline:none;margin-bottom:14px;transition:border-color .15s;" onfocus="this.style.borderColor='rgba(var(--accent-rgb),.4)'" onblur="this.style.borderColor='var(--line)'" onkeydown="if(event.key==='Enter')confirmProvider()"/>
         <div style="display:flex;gap:8px;">
-          <button onclick="provBack()" style="padding:9px 14px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink-muted);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;" data-i18n="providers.back">← Voltar</button>
-          <button onclick="confirmProvider()" style="flex:1;padding:9px;background:var(--accent-dim);border:1px solid rgba(79,195,247,.3);border-radius:var(--radius);color:var(--accent);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;" data-i18n="providers.save_connect">Salvar e Conectar</button>
-          <button onclick="closeProvider()" style="padding:9px 14px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink-muted);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;" data-i18n="ui.cancel">Cancelar</button>
+          <button onclick="provBack()" style="padding:9px 14px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink-muted);font-family:var(--font-sans);font-size:12px;cursor:pointer;" data-i18n="providers.back">← Voltar</button>
+          <button onclick="confirmProvider()" style="flex:1;padding:9px;background:var(--accent-dim);border:1px solid rgba(var(--accent-rgb),.3);border-radius:var(--radius);color:var(--accent);font-family:var(--font-sans);font-size:12px;cursor:pointer;" data-i18n="providers.save_connect">Salvar e Conectar</button>
+          <button onclick="closeProvider()" style="padding:9px 14px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink-muted);font-family:var(--font-sans);font-size:12px;cursor:pointer;" data-i18n="ui.cancel">Cancelar</button>
         </div>
       </div>
     </div>
   </div>
 
-  <div id="health-overlay" onclick="if(event.target===this)closeHealth()" style="position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+  <div id="health-overlay" onclick="if(event.target===this)closeHealth()" style="position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
     <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:440px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div class="modal-title">🩺 <span data-i18n="dashboard.title">Dashboard de Saúde</span></div>
       <div id="health-list" style="max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;">
@@ -836,7 +858,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
-  <div id="sessions-overlay" onclick="if(event.target===this)closeSessions()" style="position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+  <div id="sessions-overlay" onclick="if(event.target===this)closeSessions()" style="position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
     <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:520px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div class="modal-title">📜 <span data-i18n="sessions.title">Histórico de Sessões</span></div>
       <input id="session-search" class="session-search" placeholder="🔍 Buscar por id ou conteúdo…" oninput="filterSessions()" data-i18n-placeholder="sessions.search_placeholder">
@@ -847,7 +869,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
-  <div id="shortcuts-overlay" onclick="if(event.target===this)closeShortcuts()" style="position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+  <div id="shortcuts-overlay" onclick="if(event.target===this)closeShortcuts()" style="position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
     <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:420px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div class="modal-title">⌨️ <span data-i18n="shortcuts.title">Atalhos de Teclado</span></div>
       <div style="border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;">
@@ -864,7 +886,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   </div>
 
   <!-- Modal de Diretrizes do Agente (v0.4.2 + markdown render v0.4.2.1) — HOTFIX v0.5.1.2 -->
-  <div id="agents-overlay" onclick="if(event.target===this)closeAgents()" style="position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+  <div id="agents-overlay" onclick="if(event.target===this)closeAgents()" style="position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
     <div id="agents-modal" class="modal-shell" style="border-radius:10px;padding:0;width:680px;max-width:94vw;max-height:88vh;box-shadow:0 28px 72px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;">
       <div style="padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;">
         <span style="font-size:18px;">📋</span>
@@ -872,10 +894,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
           <div class="modal-title" style="margin-bottom:2px;" data-i18n="agents.title">Diretrizes do Agente</div>
           <div style="font-size:10.5px;color:var(--ink-muted);" data-i18n="agents.subtitle">Regras e princípios do PesquisAI (AGENTS.md)</div>
         </div>
-        <span id="agents-lang-badge" style="font-size:10px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;color:var(--ink-muted);font-family:'DM Mono',monospace;">PT-BR</span>
+        <span id="agents-lang-badge" style="font-size:10px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;color:var(--ink-muted);font-family:var(--font-sans);">PT-BR</span>
         <button onclick="closeAgents()" class="modal-close" style="width:auto;padding:4px 10px;font-size:11px;" aria-label="Fechar">✕</button>
       </div>
-      <div id="agents-content" class="markdown-body" style="flex:1;overflow-y:auto;padding:22px 26px;font-size:12.5px;line-height:1.65;color:var(--ink);background:transparent;" data-i18n="agents.loading">Carregando diretrizes…</div>
+      <div id="agents-content" class="markdown-body" style="flex:1;overflow-y:auto;padding:22px 26px;font-size:12.5px;line-height:1.65;color:var(--ink);" data-i18n="agents.loading">Carregando diretrizes…</div>
       <div style="padding:10px 18px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.02);">
         <button onclick="copyAgents()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="agents.copy">Copiar</button>
         <button onclick="reloadAgents()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;">↻ <span data-i18n="ui.loading">Recarregar</span></button>
@@ -885,17 +907,17 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
-  <!-- Modal de Memória Obsidian (v0.5.1.4 — navegar + editar) -->
-  <div id="memory-overlay" onclick="if(event.target===this)closeMemory()" style="position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+  <!-- Modal de Memória PesquisAI (v0.5.1.4 — navegar + editar) -->
+  <div id="memory-overlay" onclick="if(event.target===this)closeMemory()" style="position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
     <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:0;width:980px;max-width:96vw;max-height:92vh;box-shadow:0 28px 72px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;">
       <!-- Header -->
       <div style="padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;">
         <span style="font-size:18px;">🧠</span>
         <div style="flex:1;min-width:0;">
-          <div class="modal-title" style="margin-bottom:2px;" data-i18n="memory.title">Memória Obsidian</div>
+          <div class="modal-title" style="margin-bottom:2px;" data-i18n="memory.title">Memória PesquisAI</div>
           <div id="memory-subtitle" style="font-size:10.5px;color:var(--ink-muted);" data-i18n="memory.subtitle">Camada de memória persistente do agente</div>
         </div>
-        <span id="memory-status-badge" style="font-size:10px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;color:var(--ink-muted);font-family:'DM Mono',monospace;">…</span>
+        <span id="memory-status-badge" style="font-size:10px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;color:var(--ink-muted);font-family:var(--font-sans);">…</span>
         <span id="memory-dirty-indicator" style="display:none;font-size:10px;padding:2px 8px;background:var(--amber);color:#000;border-radius:3px;font-weight:600;">● <span data-i18n="memory.dirty">não salvo</span></span>
         <button onclick="closeMemory()" class="modal-close" style="width:auto;padding:4px 10px;font-size:11px;" aria-label="Fechar">✕</button>
       </div>
@@ -923,21 +945,21 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
           <div id="memory-note-meta" style="padding:10px 14px;border-bottom:1px solid var(--line);display:none;align-items:center;gap:8px;background:rgba(255,255,255,.02);">
             <div style="flex:1;min-width:0;">
               <input id="memory-note-title" type="text" placeholder="Título" data-i18n-placeholder="memory.note_title" oninput="markDirty()" style="width:100%;background:transparent;border:none;color:var(--ink);font-size:13px;font-weight:500;outline:none;font-family:inherit;" />
-              <div id="memory-note-path" style="font-size:10px;color:var(--ink-muted);font-family:'DM Mono',monospace;margin-top:2px;word-break:break-all;">—</div>
+              <div id="memory-note-path" style="font-size:10px;color:var(--ink-muted);font-family:var(--font-mono);margin-top:2px;word-break:break-all;">—</div>
             </div>
             <div id="memory-note-tags-display" style="display:flex;flex-wrap:wrap;gap:3px;max-width:280px;"></div>
           </div>
 
           <!-- Tabs Edit/Preview -->
           <div id="memory-editor-tabs" style="display:none;padding:6px 14px 0;border-bottom:1px solid var(--line);background:rgba(255,255,255,.01);">
-            <button id="memory-tab-edit" class="mem-tab active" onclick="switchMemoryTab('edit')" data-i18n="memory.tab_edit">Editar</button>
-            <button id="memory-tab-preview" class="mem-tab" onclick="switchMemoryTab('preview')" data-i18n="memory.tab_preview">Preview</button>
+            <button id="memory-tab-preview" class="mem-tab active" onclick="switchMemoryTab('preview')" data-i18n="memory.tab_preview">Preview</button>
+            <button id="memory-tab-edit" class="mem-tab" onclick="switchMemoryTab('edit')" data-i18n="memory.tab_edit">Editar</button>
             <button id="memory-tab-split" class="mem-tab" onclick="switchMemoryTab('split')" data-i18n="memory.tab_split">Dividido</button>
           </div>
 
           <!-- Editor + Preview -->
           <div id="memory-editor-body" style="flex:1;display:flex;min-height:0;background:rgba(0,0,0,.2);">
-            <textarea id="memory-editor" spellcheck="false" oninput="onEditorInput()" style="flex:1;background:transparent;color:var(--ink);border:none;outline:none;resize:none;padding:14px;font-family:'DM Mono',monospace;font-size:12px;line-height:1.55;display:none;" data-i18n-placeholder="memory.body_placeholder" placeholder="Selecione uma nota à esquerda ou crie uma nova."></textarea>
+            <textarea id="memory-editor" spellcheck="false" oninput="onEditorInput()" style="flex:1;background:transparent;color:var(--ink);border:none;outline:none;resize:none;padding:14px;font-family:var(--font-mono);font-size:12px;line-height:1.55;display:none;" data-i18n-placeholder="memory.body_placeholder" placeholder="Selecione uma nota à esquerda ou crie uma nova."></textarea>
             <div id="memory-preview" style="flex:1;overflow-y:auto;padding:14px 18px;font-size:12.5px;line-height:1.6;color:var(--ink);display:none;"></div>
             <div class="modal-empty" id="memory-editor-empty" style="margin:auto;color:var(--ink-muted);text-align:center;padding:20px;">
               <div style="font-size:30px;margin-bottom:10px;opacity:.5;">🧠</div>
@@ -961,11 +983,11 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   </div>
 
   <!-- Sub-modal: criar nova nota (v0.5.1.4) -->
-  <div id="memory-new-overlay" onclick="if(event.target===this)closeCreateNoteDialog()" style="position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:100000;opacity:0;pointer-events:none;transition:opacity .15s;">
+  <div id="memory-new-overlay" onclick="if(event.target===this)closeCreateNoteDialog()" style="position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:100000;opacity:0;pointer-events:none;transition:opacity .15s;">
     <div style="background:#181b1e;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:18px;width:420px;max-width:92vw;box-shadow:0 16px 40px rgba(0,0,0,.6);">
       <div style="font-size:13px;font-weight:600;margin-bottom:14px;" data-i18n="memory.new_note_dialog_title">📝 Nova nota</div>
       <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="memory.field_path">Caminho (ex: research/minha-nota.md)</label>
-      <input id="memory-new-path" type="text" placeholder="research/minha-nota.md" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;font-family:'DM Mono',monospace;outline:none;margin-bottom:10px;" />
+      <input id="memory-new-path" type="text" placeholder="research/minha-nota.md" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;font-family:var(--font-mono);outline:none;margin-bottom:10px;" />
       <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="memory.field_title">Título</label>
       <input id="memory-new-title" type="text" placeholder="Título da nota" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;outline:none;margin-bottom:10px;" />
       <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="memory.field_template">Template</label>
@@ -976,13 +998,13 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       <input id="memory-new-tags" type="text" placeholder="pesquisai/research, foo/bar" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;outline:none;margin-bottom:14px;" />
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button onclick="closeCreateNoteDialog()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="ui.cancel">Cancelar</button>
-        <button onclick="submitCreateNote()" class="modal-close" style="width:auto;padding:5px 14px;font-size:11px;background:var(--accent);color:#000;border:1px solid var(--accent);border-radius:4px;font-weight:600;" data-i18n="memory.create">Criar</button>
+        <button onclick="submitCreateNote()" class="btn-ghost" style="width:auto;padding:5px 14px;font-size:11px;background:var(--accent);color:#000;border:1px solid var(--accent);border-radius:4px;font-weight:600;" data-i18n="memory.create">Criar</button>
       </div>
     </div>
   </div>
 
   <style>
-    /* v0.5.1.4 — Editor de memória Obsidian */
+    /* v0.5.1.4 — Editor de memória PesquisAI */
     .mem-tab {
       background: transparent; color: var(--ink-muted); border: none;
       border-bottom: 2px solid transparent; padding: 6px 12px; font-size: 11.5px;
@@ -995,8 +1017,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       transition: background .12s; border-left: 2px solid transparent;
     }
     .mem-note-item:hover { background: rgba(255,255,255,.04); }
+    .mem-folder-card:hover { background: rgba(255,255,255,.04); }
+    .mem-cal-day:hover { background: rgba(255,255,255,.06) !important; }
     .mem-note-item.active {
-      background: rgba(var(--accent-rgb, 99, 179, 237), .12);
+      background: rgba(var(--accent-rgb, 21, 122, 115), .12);
       border-left-color: var(--accent);
     }
     .mem-note-item .mem-note-title {
@@ -1004,14 +1028,14 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .mem-note-item .mem-note-path {
-      font-size: 9.5px; color: var(--ink-muted); font-family: 'DM Mono', monospace;
+      font-size: 11px; color: var(--ink-muted); font-family: 'DM Mono', monospace;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .mem-note-item.human .mem-note-title::before {
       content: '✎ '; color: var(--ink-muted);
     }
     .mem-folder-label {
-      font-size: 9.5px; color: var(--ink-muted); text-transform: uppercase;
+      font-size: 11px; color: var(--ink-muted); text-transform: uppercase;
       letter-spacing: .05em; padding: 8px 4px 4px; font-weight: 600;
     }
     .mem-preview h1, .mem-preview h2, .mem-preview h3 {
@@ -1037,13 +1061,13 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     .mem-preview a { color: var(--accent); text-decoration: none; }
     .mem-preview ul, .mem-preview ol { padding-left: 1.5em; margin: 0.4em 0; }
     .mem-preview .wikilink {
-      background: rgba(var(--accent-rgb, 99, 179, 237), .1);
+      background: rgba(var(--accent-rgb, 21, 122, 115), .1);
       color: var(--accent); padding: 1px 5px; border-radius: 3px;
       font-family: 'DM Mono', monospace; font-size: 11px;
     }
     .mem-preview .tag {
       background: var(--accent-dim); color: var(--accent);
-      padding: 1px 6px; border-radius: 3px; font-size: 10.5px; margin-right: 3px;
+      padding: 1px 6px; border-radius: 3px; font-size: 11px; margin-right: 3px;
     }
     .mem-preview hr { border: none; border-top: 1px solid var(--line); margin: 1em 0; }
   </style>
@@ -1281,8 +1305,16 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         });
         const d = await r.json();
         if (d.ok) {
-          toast("✅ Importado!", "ok");
-          setTimeout(() => location.reload(), 800);
+          if (d.ttyd_restarted) {
+            toast("✅ Sessão " + (d.session_id || "") + " importada + ttyd reiniciado!", "ok");
+            // v0.5.1.6: aguardar 3.5s para o ttyd reiniciar antes de recarregar
+            // (o ttyd precisa reabrir o WebSocket + handshake do opencode)
+            setTimeout(() => location.reload(), 3500);
+          } else {
+            toast("⚠️ Importado, mas ttyd não reiniciou. Recarregue manualmente (Ctrl+Shift+R).", "warn");
+            // Fallback: tentar reload após 1.5s
+            setTimeout(() => location.reload(), 1500);
+          }
         } else {
           toast("❌ " + (d.error || "Erro"), "err");
         }
@@ -1292,15 +1324,15 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     }
 
     const PROVIDERS = [
-      { id:"anthropic", name:"Anthropic", env:"ANTHROPIC_API_KEY", hint:"sk-ant-…" },
+      { id:"anthropic", name:"Anthropic", env:"ANTHROPIC_API_KEY", hint:"sk-ant-…", recommended:true },
       { id:"bedrock", name:"AWS Bedrock", env:"AWS_ACCESS_KEY_ID", hint:"AKIA…" },
       { id:"azure", name:"Azure OpenAI", env:"AZURE_OPENAI_API_KEY", hint:"…" },
       { id:"deepseek", name:"DeepSeek", env:"DEEPSEEK_API_KEY", hint:"sk-…" },
-      { id:"google", name:"Google Gemini", env:"GOOGLE_GENERATIVE_AI_API_KEY", hint:"AIza…" },
+      { id:"google", name:"Google Gemini", env:"GOOGLE_GENERATIVE_AI_API_KEY", hint:"AIza…", recommended:true },
       { id:"groq", name:"Groq", env:"GROQ_API_KEY", hint:"gsk_…" },
       { id:"mistral", name:"Mistral", env:"MISTRAL_API_KEY", hint:"…" },
       { id:"nvidia", name:"Nvidia NIM", env:"NVIDIA_API_KEY", hint:"nvapi-…" },
-      { id:"openai", name:"OpenAI", env:"OPENAI_API_KEY", hint:"sk-…" },
+      { id:"openai", name:"OpenAI", env:"OPENAI_API_KEY", hint:"sk-…", recommended:true },
       { id:"opencode_go", name:"OpenCode Go", env:"OPENCODE_API_KEY", hint:"sk-…" },
       { id:"opencode_zen", name:"OpenCode Zen", env:"OPENCODE_API_KEY", hint:"sk-…" },
       { id:"openrouter", name:"OpenRouter", env:"OPENROUTER_API_KEY", hint:"sk-or-…" },
@@ -1312,12 +1344,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     let _selProv = null;
 
     function connectProvider() {
-      const grid = document.getElementById("prov-list");
-      grid.innerHTML = PROVIDERS.map(p => `
-        <button onclick="selectProvider('${p.id}')" style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink-muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;text-align:left;transition:background .12s,color .12s,border-color .12s;">
-          ${p.name}
-        </button>
-      `).join("");
+      document.getElementById("prov-search").value = "";
+      renderProviderList("");
       document.getElementById("prov-step1").style.display = "block";
       document.getElementById("prov-step2").style.display = "none";
       document.getElementById("prov-key-input").value = "";
@@ -1325,6 +1353,20 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       overlay.style.opacity = "1";
       overlay.style.pointerEvents = "all";
     }
+
+    function renderProviderList(q) {
+      q = (q || "").trim().toLowerCase();
+      const recommended = PROVIDERS.filter(p => p.recommended && (!q || p.name.toLowerCase().includes(q) || p.id.includes(q)));
+      const others = PROVIDERS.filter(p => !p.recommended && (!q || p.name.toLowerCase().includes(q) || p.id.includes(q)));
+      const btn = (p) => `<button onclick="selectProvider('${p.id}')" style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink-muted);font-family:var(--font-sans);font-size:11px;cursor:pointer;text-align:left;transition:background .12s,color .12s,border-color .12s;">${p.name}</button>`;
+      let html = "";
+      if (recommended.length) html += '<div style="grid-column:1/-1;font-size:10px;letter-spacing:.06em;color:var(--ink-muted);text-transform:uppercase;margin:2px 0 4px;">Recomendados</div>' + recommended.map(btn).join("");
+      if (others.length) html += others.map(btn).join("");
+      if (!html) html = '<div style="grid-column:1/-1;font-size:11px;color:var(--ink-muted);padding:8px 0;">Nenhum provedor encontrado.</div>';
+      document.getElementById("prov-list").innerHTML = html;
+    }
+
+    function filterProviders(q) { renderProviderList(q); }
 
     function selectProvider(id) {
       _selProv = PROVIDERS.find(p => p.id === id);
@@ -1335,6 +1377,18 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       document.getElementById("prov-step1").style.display = "none";
       document.getElementById("prov-step2").style.display = "block";
       setTimeout(() => document.getElementById("prov-key-input").focus(), 80);
+    }
+
+    // ── Confirm dialog (replaces native confirm()) ─────────────
+    function pesquisaiConfirm(msg, onYes) {
+      document.getElementById("confirm-msg").textContent = msg;
+      const ov = document.getElementById("confirm-overlay");
+      const yes = document.getElementById("confirm-yes");
+      const no = document.getElementById("confirm-no");
+      yes.onclick = function() { ov.style.opacity = "0"; ov.style.pointerEvents = "none"; if (onYes) onYes(); };
+      no.onclick = function() { ov.style.opacity = "0"; ov.style.pointerEvents = "none"; };
+      ov.onclick = function(e) { if (e.target === ov) { ov.style.opacity = "0"; ov.style.pointerEvents = "none"; } };
+      ov.style.opacity = "1"; ov.style.pointerEvents = "all";
     }
 
     function provBack() {
@@ -1378,23 +1432,208 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       }
     }
 
+    // ── Cache compartilhado (5s) ──────────────────────────────────
+    let _healthCache = { data: null, ts: 0 };
+    let _sessionsCache = { data: null, ts: 0 };
+    const CACHE_TTL = 5000;
+
+    // ── Dashboard de Saude ───────────────────────────────────────
     async function openHealth() {
       const overlay = document.getElementById("health-overlay");
       overlay.style.opacity = "1"; overlay.style.pointerEvents = "all";
+      await loadHealth();
     }
     function closeHealth() {
       const o = document.getElementById("health-overlay");
       o.style.opacity = "0"; o.style.pointerEvents = "none";
     }
 
+    async function loadHealth(force) {
+      const listEl = document.getElementById("health-list");
+      if (!listEl) return;
+      const now = Date.now();
+      if (!force && _healthCache.data && (now - _healthCache.ts) < CACHE_TTL) {
+        renderHealth(listEl, _healthCache.data);
+        return;
+      }
+      listEl.innerHTML = '<div class="modal-empty" data-i18n="ui.loading">Carregando diagnóstico…</div>';
+      try {
+        const r = await fetch(BASE + "/api/health");
+        const d = await r.json();
+        if (d.ok && d.checks) {
+          _healthCache = { data: d, ts: Date.now() };
+          renderHealth(listEl, d);
+        } else {
+          listEl.innerHTML = '<div class="modal-empty">❌ Erro ao carregar diagnóstico.</div>';
+        }
+      } catch (e) {
+        listEl.innerHTML = '<div class="modal-empty">❌ ' + e.message + '</div>';
+      }
+    }
+
+    function renderHealth(listEl, d) {
+      var c = d.checks;
+      var h = '<div style="padding:6px 0;">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
+      h += '<span style="font-size:11px;color:var(--ink-muted);">v' + (d.version || '?') + '</span>';
+      h += '<button onclick="loadHealth(true)" style="background:none;border:1px solid var(--line);border-radius:var(--radius);padding:3px 8px;font-size:10px;color:var(--accent);cursor:pointer;">↻ Atualizar</button>';
+      h += '</div>';
+      var checks = [
+        { k: "drive_mounted", l: "Google Drive montado" },
+        { k: "backup_dir_exists", l: "Diretório de backup" },
+        { k: "ttyd_alive", l: "Terminal ttyd ativo" },
+        { k: "opencode_found", l: "OpenCode encontrado" },
+        { k: "keys_loaded_count", l: "Chaves carregadas (" + (c.keys_loaded_count||0) + ")" },
+        { k: "ffmpeg_ok", l: "FFmpeg disponível" },
+        { k: "skills_count", l: "Skills instaladas (" + (c.skills_count||0) + ")" }
+      ];
+      for (var i = 0; i < checks.length; i++) {
+        var ok = c[checks[i].k];
+        var color = ok ? 'var(--accent)' : '#ff6b6b';
+        var svg = ok
+          ? '<svg viewBox="0 0 16 16" style="width:14px;height:14px;display:block;"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 8l2 2 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+          : '<svg viewBox="0 0 16 16" style="width:14px;height:14px;display:block;"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 6l4 4M10 6l-4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+        h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:12px;">';
+        h += '<span style="color:' + color + ';">' + svg + '</span>';
+        h += '<span style="flex:1;">' + checks[i].l + '</span>';
+        if (checks[i].k === 'keys_loaded_count' && c.keys_loaded && c.keys_loaded.length) {
+          h += '<span style="font-size:10px;color:var(--ink-muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + c.keys_loaded.join(', ') + '</span>';
+        }
+        h += '</div>';
+      }
+      // disco
+      var diskPct = c.disk_total_mb > 0 ? Math.round(c.disk_free_mb / c.disk_total_mb * 100) : 0;
+      var diskColor = diskPct < 10 ? '#ff6b6b' : diskPct < 25 ? '#ffd93d' : 'var(--accent)';
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;font-size:12px;">';
+      h += '<span style="color:' + diskColor + ';">💾</span>';
+      h += '<span style="flex:1;">Disco livre: ' + (c.disk_free_mb||'?') + ' MB / ' + (c.disk_total_mb||'?') + ' MB (' + diskPct + '%)</span>';
+      h += '</div>';
+      h += '</div>';
+      listEl.innerHTML = h;
+    }
+
+    // ── Historico de Sessoes ─────────────────────────────────────
     let _allSessions = [];
+    let _filteredSessions = [];
+    let _sessionsPage = 0;
+    const SESSIONS_PAGE_SIZE = 20;
+
     async function openSessions() {
       const overlay = document.getElementById("sessions-overlay");
       overlay.style.opacity = "1"; overlay.style.pointerEvents = "all";
+      await loadSessions();
     }
     function closeSessions() {
       const o = document.getElementById("sessions-overlay");
       o.style.opacity = "0"; o.style.pointerEvents = "none";
+    }
+
+    async function loadSessions(force) {
+      const listEl = document.getElementById("session-list");
+      if (!listEl) return;
+      const now = Date.now();
+      if (!force && _sessionsCache.data && (now - _sessionsCache.ts) < CACHE_TTL) {
+        _allSessions = _sessionsCache.data;
+        _filteredSessions = _allSessions;
+        _sessionsPage = 0;
+        renderSessions(listEl);
+        return;
+      }
+      listEl.innerHTML = '<div class="modal-empty" data-i18n="ui.loading">Carregando sessões…</div>';
+      try {
+        const r = await fetch(BASE + "/api/sessions");
+        const d = await r.json();
+        if (d && d.sessions) {
+          _sessionsCache = { data: d.sessions, ts: Date.now() };
+          _allSessions = d.sessions;
+          _filteredSessions = d.sessions;
+          _sessionsPage = 0;
+          renderSessions(listEl);
+        } else {
+          listEl.innerHTML = '<div class="modal-empty" data-i18n="sessions.empty">Nenhuma sessão encontrada.</div>';
+        }
+      } catch (e) {
+        listEl.innerHTML = '<div class="modal-empty">❌ ' + e.message + '</div>';
+      }
+    }
+
+    function renderSessions(listEl) {
+      var start = 0;
+      var end = (_sessionsPage + 1) * SESSIONS_PAGE_SIZE;
+      var items = _filteredSessions.slice(start, end);
+      if (!items.length) {
+        listEl.innerHTML = '<div class="modal-empty" data-i18n="sessions.empty_filtered">Nenhuma sessão corresponde ao filtro.</div>';
+        return;
+      }
+      var h = '<div style="padding:4px 0;">';
+      for (var i = 0; i < items.length; i++) {
+        var s = items[i];
+        var id = s.id || '';
+        var title = s.title || s.name || id;
+        var date = s.date || s.created || '';
+        h += '<div class="session-item" data-session-id="' + id.replace(/"/g,'&quot;') + '" onclick="restoreSession(this.dataset.sessionId)" style="padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s;font-size:12px;">';
+        h += '<div style="font-weight:500;">' + escapeHtml(title) + '</div>';
+        if (date) h += '<div style="font-size:10px;color:var(--ink-muted);margin-top:2px;">' + escapeHtml(date) + '</div>';
+        h += '<div style="font-size:10px;color:var(--ink-muted);opacity:.6;">' + escapeHtml(id) + '</div>';
+        h += '</div>';
+      }
+      h += '</div>';
+      if (end < _filteredSessions.length) {
+        h += '<button onclick="loadMoreSessions()" style="width:100%;padding:8px;background:none;border:1px solid var(--line);border-radius:var(--radius);color:var(--accent);font-size:11px;cursor:pointer;margin-top:4px;">Ver mais (' + (_filteredSessions.length - end) + ' restantes)</button>';
+      }
+      listEl.innerHTML = h;
+    }
+
+    function loadMoreSessions() {
+      _sessionsPage++;
+      var listEl = document.getElementById("session-list");
+      if (listEl) renderSessions(listEl);
+    }
+
+    function filterSessions() {
+      var q = (document.getElementById("session-search").value || "").toLowerCase().trim();
+      if (!q) {
+        _filteredSessions = _allSessions;
+      } else {
+        _filteredSessions = _allSessions.filter(function(s) {
+          var str = (s.id || "") + " " + (s.title || "") + " " + (s.name || "") + " " + (s.date || "") + " " + (s.created || "");
+          return str.toLowerCase().indexOf(q) !== -1;
+        });
+      }
+      _sessionsPage = 0;
+      var listEl = document.getElementById("session-list");
+      if (listEl) renderSessions(listEl);
+    }
+
+    async function restoreSession(sessionId) {
+      if (!sessionId) return;
+      var _confirmed = false;
+      pesquisaiConfirm("Restaurar sessão " + sessionId + "?", function() {
+        if (_confirmed) return; _confirmed = true;
+        _doRestoreSession(sessionId);
+      });
+    }
+    async function _doRestoreSession(sessionId) {
+      try {
+        var listEl = document.getElementById("session-list");
+        if (listEl) listEl.innerHTML = '<div class="modal-empty">Restaurando sessão…</div>';
+        const r = await fetch(BASE + "/api/run_terminal", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({cmd: "opencode session restore " + sessionId})
+        });
+        const d = await r.json();
+        if (r.ok) {
+          toast("✅ Sessão " + sessionId + " restaurada!", "ok");
+          closeSessions();
+        } else {
+          toast("❌ Erro ao restaurar: " + (d.error || r.status), "err");
+          loadSessions(true);
+        }
+      } catch(e) {
+        toast("❌ " + e.message, "err");
+        loadSessions(true);
+      }
     }
 
     function openShortcuts() {
@@ -1525,7 +1764,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       });
     }
 
-    // ── Memória Obsidian (v0.5.1.4 — navegar + editar) ────────
+    // ── Memória PesquisAI (v0.5.1.4 — navegar + editar) ────────
     // Estado:
     //   _memoryTree      — lista plana de notas carregada do /api/obsidian/tree
     //   _memoryStatus    — {status, root, writable, notes_count, ...}
@@ -1533,12 +1772,18 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     //   _memoryDirty     — true se o editor tem mudanças não salvas
     //   _memorySearch    — termo de busca atual (filtro da sidebar)
     //   _memoryTab       — 'edit' | 'preview' | 'split'
+    // v0.5.1.8: cache de 5s para evitar refetch em aberturas repetidas
+    let _memoryCache = { tree: null, status: null, ts: 0 };
     let _memoryTree = [];
     let _memoryStatus = null;
     let _memoryCurrent = null;
     let _memoryDirty = false;
     let _memorySearch = "";
-    let _memoryTab = "edit";
+    let _memoryTab = "preview";
+    // v0.5.1.9: navegação por pastas + calendário
+    let _memoryCurrentFolder = null;     // null = lista de pastas, "daily/" = calendário, etc
+    let _memoryCalendarDate = new Date(); // mês atual do calendário
+    let _memoryCalendarDailies = [];     // paths das daily notes existentes
 
     async function openMemory(force) {
       const overlay = document.getElementById("memory-overlay");
@@ -1548,27 +1793,63 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       }
       const dict = I18N[_currentLang] || I18N["pt_BR"];
       const list = document.getElementById("memory-list");
+      // v0.5.1.9: reseta para lista de pastas ao abrir
+      _memoryCurrentFolder = null;
+      _memoryCalendarDate = new Date();
       if (list) {
         list.innerHTML = '<div class="modal-empty" style="padding:14px;">' +
           (dict["ui.loading"] || "Carregando…") + '</div>';
       }
-      // Sempre recarrega o status e a árvore; cache apenas para
-      // o caso de força=false numa sessão recente (5 s).
+      // v0.5.1.8: cache de 5s — evita nova requisição se cache for recente
+      const now = Date.now();
+      if (!force && _memoryCache.tree && (now - _memoryCache.ts) < 5000) {
+        _memoryStatus = _memoryCache.status;
+        _memoryTree = _memoryCache.tree;
+        renderMemoryHeader(_memoryCache.status, dict);
+        renderMemorySidebar();
+        if (_memoryCache.status && _memoryCache.status.status === "ready") {
+          if (!_memoryCurrent) {
+            const lastDaily = findLastDaily();
+            if (lastDaily) loadMemoryNote(lastDaily.path);
+          }
+        }
+        return;
+      }
       try {
-        const [rStatus, rTree] = await Promise.all([
-          fetch(BASE + "/api/obsidian"),
-          fetch(BASE + "/api/obsidian/tree"),
-        ]);
-        const dStatus = await rStatus.json();
-        const dTree = await rTree.json();
+        // v0.5.1.8: tenta rota unificada ?include=tree (1 request ao invés de 2)
+        let dStatus, dTree;
+        const unifiedResp = await fetch(BASE + "/api/obsidian?include=tree");
+        const unifiedData = await unifiedResp.json();
+        if (unifiedData.ok && unifiedData.tree) {
+          dStatus = unifiedData;
+          dTree = { tree: unifiedData.tree };
+        } else {
+          // Fallback: 2 chamadas separadas (backend antigo)
+          const [rStatus, rTree] = await Promise.all([
+            fetch(BASE + "/api/obsidian"),
+            fetch(BASE + "/api/obsidian/tree"),
+          ]);
+          dStatus = await rStatus.json();
+          dTree = await rTree.json();
+        }
         _memoryStatus = dStatus;
         _memoryTree = (dTree && dTree.tree) ? dTree.tree : [];
+        // Atualiza cache
+        _memoryCache = { tree: _memoryTree, status: dStatus, ts: Date.now() };
         renderMemoryHeader(dStatus, dict);
         renderMemorySidebar();
         if (dStatus.status !== "ready") {
           if (list) {
             list.innerHTML = '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' +
               escapeHtml(dStatus.message || dStatus.status) + '</div>';
+          }
+        } else {
+          // Abre automaticamente o último daily note se nenhuma nota estiver carregada
+          if (!_memoryCurrent && !force) {
+            const lastDaily = findLastDaily();
+            if (lastDaily) {
+              loadMemoryNote(lastDaily.path);
+            }
           }
         }
       } catch (e) {
@@ -1579,13 +1860,33 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       }
     }
 
+    // ── Encontra o último daily note na árvore da memória ──────
+    function findLastDaily() {
+      const dailies = [];
+      for (const folder of _memoryTree) {
+        for (const n of folder.notes) {
+          if (n.path && n.path.startsWith("daily/")) {
+            dailies.push(n);
+          }
+        }
+      }
+      dailies.sort((a, b) => b.path.localeCompare(a.path));
+      return dailies.length > 0 ? dailies[0] : null;
+    }
+
     function closeMemory(force) {
       // Se houver mudanças não salvas, pedir confirmação (a menos que force=true)
       if (!force && _memoryDirty && _memoryCurrent) {
-        if (!confirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nFechar mesmo assim?")) {
-          return;
-        }
+        var _confirmed = false;
+        pesquisaiConfirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nFechar mesmo assim?", function() {
+          if (_confirmed) return; _confirmed = true;
+          _doCloseMemory();
+        });
+        return;
       }
+      _doCloseMemory();
+    }
+    function _doCloseMemory() {
       const overlay = document.getElementById("memory-overlay");
       if (overlay) {
         overlay.style.opacity = "0";
@@ -1593,6 +1894,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       }
       _memoryDirty = false;
       _memoryCurrent = null;
+      _memoryCurrentFolder = null; // v0.5.1.9
       markDirty();
     }
 
@@ -1635,53 +1937,251 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       }
     }
 
-    // ── Renderização: sidebar (lista de notas agrupadas por pasta) ──
+    // ── Renderização: sidebar (navegação por pastas + calendário) ──
+    // v0.5.1.9: três modos:
+    //   1. Busca ativa → resultados filtrados (comportamento original)
+    //   2. Nenhuma pasta → lista de pastas (primeiro nível)
+    //   3. Pasta selecionada → calendário (daily/) ou lista de notas
     function renderMemorySidebar() {
       const list = document.getElementById("memory-list");
       const cnt  = document.getElementById("memory-count");
       if (!list) return;
       const dict = I18N[_currentLang] || I18N["pt_BR"];
-      // Filtra por busca
       const q = (_memorySearch || "").toLowerCase().trim();
-      const filtered = [];
-      for (const folder of _memoryTree) {
-        const matches = [];
-        for (const n of folder.notes) {
-          if (!q) { matches.push(n); continue; }
-          if ((n.title || "").toLowerCase().includes(q) ||
-              (n.path || "").toLowerCase().includes(q) ||
-              (n.tags || []).some(t => (t || "").toLowerCase().includes(q))) {
-            matches.push(n);
+
+      // 1) Modo busca: exibe resultados filtrados (comportamento original)
+      if (q) {
+        const filtered = [];
+        for (const folder of _memoryTree) {
+          const matches = [];
+          for (const n of folder.notes) {
+            if ((n.title || "").toLowerCase().includes(q) ||
+                (n.path || "").toLowerCase().includes(q) ||
+                (n.tags || []).some(t => (t || "").toLowerCase().includes(q))) {
+              matches.push(n);
+            }
+          }
+          if (matches.length) filtered.push({ folder: folder.folder, notes: matches });
+        }
+        const total = filtered.reduce((s, f) => s + f.notes.length, 0);
+        if (cnt) cnt.textContent = total + " " + (dict["memory.notes_count"] || "notas");
+        if (total === 0) {
+          list.innerHTML = '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' +
+            (dict["memory.no_results"] || "Nenhum resultado para '" + escapeHtml(q) + "'.") + '</div>';
+          return;
+        }
+        let html = "";
+        for (const folder of filtered) {
+          const label = folder.folder || "📁 (raiz)";
+          html += '<div class="mem-folder-label">' + escapeHtml(label) + '</div>';
+          for (const n of folder.notes) {
+            const active = (_memoryCurrent && _memoryCurrent.path === n.path) ? " active" : "";
+            const human  = n.is_pesquisai_generated ? "" : " human";
+            const tagHtml = (n.tags || []).slice(0, 3).map(t =>
+              '<span style="display:inline-block;font-size:9px;padding:0 4px;background:var(--accent-dim);color:var(--accent);border-radius:2px;margin-right:2px;">#' + escapeHtml(String(t).replace(/^#/, "")) + '</span>'
+            ).join("");
+            html += '<div class="mem-note-item' + active + human + '" data-path="' + encodeURIComponent(n.path) + '" onclick="loadMemoryNote(decodeURIComponent(this.dataset.path))">' +
+                 '<div class="mem-note-title">' + escapeHtml(n.title || n.path) + '</div>' +
+                    '<div class="mem-note-path">' + escapeHtml(n.path) + '</div>' +
+                    (tagHtml ? '<div style="margin-top:3px;">' + tagHtml + '</div>' : '') +
+                    '</div>';
           }
         }
-        if (matches.length) filtered.push({ folder: folder.folder, notes: matches });
-      }
-      const total = filtered.reduce((s, f) => s + f.notes.length, 0);
-      if (cnt) cnt.textContent = total + " " + (dict["memory.notes_count"] || "notas");
-      if (total === 0) {
-        list.innerHTML = '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' +
-          (q ? (dict["memory.no_results"] || "Nenhum resultado para '" + escapeHtml(q) + "'.") :
-               (dict["memory.no_notes"] || "Nenhuma nota ainda.")) + '</div>';
+        list.innerHTML = html;
         return;
       }
-      let html = "";
-      for (const folder of filtered) {
-        const label = folder.folder || "📁 (raiz)";
-        html += '<div class="mem-folder-label">' + escapeHtml(label) + '</div>';
-        for (const n of folder.notes) {
-          const active = (_memoryCurrent && _memoryCurrent.path === n.path) ? " active" : "";
-          const human  = n.is_pesquisai_generated ? "" : " human";
-          const tagHtml = (n.tags || []).slice(0, 3).map(t =>
-            '<span style="display:inline-block;font-size:9px;padding:0 4px;background:var(--accent-dim);color:var(--accent);border-radius:2px;margin-right:2px;">#' + escapeHtml(String(t).replace(/^#/, "")) + '</span>'
-          ).join("");
-          html += `<div class="mem-note-item${active}${human}" onclick="loadMemoryNote('${n.path.replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\'")}')">` +
-               '<div class="mem-note-title">' + escapeHtml(n.title || n.path) + '</div>' +
-                  '<div class="mem-note-path">' + escapeHtml(n.path) + '</div>' +
-                  (tagHtml ? '<div style="margin-top:3px;">' + tagHtml + '</div>' : '') +
-                  '</div>';
+
+      // 2) Modo pasta selecionada: mostra conteúdo da pasta
+      if (_memoryCurrentFolder) {
+        renderFolderContent(_memoryCurrentFolder, list, cnt, dict);
+        return;
+      }
+
+      // 3) Modo raiz: lista de pastas
+      renderFolderList(list, cnt, dict);
+    }
+
+    // ── Lista de pastas (primeiro nível) ─────────────────────────
+    function renderFolderList(list, cnt, dict) {
+      // Agrupa e conta notas por pasta
+      const folderMap = {};
+      const folderIcons = {
+        "daily/": "📅", "research/": "🔬", "literature/": "📚",
+        "sessions/": "📜", "reference/": "📖", "methodology/": "⚙️",
+        "hypothesis/": "💡", "datasource/": "🗄️", "moc/": "🗺️",
+        "inbox/": "📥", "assets/": "🎨"
+      };
+      let totalNotes = 0;
+      for (const folder of _memoryTree) {
+        const f = folder.folder || "";
+        if (!folderMap[f]) folderMap[f] = 0;
+        folderMap[f] += folder.notes.length;
+        totalNotes += folder.notes.length;
+      }
+      if (cnt) cnt.textContent = totalNotes + " " + (dict["memory.notes_count"] || "notas");
+      let html = '<div style="padding:6px 0;">';
+      // Ordem: daily sempre primeiro, depois alfabético
+      const ordered = Object.keys(folderMap).sort((a, b) => {
+        if (a === "daily/") return -1;
+        if (b === "daily/") return 1;
+        return a.localeCompare(b);
+      });
+      for (const f of ordered) {
+        const icon = folderIcons[f] || "📁";
+        const label = f ? f.replace(/\/$/, "") : "(raiz)";
+        const count = folderMap[f];
+        const isDaily = f === "daily/";
+        html += '<div class="mem-folder-card" data-folder="' + encodeURIComponent(f) + '" onclick="navigateToFolder(decodeURIComponent(this.dataset.folder))" style="padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s;display:flex;align-items:center;gap:10px;">';
+        html += '<span style="font-size:16px;">' + icon + '</span>';
+        html += '<div style="flex:1;min-width:0;">';
+        html += '<div style="font-size:12px;font-weight:500;">' + escapeHtml(label) + '</div>';
+        html += '<div style="font-size:10px;color:var(--ink-muted);">' + count + ' nota' + (count !== 1 ? 's' : '') + '</div>';
+        html += '</div>';
+        html += '<span style="color:var(--ink-muted);font-size:10px;">→</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+      list.innerHTML = html;
+    }
+
+    // ── Conteúdo de uma pasta ────────────────────────────────────
+    function renderFolderContent(folderName, list, cnt, dict) {
+      // Encontra as notas da pasta
+      const notes = [];
+      for (const folder of _memoryTree) {
+        if (folder.folder === folderName) {
+          for (const n of folder.notes) notes.push(n);
+        }
+      }
+      if (cnt) cnt.textContent = notes.length + " " + (dict["memory.notes_count"] || "notas");
+
+      // Botão voltar
+      let html = '<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;">';
+      html += '<button onclick="navigateBack()" style="background:none;border:1px solid var(--line);border-radius:var(--radius);padding:3px 8px;font-size:10px;color:var(--accent);cursor:pointer;">← ' + (dict["memory.back"] || "Voltar") + '</button>';
+      const iconMap = {
+        "daily/": "📅", "research/": "🔬", "literature/": "📚",
+        "sessions/": "📜", "reference/": "📖", "methodology/": "⚙️",
+        "hypothesis/": "💡", "datasource/": "🗄️", "moc/": "🗺️",
+        "inbox/": "📥", "assets/": "🎨"
+      };
+      html += '<span style="font-size:12px;font-weight:500;color:var(--ink-muted);">' + (iconMap[folderName] || "📁") + ' ' + escapeHtml(folderName.replace(/\/$/, "")) + '</span>';
+      html += '</div>';
+
+      if (folderName === "daily/") {
+        // Calendário para daily notes
+        html += renderCalendar();
+      } else {
+        // Lista de notas para demais pastas
+        if (notes.length === 0) {
+          html += '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' + (dict["memory.no_notes"] || "Nenhuma nota ainda.") + '</div>';
+        } else {
+          html += '<div style="padding:4px 0;">';
+          for (const n of notes) {
+            const active = (_memoryCurrent && _memoryCurrent.path === n.path) ? " active" : "";
+            const human  = n.is_pesquisai_generated ? "" : " human";
+            const tagHtml = (n.tags || []).slice(0, 3).map(t =>
+              '<span style="display:inline-block;font-size:9px;padding:0 4px;background:var(--accent-dim);color:var(--accent);border-radius:2px;margin-right:2px;">#' + escapeHtml(String(t).replace(/^#/, "")) + '</span>'
+            ).join("");
+            html += '<div class="mem-note-item' + active + human + '" data-path="' + encodeURIComponent(n.path) + '" onclick="loadMemoryNote(decodeURIComponent(this.dataset.path))">' +
+                 '<div class="mem-note-title">' + escapeHtml(n.title || n.path) + '</div>' +
+                    '<div class="mem-note-path">' + escapeHtml(n.path) + '</div>' +
+                    (tagHtml ? '<div style="margin-top:3px;">' + tagHtml + '</div>' : '') +
+                    '</div>';
+          }
+          html += '</div>';
         }
       }
       list.innerHTML = html;
+    }
+
+    // ── Calendário de Daily Notes ────────────────────────────────
+    function renderCalendar() {
+      // Extrai paths das daily notes existentes
+      _memoryCalendarDailies = [];
+      for (const folder of _memoryTree) {
+        if (folder.folder === "daily/") {
+          for (const n of folder.notes) {
+            if (n.path) _memoryCalendarDailies.push(n.path);
+          }
+        }
+      }
+      const date = _memoryCalendarDate;
+      const year = date.getFullYear();
+      const month = date.getMonth(); // 0-based
+      const today = new Date();
+      const todayStr = today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2,"0") + "-" + String(today.getDate()).padStart(2,"0");
+
+      // Primeiro dia do mês (0=domingo..6=sábado)
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      // Mês e ano por extenso
+      const monthNames = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+                          "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+      const weekDays = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+
+      let h = '<div style="padding:8px;">';
+      // Header: navegação entre meses
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+      h += '<button onclick="prevMonth()" style="background:none;border:1px solid var(--line);border-radius:var(--radius);padding:3px 8px;font-size:11px;color:var(--accent);cursor:pointer;">◀</button>';
+      h += '<span style="font-size:13px;font-weight:600;">' + monthNames[month] + ' ' + year + '</span>';
+      h += '<button onclick="nextMonth()" style="background:none;border:1px solid var(--line);border-radius:var(--radius);padding:3px 8px;font-size:11px;color:var(--accent);cursor:pointer;">▶</button>';
+      h += '</div>';
+      // Grid: dias da semana
+      h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:10px;color:var(--ink-muted);margin-bottom:4px;">';
+      for (let w = 0; w < 7; w++) {
+        h += '<div style="padding:4px 0;">' + weekDays[w] + '</div>';
+      }
+      h += '</div>';
+      // Grid: dias do mês
+      h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;">';
+      // Células vazias antes do primeiro dia
+      for (let i = 0; i < firstDay; i++) {
+        h += '<div style="padding:6px 0;"></div>';
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = year + "-" + String(month+1).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+        const path = "daily/" + dateStr + ".md";
+        const hasNote = _memoryCalendarDailies.indexOf(path) !== -1;
+        const isToday = dateStr === todayStr;
+        const isSelected = _memoryCurrent && _memoryCurrent.path === path;
+        let styles = "padding:6px 0;border-radius:4px;font-size:11px;cursor:pointer;transition:background .12s;position:relative;";
+        if (isSelected) styles += "background:var(--accent-dim);color:var(--accent);font-weight:700;";
+        else if (isToday) styles += "background:rgba(var(--accent-rgb),.12);color:var(--accent);font-weight:600;";
+        else styles += "color:var(--ink);";
+         h += '<div class="mem-cal-day" style="' + styles + '" onclick="loadMemoryNote(\\'' + path + '\\')">';
+        h += d;
+        if (hasNote) {
+          h += '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--accent);"></div>';
+        }
+        h += '</div>';
+      }
+      h += '</div></div>';
+      return h;
+    }
+
+    // ── Navegação entre pastas ───────────────────────────────────
+    function navigateToFolder(folderName) {
+      _memoryCurrentFolder = folderName;
+      if (folderName === "daily/") {
+        _memoryCalendarDate = new Date(); // volta para o mês atual
+      }
+      renderMemorySidebar();
+    }
+
+    function navigateBack() {
+      _memoryCurrentFolder = null;
+      renderMemorySidebar();
+    }
+
+    function prevMonth() {
+      _memoryCalendarDate.setMonth(_memoryCalendarDate.getMonth() - 1);
+      renderMemorySidebar();
+    }
+
+    function nextMonth() {
+      _memoryCalendarDate.setMonth(_memoryCalendarDate.getMonth() + 1);
+      renderMemorySidebar();
     }
 
     // ── Busca ──────────────────────────────────────────────────────
@@ -1697,8 +2197,22 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     // ── Carregar nota no editor ───────────────────────────────────
     async function loadMemoryNote(path) {
       if (_memoryDirty && _memoryCurrent && _memoryCurrent.path !== path) {
-        if (!confirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nDescartar e abrir outra nota?")) {
-          return;
+        var _confirmed = false;
+        pesquisaiConfirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nDescartar e abrir outra nota?", function() {
+          if (_confirmed) return; _confirmed = true;
+          _continueLoadMemoryNote(path);
+        });
+        return;
+      }
+      _continueLoadMemoryNote(path);
+    }
+    async function _continueLoadMemoryNote(path) {
+      // v0.5.1.9: navega automaticamente para a pasta da nota
+      const slashIdx = path.indexOf("/");
+      if (slashIdx !== -1) {
+        const folder = path.substring(0, slashIdx + 1);
+        if (_memoryCurrentFolder !== folder) {
+          _memoryCurrentFolder = folder;
         }
       }
       const dict = I18N[_currentLang] || I18N["pt_BR"];
@@ -1786,7 +2300,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             (m, p, t) => p + '<span class="tag">#' + escapeHtml(t) + '</span>');
           prev.innerHTML = '<div class="mem-preview">' + html + '</div>';
         } else {
-          prev.innerHTML = '<pre style="white-space:pre-wrap;font-family:DM Mono,monospace;font-size:11.5px;">' + escapeHtml(src) + '</pre>';
+          prev.innerHTML = '<pre style="white-space:pre-wrap;font-family:var(--font-mono);font-size:11.5px;">' + escapeHtml(src) + '</pre>';
         }
       } catch (e) {
         prev.innerHTML = '<pre>' + escapeHtml(src) + '</pre>';
@@ -1870,9 +2384,14 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     // ── Excluir nota ──────────────────────────────────────────────
     async function deleteCurrentNote() {
       if (!_memoryCurrent) return;
-      const dict = I18N[_currentLang] || I18N["pt_BR"];
-      const ok = confirm("Mover '" + _memoryCurrent.path + "' para .trash/?");
-      if (!ok) return;
+      var _confirmed = false;
+      pesquisaiConfirm("Mover '" + _memoryCurrent.path + "' para .trash/?", function() {
+        if (_confirmed) return; _confirmed = true;
+        _continueDeleteCurrentNote();
+      });
+      return;
+    }
+    async function _continueDeleteCurrentNote() {
       try {
         const r = await fetch(BASE + "/api/obsidian/note", {
           method: "POST",
@@ -1916,8 +2435,16 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     // ── Diálogo de nova nota ──────────────────────────────────────
     async function openCreateNoteDialog() {
       if (_memoryDirty && _memoryCurrent) {
-        if (!confirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nContinuar?")) return;
+        var _confirmed = false;
+        pesquisaiConfirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nContinuar?", function() {
+          if (_confirmed) return; _confirmed = true;
+          _continueOpenCreateNoteDialog();
+        });
+        return;
       }
+      _continueOpenCreateNoteDialog();
+    }
+    function _continueOpenCreateNoteDialog() {
       const dict = I18N[_currentLang] || I18N["pt_BR"];
       const overlay = document.getElementById("memory-new-overlay");
       if (overlay) { overlay.style.opacity = "1"; overlay.style.pointerEvents = "all"; }
@@ -2046,9 +2573,9 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         root.style.setProperty("--surface", "#f5f6f7");
         root.style.setProperty("--rail", "#ffffff");
         root.style.setProperty("--line", "rgba(0,0,0,.1)");
-        root.style.setProperty("--accent", "#0288d1");
-        root.style.setProperty("--accent-dim", "rgba(2,136,209,.1)");
-        root.style.setProperty("--accent-glow", "rgba(2,136,209,.2)");
+        root.style.setProperty("--accent", "#157a73");
+        root.style.setProperty("--accent-dim", "rgba(21,122,115,.10)");
+        root.style.setProperty("--accent-glow", "rgba(21,122,115,.18)");
         root.style.setProperty("--green", "#2e7d32");
         root.style.setProperty("--green-dim", "rgba(46,125,50,.1)");
         root.style.setProperty("--amber", "#e65100");
@@ -2058,13 +2585,13 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#f5f6f7");
       } else {
         root.style.setProperty("--ink", "#e8e6e0");
-        root.style.setProperty("--ink-muted", "#8a8780");
+        root.style.setProperty("--ink-muted", "#9a9790");
         root.style.setProperty("--surface", "#0d0f10");
         root.style.setProperty("--rail", "#151819");
         root.style.setProperty("--line", "rgba(255,255,255,.07)");
-        root.style.setProperty("--accent", "#4fc3f7");
-        root.style.setProperty("--accent-dim", "rgba(79,195,247,.12)");
-        root.style.setProperty("--accent-glow", "rgba(79,195,247,.22)");
+        root.style.setProperty("--accent", "#46a39b");
+        root.style.setProperty("--accent-dim", "rgba(var(--accent-rgb),.12)");
+        root.style.setProperty("--accent-glow", "rgba(var(--accent-rgb),.22)");
         root.style.setProperty("--green", "#5dba7e");
         root.style.setProperty("--green-dim", "rgba(93,186,126,.12)");
         root.style.setProperty("--amber", "#e8b84b");
@@ -2141,8 +2668,61 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       loadInitialTheme();
       // 3. Aplica keys no ambiente
       fetch(BASE + "/api/apikey/apply", { method: "POST" }).catch(() => {});
+      // 4. First-run welcome hint
+      var _welcomeEl = document.getElementById("welcome-hint");
+      if (_welcomeEl && !localStorage.getItem("pesquisai_onboarded")) {
+        _welcomeEl.style.opacity = "1";
+        _welcomeEl.style.pointerEvents = "all";
+      }
     });
   </script>
+  <!-- marked.js: renderizador de markdown para o modal de Diretrizes do Agente e preview do editor -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <!-- Welcome hint (first-run onboarding) -->
+<div id="welcome-hint" onclick="document.getElementById('welcome-hint').style.opacity='0';document.getElementById('welcome-hint').style.pointerEvents='none';try{localStorage.setItem('pesquisai_onboarded','1')}catch(e){}" style="position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:100000;opacity:0;pointer-events:none;transition:opacity .25s;">
+  <div style="background:#1c1f22;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:28px 32px;width:420px;max-width:90vw;box-shadow:0 28px 72px rgba(0,0,0,.7);text-align:center;">
+    
+    <!-- Título -->
+    <div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:8px;">PesquisAI</div>
+    
+    <!-- Descrição concisa -->
+    <div style="font-size:12.5px;line-height:1.65;color:var(--ink-muted);margin-bottom:8px;">
+      Agente de IA para pesquisa científica.
+    </div>
+    
+    <!-- Linha 1: Links principais -->
+    <div style="font-size:12px;line-height:1.6;color:var(--ink-muted);margin-bottom:4px;">
+      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/MANUAL.md" target="_blank" style="color:var(--accent);text-decoration:underline;">Manual</a>
+      &middot;
+      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/AGENTS.md" target="_blank" style="color:var(--accent);text-decoration:underline;">Arquitetura</a>
+      &middot;
+      <a href="https://github.com/gustavobraga-byte/PesquisAI" target="_blank" style="color:var(--accent);text-decoration:underline;">Repositório</a>
+    </div>
+    
+    <!-- Linha 2: Links legais/éticos -->
+    <div style="font-size:12px;line-height:1.6;color:var(--ink-muted);margin-bottom:20px;">
+      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/disclaimer_pesquisai.md" target="_blank" style="color:var(--accent);text-decoration:underline;">Disclaimer</a>
+      &middot;
+      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/MANUAL.md#citação-do-pesquisai" target="_blank" style="color:var(--accent);text-decoration:underline;">Como citar</a>
+      &middot;
+      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/declaracao_uso_ia.md" target="_blank" style="color:var(--accent);text-decoration:underline;">Uso de IA</a>
+    </div>
+    
+    <!-- Botão -->
+    <button onclick="document.getElementById('welcome-hint').style.opacity='0';document.getElementById('welcome-hint').style.pointerEvents='none';try{localStorage.setItem('pesquisai_onboarded','1')}catch(e){}" class="btn-ghost" style="background:var(--accent);color:#000;border-color:var(--accent);font-weight:600;padding:10px 28px;cursor:pointer;border-radius:6px;border:1px solid transparent;font-size:13px;">Começar</button>
+  </div>
+</div>
+  </div>
+  <!-- Confirm dialog overlay (replaces native confirm()) -->
+  <div id="confirm-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:100001;opacity:0;pointer-events:none;transition:opacity .18s;">
+    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:22px;width:400px;max-width:92vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
+      <div id="confirm-msg" style="font-size:13px;line-height:1.55;color:var(--ink);margin-bottom:18px;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="confirm-no" class="btn-ghost" style="padding:9px 16px;" data-i18n="ui.cancel">Cancelar</button>
+        <button id="confirm-yes" class="btn-ghost" style="padding:9px 16px;background:var(--accent);color:#000;border-color:var(--accent);font-weight:600;" data-i18n="ui.confirm">Confirmar</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>"""
 
@@ -2180,10 +2760,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal recarregado com novo tema",
             "languages.label": "Idioma", "languages.switched_to": "Idioma alterado para",
             "success_messages.backup_saved": "Backup salvo",
-            # v0.5.1.2 — Memória Obsidian
-            "memory.title": "Memória Obsidian",
+            # v0.5.1.2 — Memória PesquisAI
+            "memory.title": "Memória PesquisAI",
             "memory.subtitle": "Camada de memória persistente do agente",
-            "memory.tooltip": "Memória Obsidian (segundo cérebro)",
+            "memory.tooltip": "Memória PesquisAI (segundo cérebro)",
             "memory.status_ready": "🟢 Ativa",
             "memory.status_disabled": "⚪ Desativada",
             "memory.status_no_vault": "🟡 Sem vault",
@@ -2252,10 +2832,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal reloaded with new theme",
             "languages.label": "Language", "languages.switched_to": "Language switched to",
             "success_messages.backup_saved": "Backup saved",
-            # v0.5.1.2 — Obsidian Memory
-            "memory.title": "Obsidian Memory",
+            # v0.5.1.2 — PesquisAI Memory
+            "memory.title": "PesquisAI Memory",
             "memory.subtitle": "Agent's persistent memory layer",
-            "memory.tooltip": "Obsidian Memory (second brain)",
+            "memory.tooltip": "PesquisAI Memory (second brain)",
             "memory.status_ready": "🟢 Active",
             "memory.status_disabled": "⚪ Disabled",
             "memory.status_no_vault": "🟡 No vault",
@@ -2324,10 +2904,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal recargado con nuevo tema",
             "languages.label": "Idioma", "languages.switched_to": "Idioma cambiado a",
             "success_messages.backup_saved": "Copia guardada",
-            # v0.5.1.2 — Memoria Obsidian
-            "memory.title": "Memoria Obsidian",
+            # v0.5.1.2 — Memoria PesquisAI
+            "memory.title": "Memoria PesquisAI",
             "memory.subtitle": "Capa de memoria persistente del agente",
-            "memory.tooltip": "Memoria Obsidian (segundo cerebro)",
+            "memory.tooltip": "Memoria PesquisAI (segundo cerebro)",
             "memory.status_ready": "🟢 Activa",
             "memory.status_disabled": "⚪ Desactivada",
             "memory.status_no_vault": "🟡 Sin vault",
@@ -2396,10 +2976,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal rechargé avec le nouveau thème",
             "languages.label": "Langue", "languages.switched_to": "Langue changée en",
             "success_messages.backup_saved": "Sauvegarde enregistrée",
-            # v0.5.1.2 — Mémoire Obsidian
-            "memory.title": "Mémoire Obsidian",
+            # v0.5.1.2 — Mémoire PesquisAI
+            "memory.title": "Mémoire PesquisAI",
             "memory.subtitle": "Couche de mémoire persistante de l'agent",
-            "memory.tooltip": "Mémoire Obsidian (deuxième cerveau)",
+            "memory.tooltip": "Mémoire PesquisAI (deuxième cerveau)",
             "memory.status_ready": "🟢 Active",
             "memory.status_disabled": "⚪ Désactivée",
             "memory.status_no_vault": "🟡 Pas de vault",

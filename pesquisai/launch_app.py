@@ -538,7 +538,7 @@ def start_ttyd(lang: str | None = None):
     greeting = get_greeting(full_lang)
     # Escapar aspas para o bash -c "..."
     safe_prompt = greeting.replace('"', '\\"').replace("'", "\\'")
-    bash_cmd = f'{opencode_bin} --prompt "{safe_prompt}" ; exec bash'
+    bash_cmd = f'{opencode_bin} --prompt "{safe_prompt}" --yolo ; exec bash'
 
     # v0.4.2.5: construir args com --index (touch handlers)
     base_args = ["ttyd", "-p", str(TERMINAL_PORT), "bash", "-i", "-c", bash_cmd]
@@ -982,13 +982,17 @@ def start_wrapper_server():
                 return
 
             if p == "/api/obsidian":
-                # v0.5.1.2: status da memória Obsidian (segundo cérebro)
+                # v0.5.1.2: status da memória PesquisAI (segundo cérebro)
                 # Lê o vault via pesquisai.obsidian (módulo oficial).
                 # Retorna JSON com:
                 #   - enabled / status / root
                 #   - notes_count / tags_count / recent_notes / recent_daily
                 #   - templates / templates_path
                 #   - message (string amigável i18n pronta para toast)
+                # v0.5.1.8: suporte a ?include=tree para unificar rotas
+                q_obs = urlparse(self.path).query
+                qp_obs = parse_qs(q_obs)
+                incl_tree = "tree" in (qp_obs.get("include", [""])[0] or "")
                 result = {
                     "ok": True,
                     "enabled": False,
@@ -1094,6 +1098,32 @@ def start_wrapper_server():
                             "templates_path": templates_path,
                             "message": "Memória ativa.",
                         })
+                        # v0.5.1.8: se ?include=tree, inclui árvore de notas
+                        if incl_tree and mem._vault is not None:
+                            try:
+                                tree_data = []
+                                folders_data: dict[str, list[dict]] = {}
+                                for note in mem._vault.iter_notes():
+                                    rel = note.path
+                                    folder = str(Path(rel).parent) if "/" in rel else ""
+                                    folders_data.setdefault(folder, []).append({
+                                        "path": note.path,
+                                        "title": note.metadata.title,
+                                        "tags": list(note.tags)[:6],
+                                        "length": len(note.body or ""),
+                                        "updated": note.metadata.updated.isoformat() if note.metadata.updated else None,
+                                        "is_pesquisai_generated": note.is_pesquisai_generated,
+                                    })
+                                for folder in sorted(folders_data):
+                                    tree_data.append({
+                                        "folder": folder,
+                                        "notes": sorted(folders_data[folder], key=lambda n: n["title"].lower()),
+                                    })
+                                result["tree"] = tree_data
+                                result["tree_total"] = sum(len(t["notes"]) for t in tree_data)
+                            except Exception:
+                                result["tree"] = []
+                                result["tree_total"] = 0
                     else:
                         result["status"] = str(mem.status.value)
                         result["message"] = f"Status desconhecido: {mem.status.value}"
@@ -1786,14 +1816,49 @@ def start_wrapper_server():
                 except Exception as e:
                     parse_error = str(e)
                 
-                # 3. Respond — frontend will call run_terminal with opencode -s {session_id}
+                # 3. v0.5.1.6 — REINICIAR ttyd com `opencode -s <session_id>`
+                # Bug antigo: importava a sessão mas o ttyd continuava com --prompt,
+                # então location.reload() mostrava a conversa ATUAL, não a importada.
+                ttyd_restarted = False
+                ttyd_restart_error = ""
+                if session_id:
+                    try:
+                        # Mata ttyd + opencode atuais
+                        subprocess.run(["pkill", "-9", "-f", "ttyd"], capture_output=True, timeout=5)
+                        subprocess.run(["pkill", "-9", "-f", "opencode"], capture_output=True, timeout=5)
+                        time.sleep(1.0)
+                        # Reinicia ttyd com a sessão importada
+                        opencode_bin, env = resolve_opencode()
+                        bash_cmd = f'{opencode_bin} -s "{session_id}" ; exec bash'
+                        base_args = ["ttyd", "-p", str(TERMINAL_PORT), "bash", "-i", "-c", bash_cmd]
+                        ttyd_args = _build_ttyd_args(base_args, env)
+                        subprocess.Popen(
+                            ttyd_args,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            env=env,
+                        )
+                        ttyd_restarted = True
+                        print(f"🔄 ttyd reiniciado com sessão {session_id}")
+                    except Exception as restart_err:
+                        ttyd_restart_error = str(restart_err)[:200]
+                        logger.error("Falha ao reiniciar ttyd com sessão %s: %s", session_id, restart_err)
+
+                # 4. Respond
                 self._json(200, {
                     "ok": True,
                     "file": fname,
                     "session_id": session_id,
                     "parse_error": parse_error,
                     "import_stdout": r.stdout.strip()[:300],
-                    "message": "Sessão importada com sucesso."
+                    "ttyd_restarted": ttyd_restarted,
+                    "ttyd_restart_error": ttyd_restart_error,
+                    "message": (
+                        "Sessão importada e ttyd reiniciado com opencode -s "
+                        + session_id if ttyd_restarted else
+                        "Sessão importada, mas ttyd NÃO foi reiniciado. "
+                        "Faça reload manual após o import."
+                    ),
                 })
                 return
             

@@ -357,8 +357,14 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   <meta name="theme-color" content="#0d0f10">
   <title>PesquisAI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+  <!-- github-markdown-css: estilização markdown para o modal de Diretrizes -->
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css" as="style">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css">
+  <!-- marked.js: preload para acelerar renderização de markdown -->
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" as="script">
   <script>
     // ═══════════════════════════════════════════════════════════
     // 🛡️ ANTI-FLASH: aplica tema ANTES de qualquer renderização
@@ -688,7 +694,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       <button class="tb-icon" onclick="openAgents()" title="Diretrizes do Agente" data-i18n-title="agents.title">
         <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h7"/></svg>
       </button>
-      <button class="tb-icon" onclick="openMemory()" id="memory-btn" title="Memória Obsidian" data-i18n-title="memory.tooltip">
+      <button class="tb-icon" onclick="openMemory()" id="memory-btn" title="Memória PesquisAI" data-i18n-title="memory.tooltip">
         <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 3 1.5 5 3 7l1 1v3a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-3l1-1c1.5-2 3-4 3-7a7 7 0 0 0-7-7z"/><path d="M9 22h6"/><path d="M12 2v20"/></svg>
       </button>
       <button class="tb-icon" onclick="toggleTheme()" id="theme-toggle" title="Alternar tema" data-theme="pesquisai" data-i18n-title="theme.toggle">
@@ -742,11 +748,11 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       <span data-i18n="providers.title">+ provedor</span>
     </button>
     <div style="height:1px;background:var(--line);margin:8px 0;"></div>
-    <button class="modal-close" onclick="openHealth(); toggleMobileMenu();">🩺 <span data-i18n="dashboard.title">Dashboard de Saúde</span></button>
+    <button class="modal-close" onclick="openHealth(); toggleMobileMenu();">🩺 <pan data-i18n="dashboard.title">Dashboard de Saúde</span></button>
     <button class="modal-close" onclick="openSessions(); toggleMobileMenu();">📜 <span data-i18n="sessions.title">Histórico de Sessões</span></button>
     <button class="modal-close" onclick="openShortcuts(); toggleMobileMenu();">⌨️ <span data-i18n="shortcuts.title">Atalhos de Teclado</span></button>
     <button class="modal-close" onclick="openAgents(); toggleMobileMenu();">📋 <span data-i18n="agents.title">Diretrizes do Agente</span></button>
-    <button class="modal-close" onclick="openMemory(); toggleMobileMenu();">🧠 <span data-i18n="memory.title">Memória Obsidian</span></button>
+    <button class="modal-close" onclick="openMemory(); toggleMobileMenu();">🧠 <span data-i18n="memory.title">Memória PesquisAI</span></button>
     <button class="modal-close" onclick="toggleTheme(); toggleMobileMenu();">◑ <span data-i18n="theme.toggle">Alternar Tema</span></button>
     <button class="modal-close" onclick="toggleLangMenu();">🌐 <span data-i18n="languages.label">Idioma</span></button>
   </div>
@@ -875,7 +881,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         <span id="agents-lang-badge" style="font-size:10px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;color:var(--ink-muted);font-family:'DM Mono',monospace;">PT-BR</span>
         <button onclick="closeAgents()" class="modal-close" style="width:auto;padding:4px 10px;font-size:11px;" aria-label="Fechar">✕</button>
       </div>
-      <div id="agents-content" class="markdown-body" style="flex:1;overflow-y:auto;padding:22px 26px;font-size:12.5px;line-height:1.65;color:var(--ink);background:transparent;" data-i18n="agents.loading">Carregando diretrizes…</div>
+      <div id="agents-content" class="markdown-body" style="flex:1;overflow-y:auto;padding:22px 26px;font-size:12.5px;line-height:1.65;color:var(--ink);" data-i18n="agents.loading">Carregando diretrizes…</div>
       <div style="padding:10px 18px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.02);">
         <button onclick="copyAgents()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="agents.copy">Copiar</button>
         <button onclick="reloadAgents()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;">↻ <span data-i18n="ui.loading">Recarregar</span></button>
@@ -885,14 +891,14 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
-  <!-- Modal de Memória Obsidian (v0.5.1.4 — navegar + editar) -->
+  <!-- Modal de Memória PesquisAI (v0.5.1.4 — navegar + editar) -->
   <div id="memory-overlay" onclick="if(event.target===this)closeMemory()" style="position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
     <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:0;width:980px;max-width:96vw;max-height:92vh;box-shadow:0 28px 72px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;">
       <!-- Header -->
       <div style="padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;">
         <span style="font-size:18px;">🧠</span>
         <div style="flex:1;min-width:0;">
-          <div class="modal-title" style="margin-bottom:2px;" data-i18n="memory.title">Memória Obsidian</div>
+          <div class="modal-title" style="margin-bottom:2px;" data-i18n="memory.title">Memória PesquisAI</div>
           <div id="memory-subtitle" style="font-size:10.5px;color:var(--ink-muted);" data-i18n="memory.subtitle">Camada de memória persistente do agente</div>
         </div>
         <span id="memory-status-badge" style="font-size:10px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;color:var(--ink-muted);font-family:'DM Mono',monospace;">…</span>
@@ -930,8 +936,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
 
           <!-- Tabs Edit/Preview -->
           <div id="memory-editor-tabs" style="display:none;padding:6px 14px 0;border-bottom:1px solid var(--line);background:rgba(255,255,255,.01);">
-            <button id="memory-tab-edit" class="mem-tab active" onclick="switchMemoryTab('edit')" data-i18n="memory.tab_edit">Editar</button>
-            <button id="memory-tab-preview" class="mem-tab" onclick="switchMemoryTab('preview')" data-i18n="memory.tab_preview">Preview</button>
+            <button id="memory-tab-preview" class="mem-tab active" onclick="switchMemoryTab('preview')" data-i18n="memory.tab_preview">Preview</button>
+            <button id="memory-tab-edit" class="mem-tab" onclick="switchMemoryTab('edit')" data-i18n="memory.tab_edit">Editar</button>
             <button id="memory-tab-split" class="mem-tab" onclick="switchMemoryTab('split')" data-i18n="memory.tab_split">Dividido</button>
           </div>
 
@@ -982,7 +988,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   </div>
 
   <style>
-    /* v0.5.1.4 — Editor de memória Obsidian */
+    /* v0.5.1.4 — Editor de memória PesquisAI */
     .mem-tab {
       background: transparent; color: var(--ink-muted); border: none;
       border-bottom: 2px solid transparent; padding: 6px 12px; font-size: 11.5px;
@@ -995,6 +1001,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       transition: background .12s; border-left: 2px solid transparent;
     }
     .mem-note-item:hover { background: rgba(255,255,255,.04); }
+    .mem-folder-card:hover { background: rgba(255,255,255,.04); }
+    .mem-cal-day:hover { background: rgba(255,255,255,.06) !important; }
     .mem-note-item.active {
       background: rgba(var(--accent-rgb, 99, 179, 237), .12);
       border-left-color: var(--accent);
@@ -1378,23 +1386,200 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       }
     }
 
+    // ── Cache compartilhado (5s) ──────────────────────────────────
+    let _healthCache = { data: null, ts: 0 };
+    let _sessionsCache = { data: null, ts: 0 };
+    const CACHE_TTL = 5000;
+
+    // ── Dashboard de Saude ───────────────────────────────────────
     async function openHealth() {
       const overlay = document.getElementById("health-overlay");
       overlay.style.opacity = "1"; overlay.style.pointerEvents = "all";
+      await loadHealth();
     }
     function closeHealth() {
       const o = document.getElementById("health-overlay");
       o.style.opacity = "0"; o.style.pointerEvents = "none";
     }
 
+    async function loadHealth(force) {
+      const listEl = document.getElementById("health-list");
+      if (!listEl) return;
+      const now = Date.now();
+      if (!force && _healthCache.data && (now - _healthCache.ts) < CACHE_TTL) {
+        renderHealth(listEl, _healthCache.data);
+        return;
+      }
+      listEl.innerHTML = '<div class="modal-empty" data-i18n="ui.loading">Carregando diagnóstico…</div>';
+      try {
+        const r = await fetch(BASE + "/api/health");
+        const d = await r.json();
+        if (d.ok && d.checks) {
+          _healthCache = { data: d, ts: Date.now() };
+          renderHealth(listEl, d);
+        } else {
+          listEl.innerHTML = '<div class="modal-empty">❌ Erro ao carregar diagnóstico.</div>';
+        }
+      } catch (e) {
+        listEl.innerHTML = '<div class="modal-empty">❌ ' + e.message + '</div>';
+      }
+    }
+
+    function renderHealth(listEl, d) {
+      var c = d.checks;
+      var h = '<div style="padding:6px 0;">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
+      h += '<span style="font-size:11px;color:var(--ink-muted);">v' + (d.version || '?') + '</span>';
+      h += '<button onclick="loadHealth(true)" style="background:none;border:1px solid var(--line);border-radius:var(--radius);padding:3px 8px;font-size:10px;color:var(--accent);cursor:pointer;">↻ Atualizar</button>';
+      h += '</div>';
+      var checks = [
+        { k: "drive_mounted", l: "Google Drive montado" },
+        { k: "backup_dir_exists", l: "Diretório de backup" },
+        { k: "ttyd_alive", l: "Terminal ttyd ativo" },
+        { k: "opencode_found", l: "OpenCode encontrado" },
+        { k: "keys_loaded_count", l: "Chaves carregadas (" + (c.keys_loaded_count||0) + ")" },
+        { k: "ffmpeg_ok", l: "FFmpeg disponível" },
+        { k: "skills_count", l: "Skills instaladas (" + (c.skills_count||0) + ")" }
+      ];
+      for (var i = 0; i < checks.length; i++) {
+        var ok = c[checks[i].k];
+        var icon = ok ? '✅' : '❌';
+        var color = ok ? 'var(--accent)' : '#ff6b6b';
+        h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid var(--line);font-size:12px;">';
+        h += '<span style="color:' + color + ';">' + icon + '</span>';
+        h += '<span style="flex:1;">' + checks[i].l + '</span>';
+        if (checks[i].k === 'keys_loaded_count' && c.keys_loaded && c.keys_loaded.length) {
+          h += '<span style="font-size:10px;color:var(--ink-muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + c.keys_loaded.join(', ') + '</span>';
+        }
+        h += '</div>';
+      }
+      // disco
+      var diskPct = c.disk_total_mb > 0 ? Math.round(c.disk_free_mb / c.disk_total_mb * 100) : 0;
+      var diskColor = diskPct < 10 ? '#ff6b6b' : diskPct < 25 ? '#ffd93d' : 'var(--accent)';
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;font-size:12px;">';
+      h += '<span style="color:' + diskColor + ';">💾</span>';
+      h += '<span style="flex:1;">Disco livre: ' + (c.disk_free_mb||'?') + ' MB / ' + (c.disk_total_mb||'?') + ' MB (' + diskPct + '%)</span>';
+      h += '</div>';
+      h += '</div>';
+      listEl.innerHTML = h;
+    }
+
+    // ── Historico de Sessoes ─────────────────────────────────────
     let _allSessions = [];
+    let _filteredSessions = [];
+    let _sessionsPage = 0;
+    const SESSIONS_PAGE_SIZE = 20;
+
     async function openSessions() {
       const overlay = document.getElementById("sessions-overlay");
       overlay.style.opacity = "1"; overlay.style.pointerEvents = "all";
+      await loadSessions();
     }
     function closeSessions() {
       const o = document.getElementById("sessions-overlay");
       o.style.opacity = "0"; o.style.pointerEvents = "none";
+    }
+
+    async function loadSessions(force) {
+      const listEl = document.getElementById("session-list");
+      if (!listEl) return;
+      const now = Date.now();
+      if (!force && _sessionsCache.data && (now - _sessionsCache.ts) < CACHE_TTL) {
+        _allSessions = _sessionsCache.data;
+        _filteredSessions = _allSessions;
+        _sessionsPage = 0;
+        renderSessions(listEl);
+        return;
+      }
+      listEl.innerHTML = '<div class="modal-empty" data-i18n="ui.loading">Carregando sessões…</div>';
+      try {
+        const r = await fetch(BASE + "/api/sessions");
+        const d = await r.json();
+        if (d && d.sessions) {
+          _sessionsCache = { data: d.sessions, ts: Date.now() };
+          _allSessions = d.sessions;
+          _filteredSessions = d.sessions;
+          _sessionsPage = 0;
+          renderSessions(listEl);
+        } else {
+          listEl.innerHTML = '<div class="modal-empty" data-i18n="sessions.empty">Nenhuma sessão encontrada.</div>';
+        }
+      } catch (e) {
+        listEl.innerHTML = '<div class="modal-empty">❌ ' + e.message + '</div>';
+      }
+    }
+
+    function renderSessions(listEl) {
+      var start = 0;
+      var end = (_sessionsPage + 1) * SESSIONS_PAGE_SIZE;
+      var items = _filteredSessions.slice(start, end);
+      if (!items.length) {
+        listEl.innerHTML = '<div class="modal-empty" data-i18n="sessions.empty_filtered">Nenhuma sessão corresponde ao filtro.</div>';
+        return;
+      }
+      var h = '<div style="padding:4px 0;">';
+      for (var i = 0; i < items.length; i++) {
+        var s = items[i];
+        var id = s.id || '';
+        var title = s.title || s.name || id;
+        var date = s.date || s.created || '';
+        h += '<div class="session-item" data-session-id="' + id.replace(/"/g,'&quot;') + '" onclick="restoreSession(this.dataset.sessionId)" style="padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s;font-size:12px;" onmouseover="this.style.background=\\x27rgba(255,255,255,.04)\\x27" onmouseout="this.style.background=\\x27transparent\\x27">';
+        h += '<div style="font-weight:500;">' + escapeHtml(title) + '</div>';
+        if (date) h += '<div style="font-size:10px;color:var(--ink-muted);margin-top:2px;">' + escapeHtml(date) + '</div>';
+        h += '<div style="font-size:10px;color:var(--ink-muted);opacity:.6;">' + escapeHtml(id) + '</div>';
+        h += '</div>';
+      }
+      h += '</div>';
+      if (end < _filteredSessions.length) {
+        h += '<button onclick="loadMoreSessions()" style="width:100%;padding:8px;background:none;border:1px solid var(--line);border-radius:var(--radius);color:var(--accent);font-size:11px;cursor:pointer;margin-top:4px;">Ver mais (' + (_filteredSessions.length - end) + ' restantes)</button>';
+      }
+      listEl.innerHTML = h;
+    }
+
+    function loadMoreSessions() {
+      _sessionsPage++;
+      var listEl = document.getElementById("session-list");
+      if (listEl) renderSessions(listEl);
+    }
+
+    function filterSessions() {
+      var q = (document.getElementById("session-search").value || "").toLowerCase().trim();
+      if (!q) {
+        _filteredSessions = _allSessions;
+      } else {
+        _filteredSessions = _allSessions.filter(function(s) {
+          var str = (s.id || "") + " " + (s.title || "") + " " + (s.name || "") + " " + (s.date || "") + " " + (s.created || "");
+          return str.toLowerCase().indexOf(q) !== -1;
+        });
+      }
+      _sessionsPage = 0;
+      var listEl = document.getElementById("session-list");
+      if (listEl) renderSessions(listEl);
+    }
+
+    async function restoreSession(sessionId) {
+      if (!sessionId) return;
+      if (!confirm("Restaurar sessao " + sessionId + " ?")) return;
+      try {
+        var listEl = document.getElementById("session-list");
+        if (listEl) listEl.innerHTML = '<div class="modal-empty">Restaurando sessão…</div>';
+        const r = await fetch(BASE + "/api/run_terminal", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({cmd: "opencode session restore " + sessionId})
+        });
+        const d = await r.json();
+        if (r.ok) {
+          toast("✅ Sessão " + sessionId + " restaurada!", "ok");
+          closeSessions();
+        } else {
+          toast("❌ Erro ao restaurar: " + (d.error || r.status), "err");
+          loadSessions(true);
+        }
+      } catch(e) {
+        toast("❌ " + e.message, "err");
+        loadSessions(true);
+      }
     }
 
     function openShortcuts() {
@@ -1525,7 +1710,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       });
     }
 
-    // ── Memória Obsidian (v0.5.1.4 — navegar + editar) ────────
+    // ── Memória PesquisAI (v0.5.1.4 — navegar + editar) ────────
     // Estado:
     //   _memoryTree      — lista plana de notas carregada do /api/obsidian/tree
     //   _memoryStatus    — {status, root, writable, notes_count, ...}
@@ -1533,12 +1718,18 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     //   _memoryDirty     — true se o editor tem mudanças não salvas
     //   _memorySearch    — termo de busca atual (filtro da sidebar)
     //   _memoryTab       — 'edit' | 'preview' | 'split'
+    // v0.5.1.8: cache de 5s para evitar refetch em aberturas repetidas
+    let _memoryCache = { tree: null, status: null, ts: 0 };
     let _memoryTree = [];
     let _memoryStatus = null;
     let _memoryCurrent = null;
     let _memoryDirty = false;
     let _memorySearch = "";
-    let _memoryTab = "edit";
+    let _memoryTab = "preview";
+    // v0.5.1.9: navegação por pastas + calendário
+    let _memoryCurrentFolder = null;     // null = lista de pastas, "daily/" = calendário, etc
+    let _memoryCalendarDate = new Date(); // mês atual do calendário
+    let _memoryCalendarDailies = [];     // paths das daily notes existentes
 
     async function openMemory(force) {
       const overlay = document.getElementById("memory-overlay");
@@ -1548,27 +1739,63 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       }
       const dict = I18N[_currentLang] || I18N["pt_BR"];
       const list = document.getElementById("memory-list");
+      // v0.5.1.9: reseta para lista de pastas ao abrir
+      _memoryCurrentFolder = null;
+      _memoryCalendarDate = new Date();
       if (list) {
         list.innerHTML = '<div class="modal-empty" style="padding:14px;">' +
           (dict["ui.loading"] || "Carregando…") + '</div>';
       }
-      // Sempre recarrega o status e a árvore; cache apenas para
-      // o caso de força=false numa sessão recente (5 s).
+      // v0.5.1.8: cache de 5s — evita nova requisição se cache for recente
+      const now = Date.now();
+      if (!force && _memoryCache.tree && (now - _memoryCache.ts) < 5000) {
+        _memoryStatus = _memoryCache.status;
+        _memoryTree = _memoryCache.tree;
+        renderMemoryHeader(_memoryCache.status, dict);
+        renderMemorySidebar();
+        if (_memoryCache.status && _memoryCache.status.status === "ready") {
+          if (!_memoryCurrent) {
+            const lastDaily = findLastDaily();
+            if (lastDaily) loadMemoryNote(lastDaily.path);
+          }
+        }
+        return;
+      }
       try {
-        const [rStatus, rTree] = await Promise.all([
-          fetch(BASE + "/api/obsidian"),
-          fetch(BASE + "/api/obsidian/tree"),
-        ]);
-        const dStatus = await rStatus.json();
-        const dTree = await rTree.json();
+        // v0.5.1.8: tenta rota unificada ?include=tree (1 request ao invés de 2)
+        let dStatus, dTree;
+        const unifiedResp = await fetch(BASE + "/api/obsidian?include=tree");
+        const unifiedData = await unifiedResp.json();
+        if (unifiedData.ok && unifiedData.tree) {
+          dStatus = unifiedData;
+          dTree = { tree: unifiedData.tree };
+        } else {
+          // Fallback: 2 chamadas separadas (backend antigo)
+          const [rStatus, rTree] = await Promise.all([
+            fetch(BASE + "/api/obsidian"),
+            fetch(BASE + "/api/obsidian/tree"),
+          ]);
+          dStatus = await rStatus.json();
+          dTree = await rTree.json();
+        }
         _memoryStatus = dStatus;
         _memoryTree = (dTree && dTree.tree) ? dTree.tree : [];
+        // Atualiza cache
+        _memoryCache = { tree: _memoryTree, status: dStatus, ts: Date.now() };
         renderMemoryHeader(dStatus, dict);
         renderMemorySidebar();
         if (dStatus.status !== "ready") {
           if (list) {
             list.innerHTML = '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' +
               escapeHtml(dStatus.message || dStatus.status) + '</div>';
+          }
+        } else {
+          // Abre automaticamente o último daily note se nenhuma nota estiver carregada
+          if (!_memoryCurrent && !force) {
+            const lastDaily = findLastDaily();
+            if (lastDaily) {
+              loadMemoryNote(lastDaily.path);
+            }
           }
         }
       } catch (e) {
@@ -1577,6 +1804,20 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             (dict["agents.error"] || "Erro") + ': ' + escapeHtml(e.message) + '</div>';
         }
       }
+    }
+
+    // ── Encontra o último daily note na árvore da memória ──────
+    function findLastDaily() {
+      const dailies = [];
+      for (const folder of _memoryTree) {
+        for (const n of folder.notes) {
+          if (n.path && n.path.startsWith("daily/")) {
+            dailies.push(n);
+          }
+        }
+      }
+      dailies.sort((a, b) => b.path.localeCompare(a.path));
+      return dailies.length > 0 ? dailies[0] : null;
     }
 
     function closeMemory(force) {
@@ -1593,6 +1834,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       }
       _memoryDirty = false;
       _memoryCurrent = null;
+      _memoryCurrentFolder = null; // v0.5.1.9
       markDirty();
     }
 
@@ -1635,53 +1877,233 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       }
     }
 
-    // ── Renderização: sidebar (lista de notas agrupadas por pasta) ──
+    // ── Renderização: sidebar (navegação por pastas + calendário) ──
+    // v0.5.1.9: três modos:
+    //   1. Busca ativa → resultados filtrados (comportamento original)
+    //   2. Nenhuma pasta → lista de pastas (primeiro nível)
+    //   3. Pasta selecionada → calendário (daily/) ou lista de notas
     function renderMemorySidebar() {
       const list = document.getElementById("memory-list");
       const cnt  = document.getElementById("memory-count");
       if (!list) return;
       const dict = I18N[_currentLang] || I18N["pt_BR"];
-      // Filtra por busca
       const q = (_memorySearch || "").toLowerCase().trim();
-      const filtered = [];
-      for (const folder of _memoryTree) {
-        const matches = [];
-        for (const n of folder.notes) {
-          if (!q) { matches.push(n); continue; }
-          if ((n.title || "").toLowerCase().includes(q) ||
-              (n.path || "").toLowerCase().includes(q) ||
-              (n.tags || []).some(t => (t || "").toLowerCase().includes(q))) {
-            matches.push(n);
+
+      // 1) Modo busca: exibe resultados filtrados (comportamento original)
+      if (q) {
+        const filtered = [];
+        for (const folder of _memoryTree) {
+          const matches = [];
+          for (const n of folder.notes) {
+            if ((n.title || "").toLowerCase().includes(q) ||
+                (n.path || "").toLowerCase().includes(q) ||
+                (n.tags || []).some(t => (t || "").toLowerCase().includes(q))) {
+              matches.push(n);
+            }
+          }
+          if (matches.length) filtered.push({ folder: folder.folder, notes: matches });
+        }
+        const total = filtered.reduce((s, f) => s + f.notes.length, 0);
+        if (cnt) cnt.textContent = total + " " + (dict["memory.notes_count"] || "notas");
+        if (total === 0) {
+          list.innerHTML = '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' +
+            (dict["memory.no_results"] || "Nenhum resultado para '" + escapeHtml(q) + "'.") + '</div>';
+          return;
+        }
+        let html = "";
+        for (const folder of filtered) {
+          const label = folder.folder || "📁 (raiz)";
+          html += '<div class="mem-folder-label">' + escapeHtml(label) + '</div>';
+          for (const n of folder.notes) {
+            const active = (_memoryCurrent && _memoryCurrent.path === n.path) ? " active" : "";
+            const human  = n.is_pesquisai_generated ? "" : " human";
+            const tagHtml = (n.tags || []).slice(0, 3).map(t =>
+              '<span style="display:inline-block;font-size:9px;padding:0 4px;background:var(--accent-dim);color:var(--accent);border-radius:2px;margin-right:2px;">#' + escapeHtml(String(t).replace(/^#/, "")) + '</span>'
+            ).join("");
+            html += '<div class="mem-note-item' + active + human + '" data-path="' + encodeURIComponent(n.path) + '" onclick="loadMemoryNote(decodeURIComponent(this.dataset.path))">' +
+                 '<div class="mem-note-title">' + escapeHtml(n.title || n.path) + '</div>' +
+                    '<div class="mem-note-path">' + escapeHtml(n.path) + '</div>' +
+                    (tagHtml ? '<div style="margin-top:3px;">' + tagHtml + '</div>' : '') +
+                    '</div>';
           }
         }
-        if (matches.length) filtered.push({ folder: folder.folder, notes: matches });
-      }
-      const total = filtered.reduce((s, f) => s + f.notes.length, 0);
-      if (cnt) cnt.textContent = total + " " + (dict["memory.notes_count"] || "notas");
-      if (total === 0) {
-        list.innerHTML = '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' +
-          (q ? (dict["memory.no_results"] || "Nenhum resultado para '" + escapeHtml(q) + "'.") :
-               (dict["memory.no_notes"] || "Nenhuma nota ainda.")) + '</div>';
+        list.innerHTML = html;
         return;
       }
-      let html = "";
-      for (const folder of filtered) {
-        const label = folder.folder || "📁 (raiz)";
-        html += '<div class="mem-folder-label">' + escapeHtml(label) + '</div>';
-        for (const n of folder.notes) {
-          const active = (_memoryCurrent && _memoryCurrent.path === n.path) ? " active" : "";
-          const human  = n.is_pesquisai_generated ? "" : " human";
-          const tagHtml = (n.tags || []).slice(0, 3).map(t =>
-            '<span style="display:inline-block;font-size:9px;padding:0 4px;background:var(--accent-dim);color:var(--accent);border-radius:2px;margin-right:2px;">#' + escapeHtml(String(t).replace(/^#/, "")) + '</span>'
-          ).join("");
-          html += `<div class="mem-note-item${active}${human}" onclick="loadMemoryNote('${n.path.replace(/\\\\/g, "\\\\\\\\").replace(/'/g, "\\'")}')">` +
-               '<div class="mem-note-title">' + escapeHtml(n.title || n.path) + '</div>' +
-                  '<div class="mem-note-path">' + escapeHtml(n.path) + '</div>' +
-                  (tagHtml ? '<div style="margin-top:3px;">' + tagHtml + '</div>' : '') +
-                  '</div>';
+
+      // 2) Modo pasta selecionada: mostra conteúdo da pasta
+      if (_memoryCurrentFolder) {
+        renderFolderContent(_memoryCurrentFolder, list, cnt, dict);
+        return;
+      }
+
+      // 3) Modo raiz: lista de pastas
+      renderFolderList(list, cnt, dict);
+    }
+
+    // ── Lista de pastas (primeiro nível) ─────────────────────────
+    function renderFolderList(list, cnt, dict) {
+      const folderMap = {};
+      const folderIcons = {
+        "daily/": "📅", "research/": "🔬", "literature/": "📚",
+        "sessions/": "📜", "reference/": "📖", "methodology/": "⚙️",
+        "hypothesis/": "💡", "datasource/": "🗄️", "moc/": "🗺️",
+        "inbox/": "📥", "assets/": "🎨"
+      };
+      let totalNotes = 0;
+      for (const folder of _memoryTree) {
+        const f = folder.folder || "";
+        if (!folderMap[f]) folderMap[f] = 0;
+        folderMap[f] += folder.notes.length;
+        totalNotes += folder.notes.length;
+      }
+      if (cnt) cnt.textContent = totalNotes + " " + (dict["memory.notes_count"] || "notas");
+      let html = '<div style="padding:6px 0;">';
+      const ordered = Object.keys(folderMap).sort((a, b) => {
+        if (a === "daily/") return -1;
+        if (b === "daily/") return 1;
+        return a.localeCompare(b);
+      });
+      for (const f of ordered) {
+        const icon = folderIcons[f] || "📁";
+        const label = f ? f.replace(/\/$/, "") : "(raiz)";
+        const count = folderMap[f];
+        html += '<div class="mem-folder-card" data-folder="' + encodeURIComponent(f) + '" onclick="navigateToFolder(decodeURIComponent(this.dataset.folder))" style="padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s;display:flex;align-items:center;gap:10px;">';
+        html += '<span style="font-size:16px;">' + icon + '</span>';
+        html += '<div style="flex:1;min-width:0;">';
+        html += '<div style="font-size:12px;font-weight:500;">' + escapeHtml(label) + '</div>';
+        html += '<div style="font-size:10px;color:var(--ink-muted);">' + count + ' nota' + (count !== 1 ? 's' : '') + '</div>';
+        html += '</div>';
+        html += '<span style="color:var(--ink-muted);font-size:10px;">→</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+      list.innerHTML = html;
+    }
+
+    // ── Conteúdo de uma pasta ────────────────────────────────────
+    function renderFolderContent(folderName, list, cnt, dict) {
+      const notes = [];
+      for (const folder of _memoryTree) {
+        if (folder.folder === folderName) {
+          for (const n of folder.notes) notes.push(n);
+        }
+      }
+      if (cnt) cnt.textContent = notes.length + " " + (dict["memory.notes_count"] || "notas");
+      let html = '<div style="padding:6px 8px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;">';
+      html += '<button onclick="navigateBack()" style="background:none;border:1px solid var(--line);border-radius:var(--radius);padding:3px 8px;font-size:10px;color:var(--accent);cursor:pointer;">← ' + (dict["memory.back"] || "Voltar") + '</button>';
+      const iconMap = {
+        "daily/": "📅", "research/": "🔬", "literature/": "📚",
+        "sessions/": "📜", "reference/": "📖", "methodology/": "⚙️",
+        "hypothesis/": "💡", "datasource/": "🗄️", "moc/": "🗺️",
+        "inbox/": "📥", "assets/": "🎨"
+      };
+      html += '<span style="font-size:12px;font-weight:500;color:var(--ink-muted);">' + (iconMap[folderName] || "📁") + ' ' + escapeHtml(folderName.replace(/\/$/, "")) + '</span>';
+      html += '</div>';
+
+      if (folderName === "daily/") {
+        html += renderCalendar();
+      } else {
+        if (notes.length === 0) {
+          html += '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' + (dict["memory.no_notes"] || "Nenhuma nota ainda.") + '</div>';
+        } else {
+          html += '<div style="padding:4px 0;">';
+          for (const n of notes) {
+            const active = (_memoryCurrent && _memoryCurrent.path === n.path) ? " active" : "";
+            const human  = n.is_pesquisai_generated ? "" : " human";
+            const tagHtml = (n.tags || []).slice(0, 3).map(t =>
+              '<span style="display:inline-block;font-size:9px;padding:0 4px;background:var(--accent-dim);color:var(--accent);border-radius:2px;margin-right:2px;">#' + escapeHtml(String(t).replace(/^#/, "")) + '</span>'
+            ).join("");
+            html += '<div class="mem-note-item' + active + human + '" data-path="' + encodeURIComponent(n.path) + '" onclick="loadMemoryNote(decodeURIComponent(this.dataset.path))">' +
+                 '<div class="mem-note-title">' + escapeHtml(n.title || n.path) + '</div>' +
+                    '<div class="mem-note-path">' + escapeHtml(n.path) + '</div>' +
+                    (tagHtml ? '<div style="margin-top:3px;">' + tagHtml + '</div>' : '') +
+                    '</div>';
+          }
+          html += '</div>';
         }
       }
       list.innerHTML = html;
+    }
+
+    // ── Calendário de Daily Notes ────────────────────────────────
+    function renderCalendar() {
+      _memoryCalendarDailies = [];
+      for (const folder of _memoryTree) {
+        if (folder.folder === "daily/") {
+          for (const n of folder.notes) {
+            if (n.path) _memoryCalendarDailies.push(n.path);
+          }
+        }
+      }
+      const date = _memoryCalendarDate;
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const today = new Date();
+      const todayStr = today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2,"0") + "-" + String(today.getDate()).padStart(2,"0");
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const monthNames = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+                          "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+      const weekDays = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+      let h = '<div style="padding:8px;">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+      h += '<button onclick="prevMonth()" style="background:none;border:1px solid var(--line);border-radius:var(--radius);padding:3px 8px;font-size:11px;color:var(--accent);cursor:pointer;">◀</button>';
+      h += '<span style="font-size:13px;font-weight:600;">' + monthNames[month] + ' ' + year + '</span>';
+      h += '<button onclick="nextMonth()" style="background:none;border:1px solid var(--line);border-radius:var(--radius);padding:3px 8px;font-size:11px;color:var(--accent);cursor:pointer;">▶</button>';
+      h += '</div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:10px;color:var(--ink-muted);margin-bottom:4px;">';
+      for (let w = 0; w < 7; w++) {
+        h += '<div style="padding:4px 0;">' + weekDays[w] + '</div>';
+      }
+      h += '</div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;">';
+      for (let i = 0; i < firstDay; i++) {
+        h += '<div style="padding:6px 0;"></div>';
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = year + "-" + String(month+1).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+        const path = "daily/" + dateStr + ".md";
+        const hasNote = _memoryCalendarDailies.indexOf(path) !== -1;
+        const isToday = dateStr === todayStr;
+        const isSelected = _memoryCurrent && _memoryCurrent.path === path;
+        let styles = "padding:6px 0;border-radius:4px;font-size:11px;cursor:pointer;transition:background .12s;position:relative;";
+        if (isSelected) styles += "background:var(--accent-dim);color:var(--accent);font-weight:700;";
+        else if (isToday) styles += "background:rgba(79,195,247,.12);color:var(--accent);font-weight:600;";
+        else styles += "color:var(--ink);";
+         h += '<div class="mem-cal-day" style="' + styles + '" onclick="loadMemoryNote(\\'' + path + '\\')">';
+        h += d;
+        if (hasNote) {
+          h += '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--accent);"></div>';
+        }
+        h += '</div>';
+      }
+      h += '</div></div>';
+      return h;
+    }
+
+    // ── Navegação entre pastas ───────────────────────────────────
+    function navigateToFolder(folderName) {
+      _memoryCurrentFolder = folderName;
+      if (folderName === "daily/") {
+        _memoryCalendarDate = new Date();
+      }
+      renderMemorySidebar();
+    }
+
+    function navigateBack() {
+      _memoryCurrentFolder = null;
+      renderMemorySidebar();
+    }
+
+    function prevMonth() {
+      _memoryCalendarDate.setMonth(_memoryCalendarDate.getMonth() - 1);
+      renderMemorySidebar();
+    }
+
+    function nextMonth() {
+      _memoryCalendarDate.setMonth(_memoryCalendarDate.getMonth() + 1);
+      renderMemorySidebar();
     }
 
     // ── Busca ──────────────────────────────────────────────────────
@@ -1699,6 +2121,14 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       if (_memoryDirty && _memoryCurrent && _memoryCurrent.path !== path) {
         if (!confirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nDescartar e abrir outra nota?")) {
           return;
+        }
+      }
+      // v0.5.1.9: navega automaticamente para a pasta da nota
+      const slashIdx = path.indexOf("/");
+      if (slashIdx !== -1) {
+        const folder = path.substring(0, slashIdx + 1);
+        if (_memoryCurrentFolder !== folder) {
+          _memoryCurrentFolder = folder;
         }
       }
       const dict = I18N[_currentLang] || I18N["pt_BR"];
@@ -1784,7 +2214,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             (m, target, alias) => '<span class="wikilink">[[' + escapeHtml(alias || target) + ']]</span>');
           html = html.replace(/(^|[\s(])#([a-zA-Z0-9_\-/]+)/g,
             (m, p, t) => p + '<span class="tag">#' + escapeHtml(t) + '</span>');
-          prev.innerHTML = '<div class="mem-preview">' + html + '</div>';
+          prev.innerHTML = '<div class="mem-preview markdown-body">' + html + '</div>';
         } else {
           prev.innerHTML = '<pre style="white-space:pre-wrap;font-family:DM Mono,monospace;font-size:11.5px;">' + escapeHtml(src) + '</pre>';
         }
@@ -2143,6 +2573,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       fetch(BASE + "/api/apikey/apply", { method: "POST" }).catch(() => {});
     });
   </script>
+  <!-- marked.js: renderizador de markdown para o modal de Diretrizes do Agente e preview do editor -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 </body>
 </html>"""
 
@@ -2180,10 +2612,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal recarregado com novo tema",
             "languages.label": "Idioma", "languages.switched_to": "Idioma alterado para",
             "success_messages.backup_saved": "Backup salvo",
-            # v0.5.1.2 — Memória Obsidian
-            "memory.title": "Memória Obsidian",
+            # v0.5.1.2 — Memória PesquisAI
+            "memory.title": "Memória PesquisAI",
             "memory.subtitle": "Camada de memória persistente do agente",
-            "memory.tooltip": "Memória Obsidian (segundo cérebro)",
+            "memory.tooltip": "Memória PesquisAI (segundo cérebro)",
             "memory.status_ready": "🟢 Ativa",
             "memory.status_disabled": "⚪ Desativada",
             "memory.status_no_vault": "🟡 Sem vault",
@@ -2252,10 +2684,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal reloaded with new theme",
             "languages.label": "Language", "languages.switched_to": "Language switched to",
             "success_messages.backup_saved": "Backup saved",
-            # v0.5.1.2 — Obsidian Memory
-            "memory.title": "Obsidian Memory",
+            # v0.5.1.2 — PesquisAI Memory
+            "memory.title": "PesquisAI Memory",
             "memory.subtitle": "Agent's persistent memory layer",
-            "memory.tooltip": "Obsidian Memory (second brain)",
+            "memory.tooltip": "PesquisAI Memory (second brain)",
             "memory.status_ready": "🟢 Active",
             "memory.status_disabled": "⚪ Disabled",
             "memory.status_no_vault": "🟡 No vault",
@@ -2324,10 +2756,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal recargado con nuevo tema",
             "languages.label": "Idioma", "languages.switched_to": "Idioma cambiado a",
             "success_messages.backup_saved": "Copia guardada",
-            # v0.5.1.2 — Memoria Obsidian
-            "memory.title": "Memoria Obsidian",
+            # v0.5.1.2 — Memoria PesquisAI
+            "memory.title": "Memoria PesquisAI",
             "memory.subtitle": "Capa de memoria persistente del agente",
-            "memory.tooltip": "Memoria Obsidian (segundo cerebro)",
+            "memory.tooltip": "Memoria PesquisAI (segundo cerebro)",
             "memory.status_ready": "🟢 Activa",
             "memory.status_disabled": "⚪ Desactivada",
             "memory.status_no_vault": "🟡 Sin vault",
@@ -2396,10 +2828,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.terminal_reloaded": "Terminal rechargé avec le nouveau thème",
             "languages.label": "Langue", "languages.switched_to": "Langue changée en",
             "success_messages.backup_saved": "Sauvegarde enregistrée",
-            # v0.5.1.2 — Mémoire Obsidian
-            "memory.title": "Mémoire Obsidian",
+            # v0.5.1.2 — Mémoire PesquisAI
+            "memory.title": "Mémoire PesquisAI",
             "memory.subtitle": "Couche de mémoire persistante de l'agent",
-            "memory.tooltip": "Mémoire Obsidian (deuxième cerveau)",
+            "memory.tooltip": "Mémoire PesquisAI (deuxième cerveau)",
             "memory.status_ready": "🟢 Active",
             "memory.status_disabled": "⚪ Désactivée",
             "memory.status_no_vault": "🟡 Pas de vault",
