@@ -1,363 +1,4 @@
-"""
-launch_app_responsive.py — Wrapper HTML responsivo + tema + idioma (v0.4.1).
-
-Este módulo SUBSTITUI o `create_wrapper_html` do launch_app.py do PesquisAI
-principal (https://github.com/gustavobraga-byte/PesquisAI/blob/main/pesquisai/launch_app.py)
-corrigindo 3 problemas reportados pelo usuário em 2026-06-23:
-
-  1. 🐛 Site NÃO responsivo
-     - Problema: o CSS original não tem media queries. Topbar de 8 botões
-       estoura em mobile, modais de 400-520px não cabem, sem hamburger menu.
-     - Correção: 5 breakpoints (mobile pequeno, mobile, tablet, tablet
-       portrait, desktop, landscape), hamburger drawer, modais fluidos,
-       touch targets ≥ 32-44px (Apple HIG / WCAG 2.5.5).
-
-  2. 🐛 Tema claro/escuro não recarrega o terminal
-
-Este módulo SUBSTITUI o `create_wrapper_html` do launch_app.py do PesquisAI
-principal (https://github.com/gustavobraga-byte/PesquisAI/blob/main/pesquisai/launch_app.py)
-corrigindo 3 problemas reportados pelo usuário em 2026-06-23:
-
-  1. 🐛 Site NÃO responsivo
-     - Problema: o CSS original não tem media queries. Topbar de 8 botões
-       estoura em mobile, modais de 400-520px não cabem, sem hamburger menu.
-     - Correção: 5 breakpoints (mobile pequeno, mobile, tablet, tablet
-       portrait, desktop, landscape), hamburger drawer, modais fluidos,
-       touch targets ≥ 32-44px (Apple HIG / WCAG 2.5.5).
-
-  2. 🐛 Tema claro/escuro não recarrega o terminal
-     - Problema: toggleTheme() chama applyWrapperTheme() (muda só CSS do
-       wrapper) mas NÃO recarrega o iframe do ttyd. O terminal continua
-       renderizado com o tema antigo.
-     - Correção: após aplicar tema na UI, recarregar o iframe do terminal
-       (fr.src = "about:blank" → 3.5s → fr.src = origSrc + "?t=..."),
-       mesmo padrão usado em confirmProvider()/restoreSession().
-
-  3. 🐛 Alteração de idioma sem opção na interface
-     - Problema: o módulo i18n existe (4 idiomas, JSONs completos) mas
-       não há seletor na topbar. O usuário não tem como trocar idioma.
-     - Correção: dropdown na topbar com 🇧🇷 🇺🇸 🇪🇸 🇫🇷, persistência em
-       cookie `pesquisai_lang`, query param `?lang=xx_XX`, atualização
-       do atributo <html lang="..."> e das strings visíveis (toasts,
-       modais, botões).
-
-Instalação:
-    Editar ``pesquisai/launch_app.py`` e substituir a função
-    ``create_wrapper_html(terminal_url, drive_url)`` original por:
-
-        from .launch_app_responsive_v041 import create_wrapper_html
-
-OU (preferível, evita editar o original):
-
-    from pesquisai.launch_app_responsive_v041 import create_wrapper_html as _create
-    def create_wrapper_html(terminal_url, drive_url):
-        return _create(terminal_url, drive_url)
-
-Compatibilidade: PesquisAI v0.2.1+ (usa /api/theme, /api/lang, /api/backup,
-/api/restore, /api/apikey, /api/run_terminal, /api/health, /api/sessions).
-"""
-
-from __future__ import annotations
-
-import os
-import sys
-from pathlib import Path
-from typing import Optional
-
-# Imports resilientes (funciona dentro do pacote e standalone)
-try:
-    from .constants import WRAPPER_DIR, VERSION
-    from .jokes import next_joke
-except ImportError:
-    WRAPPER_DIR = "/tmp/pesquisai-wrapper"
-    VERSION = "0.4.1"
-    def next_joke(category: str = "aleatorio") -> str:
-        return "💻 (standalone mode) carregando..."
-
-# Garante que o diretório wrapper existe
-Path(WRAPPER_DIR).mkdir(parents=True, exist_ok=True)
-
-
-# ── CSS Responsivo injetado ──────────────────────────────────────
-# Bloco com todas as media queries (5 breakpoints + landscape + acessibilidade).
-# Reorganiza o topbar original em mobile via hamburger menu drawer.
-RESPONSIVE_CSS: str = """
-<style id="pesquisai-responsive">
-  /* === Mobile/Tablet: Hamburger menu (escondido em desktop) === */
-  .hamburger {
-    display: none;
-    width: 36px; height: 36px;
-    background: transparent;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    color: var(--ink);
-    cursor: pointer;
-    align-items: center; justify-content: center;
-  }
-  .hamburger:active { transform: scale(.94); }
-  .hamburger svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; }
-
-  .mobile-menu {
-    position: fixed;
-    top: 50px; right: 0;
-    width: 280px; max-width: 85vw;
-    height: calc(100vh - 50px);
-    background: var(--rail);
-    border-left: 1px solid var(--line);
-    transform: translateX(100%);
-    transition: transform .25s ease;
-    z-index: 9998;
-    padding: 16px;
-    overflow-y: auto;
-    display: flex; flex-direction: column; gap: 10px;
-    box-shadow: -4px 0 24px rgba(0,0,0,.35);
-  }
-  .mobile-menu.open { transform: translateX(0); }
-  .mobile-menu .tb-btn { width: 100%; justify-content: flex-start; }
-  .mobile-menu-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,.5);
-    opacity: 0; pointer-events: none;
-    transition: opacity .2s;
-    z-index: 9997;
-  }
-  .mobile-menu-overlay.open { opacity: 1; pointer-events: all; }
-
-  /* === Tablet (768px – 1023px): topbar condensado === */
-  @media (max-width: 1023px) {
-    #topbar { padding: 0 12px; gap: 8px; height: 50px; }
-    .tb-btn { padding: 0 10px; font-size: 11px; }
-    .logo-tag { display: none; }
-    .footer-link { font-size: 11px; }
-    .footer-sep { margin: 0 8px; }
-    .modal-600 { width: 90vw; max-width: 600px; }
-  }
-
-  /* === Mobile (480px – 767px): hamburger + ícones essenciais === */
-  @media (max-width: 767px) {
-    html, body { font-size: 14px; }
-    #topbar { padding: 0 8px; gap: 6px; }
-    .logo-p, .logo-ai { font-size: 15px; }
-    .status { display: none; }  /* esconde status, foco no essencial */
-    .tb-btn { display: none; }  /* migram para hamburger */
-    .tb-icons { margin-left: auto; gap: 3px; }
-    .tb-icon { width: 32px; height: 32px; }
-    .tb-icon svg { width: 14px; height: 14px; }
-    .hamburger { display: inline-flex; }
-    #footer { padding: 0 8px; height: 36px; }
-    .footer-brand { display: none; }
-    .footer-sep { margin: 0 6px; }
-    .footer-link { font-size: 11px; }
-    .btn-provider { padding: 0 6px; font-size: 9px; height: 20px; }
-    .footer-oc { display: none; }
-    /* terminal: ocupa mais espaço em mobile */
-    #terminal-frame { height: calc(100vh - 50px - 36px) !important; }
-    /* modais: largura quase total */
-    #modal, #provider-overlay > div, #health-overlay > div,
-    #sessions-overlay > div, #shortcuts-overlay > div, #lang-overlay > div {
-      width: 95vw !important; max-width: 95vw !important;
-      padding: 16px !important;
-    }
-    .modal-title { font-size: 14px !important; }
-    .backup-item, .session-item, .health-row, .shortcut-row, .lang-option {
-      padding: 10px 8px !important; font-size: 11px !important;
-    }
-    .health-status { font-size: 11px !important; }
-    .session-search { font-size: 12px !important; }
-    .toast { max-width: 260px !important; font-size: 11px !important; }
-    /* dropdown de idioma também fica fluído */
-    .lang-menu { right: 8px !important; min-width: 200px !important; }
-  }
-
-  /* === Mobile muito pequeno (< 480px): modo compacto === */
-  @media (max-width: 479px) {
-    #topbar { padding: 0 4px; }
-    .logo-p, .logo-ai { font-size: 13px; }
-    .tb-icon { width: 30px; height: 30px; }
-    .tb-icon svg { width: 13px; height: 13px; }
-    .mobile-menu { width: 100vw; max-width: 100vw; }
-    #footer { font-size: 9px; }
-    .footer-link svg { width: 9px; height: 9px; }
-  }
-
-  /* === Landscape em mobile (altura < 500px) === */
-  @media (max-height: 500px) and (orientation: landscape) {
-    #topbar { height: 40px; }
-    .logo { font-size: 12px; }
-    #footer { height: 28px; font-size: 9px; }
-    #terminal-frame { height: calc(100vh - 40px - 28px) !important; }
-  }
-
-  /* === Tablet/iPad portrait: esconde UFV footer === */
-  @media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
-    .tb-btn { padding: 0 8px; }
-    .footer-sep:nth-of-type(3) { display: none; }
-  }
-
-  /* === Acessibilidade: foco visível em todos os botões === */
-  .tb-btn:focus-visible, .tb-icon:focus-visible, .hamburger:focus-visible,
-  .lang-btn:focus-visible, .lang-option:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-
-  /* === Seletor de idioma (NOVO em v0.4.1) === */
-  .lang-btn {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 0 8px; height: 30px;
-    font-family: var(--font-sans); font-size: 11px;
-    font-weight: 500; letter-spacing: .03em;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: transparent;
-    color: var(--ink-muted);
-    cursor: pointer;
-    transition: background .15s, color .15s, border-color .15s;
-  }
-  .lang-btn:hover {
-    background: var(--accent-dim);
-    color: var(--accent);
-    border-color: rgba(var(--accent-rgb),.4);
-  }
-  .lang-btn:active { transform: scale(.96); }
-  .lang-btn .lang-flag { font-size: 13px; line-height: 1; }
-  .lang-btn .lang-code { font-weight: 600; }
-  .lang-btn .lang-chevron {
-    width: 9px; height: 9px;
-    border-right: 1.5px solid currentColor;
-    border-bottom: 1.5px solid currentColor;
-    transform: rotate(45deg);
-    margin-left: 2px;
-    margin-top: -2px;
-    transition: transform .2s;
-  }
-  .lang-btn[aria-expanded="true"] .lang-chevron { transform: rotate(-135deg); margin-top: 2px; }
-
-  .lang-menu {
-    position: fixed;
-    top: 50px; right: 18px;
-    min-width: 220px;
-    background: var(--rail);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    box-shadow: 0 12px 32px rgba(0,0,0,.5);
-    padding: 6px;
-    z-index: 9996;
-    opacity: 0; pointer-events: none;
-    transform: translateY(-8px);
-    transition: opacity .18s, transform .18s;
-  }
-  .lang-menu.open { opacity: 1; pointer-events: all; transform: translateY(0); }
-  .lang-option {
-    display: flex; align-items: center; gap: 10px;
-    width: 100%; padding: 9px 12px;
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius);
-    color: var(--ink);
-    font-family: var(--font-sans);
-    font-size: 12px;
-    text-align: left;
-    cursor: pointer;
-    transition: background .12s, color .12s;
-  }
-  .lang-option:hover { background: var(--accent-dim); color: var(--accent); }
-  .lang-option[aria-current="true"] {
-    background: var(--accent-dim); color: var(--accent);
-  }
-  .lang-option .lang-flag { font-size: 16px; line-height: 1; }
-  .lang-option .lang-name { flex: 1; }
-  .lang-option .lang-check {
-    color: var(--accent);
-    font-weight: 700;
-    opacity: 0;
-  }
-  .lang-option[aria-current="true"] .lang-check { opacity: 1; }
-
-  /* === Tema CLARO via classe .theme-light no <html> (NOVO v0.4.1) === */
-  /* Aplicado pelo script anti-flash no <head> e pelo applyWrapperTheme() */
-  /* Mantém fallback via setProperty para retrocompatibilidade */
-  html.theme-light {
-    --ink:        #1f262a;
-    --ink-muted:  #4a5a62;
-    --surface:    #f5f6f7;
-    --rail:       #ffffff;
-    --line:       rgba(0,0,0,.1);
-    --accent:     #157a73;
-    --accent-dim: rgba(21,122,115,.10);
-    --accent-glow:rgba(21,122,115,.18);
-    --accent-rgb: 21,122,115;
-    --green:      #2e7d32;
-    --green-dim:  rgba(46,125,50,.1);
-    --amber:      #e65100;
-    --amber-dim:  rgba(230,81,0,.1);
-    --red:        #c62828;
-    --red-dim:    rgba(198,40,40,.1);
-    background:   #f5f6f7;
-    color:        #1f262a;
-    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
-    --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  }}
-
-  /* === Indicador de tema ativo (NOVO em v0.4.1) === */
-  #theme-toggle[data-theme="pesquisai-light"] {
-    color: var(--amber);
-    border-color: rgba(232,184,75,.4);
-    background: var(--amber-dim);
-  }
-  #theme-toggle[data-theme="pesquisai"] {
-    color: var(--ink-muted);
-  }
-  #theme-toggle[data-theme="pesquisai-light"] svg circle { fill: currentColor; }
-
-  /* === Toasts em viewport pequeno === */
-  @media (max-height: 500px) {
-    #toast { bottom: 36px; right: 8px; }
-  }
-
-    @media (prefers-reduced-motion: reduce) {
-      * { animation-duration: .001ms !important; animation-iteration-count: 1 !important;
-          transition-duration: .001ms !important; scroll-behavior: auto !important; }
-    }
-  </style>
-"""
-
-
-# ── Dicionário de idiomas (NOVO em v0.4.1) ───────────────────────
-# Strings traduzidas para seletor e mensagens de feedback.
-# Para textos longos (toasts, modais completos), o backend Python é
-# a fonte da verdade (i18n/translations/*.json). Aqui ficam apenas as
-# strings que precisam ser atualizadas no client-side sem reload.
-SUPPORTED_LANGUAGES: list[dict[str, str]] = [
-    {"code": "pt_BR", "name": "Português (Brasil)",   "flag": "🇧🇷", "short": "PT"},
-    {"code": "en_US", "name": "English (United States)", "flag": "🇺🇸", "short": "EN"},
-    {"code": "es_ES", "name": "Español (España)",     "flag": "🇪🇸", "short": "ES"},
-    {"code": "fr_FR", "name": "Français (France)",    "flag": "🇫🇷", "short": "FR"},
-]
-
-
-def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
-    """Cria a versão v0.4.1 do wrapper HTML do PesquisAI.
-
-    Versão drop-in que substitui o HTML estático do launch_app.py por
-    um layout adaptativo com 3 correções aplicadas:
-
-      1. Responsividade completa (5 breakpoints + hamburger)
-      2. toggleTheme() que recarrega o iframe do ttyd
-      3. Seletor de idioma na topbar (4 idiomas, cookie, query param)
-
-    Args:
-        terminal_url: URL do terminal ttyd.
-        drive_url: URL do Google Drive.
-
-    Returns:
-        String HTML completa.
-    """
-    # IMPORTANTE: usamos string normal (sem f-string) e placeholders
-    # únicos (__TERMINAL_URL__, etc.) para evitar conflito com as
-    # expressões {data-i18n} e {{chaves}} do CSS que estão dentro do
-    # HTML. A substituição final é feita por .replace() abaixo.
-    html: str = """<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR" data-theme="pesquisai">
 <head>
   <meta charset="UTF-8">
@@ -680,14 +321,253 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       border:1px solid rgba(var(--accent-rgb),.25); border-radius:3px;
     }
   </style>
-  {RESPONSIVE_CSS}
+  
+<style id="pesquisai-responsive">
+  /* === Mobile/Tablet: Hamburger menu (escondido em desktop) === */
+  .hamburger {
+    display: none;
+    width: 36px; height: 36px;
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    color: var(--ink);
+    cursor: pointer;
+    align-items: center; justify-content: center;
+  }
+  .hamburger:active { transform: scale(.94); }
+  .hamburger svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+  .mobile-menu {
+    position: fixed;
+    top: 50px; right: 0;
+    width: 280px; max-width: 85vw;
+    height: calc(100vh - 50px);
+    background: var(--rail);
+    border-left: 1px solid var(--line);
+    transform: translateX(100%);
+    transition: transform .25s ease;
+    z-index: 9998;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex; flex-direction: column; gap: 10px;
+    box-shadow: -4px 0 24px rgba(0,0,0,.35);
+  }
+  .mobile-menu.open { transform: translateX(0); }
+  .mobile-menu .tb-btn { width: 100%; justify-content: flex-start; }
+  .mobile-menu-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.5);
+    opacity: 0; pointer-events: none;
+    transition: opacity .2s;
+    z-index: 9997;
+  }
+  .mobile-menu-overlay.open { opacity: 1; pointer-events: all; }
+
+  /* === Tablet (768px – 1023px): topbar condensado === */
+  @media (max-width: 1023px) {
+    #topbar { padding: 0 12px; gap: 8px; height: 50px; }
+    .tb-btn { padding: 0 10px; font-size: 11px; }
+    .logo-tag { display: none; }
+    .footer-link { font-size: 11px; }
+    .footer-sep { margin: 0 8px; }
+    .modal-600 { width: 90vw; max-width: 600px; }
+  }
+
+  /* === Mobile (480px – 767px): hamburger + ícones essenciais === */
+  @media (max-width: 767px) {
+    html, body { font-size: 14px; }
+    #topbar { padding: 0 8px; gap: 6px; }
+    .logo-p, .logo-ai { font-size: 15px; }
+    .status { display: none; }  /* esconde status, foco no essencial */
+    .tb-btn { display: none; }  /* migram para hamburger */
+    .tb-icons { margin-left: auto; gap: 3px; }
+    .tb-icon { width: 32px; height: 32px; }
+    .tb-icon svg { width: 14px; height: 14px; }
+    .hamburger { display: inline-flex; }
+    #footer { padding: 0 8px; height: 36px; }
+    .footer-brand { display: none; }
+    .footer-sep { margin: 0 6px; }
+    .footer-link { font-size: 11px; }
+    .btn-provider { padding: 0 6px; font-size: 9px; height: 20px; }
+    .footer-oc { display: none; }
+    /* terminal: ocupa mais espaço em mobile */
+    #terminal-frame { height: calc(100vh - 50px - 36px) !important; }
+    /* modais: largura quase total */
+    #modal, #provider-overlay > div, #health-overlay > div,
+    #sessions-overlay > div, #shortcuts-overlay > div, #lang-overlay > div {
+      width: 95vw !important; max-width: 95vw !important;
+      padding: 16px !important;
+    }
+    .modal-title { font-size: 14px !important; }
+    .backup-item, .session-item, .health-row, .shortcut-row, .lang-option {
+      padding: 10px 8px !important; font-size: 11px !important;
+    }
+    .health-status { font-size: 11px !important; }
+    .session-search { font-size: 12px !important; }
+    .toast { max-width: 260px !important; font-size: 11px !important; }
+    /* dropdown de idioma também fica fluído */
+    .lang-menu { right: 8px !important; min-width: 200px !important; }
+  }
+
+  /* === Mobile muito pequeno (< 480px): modo compacto === */
+  @media (max-width: 479px) {
+    #topbar { padding: 0 4px; }
+    .logo-p, .logo-ai { font-size: 13px; }
+    .tb-icon { width: 30px; height: 30px; }
+    .tb-icon svg { width: 13px; height: 13px; }
+    .mobile-menu { width: 100vw; max-width: 100vw; }
+    #footer { font-size: 9px; }
+    .footer-link svg { width: 9px; height: 9px; }
+  }
+
+  /* === Landscape em mobile (altura < 500px) === */
+  @media (max-height: 500px) and (orientation: landscape) {
+    #topbar { height: 40px; }
+    .logo { font-size: 12px; }
+    #footer { height: 28px; font-size: 9px; }
+    #terminal-frame { height: calc(100vh - 40px - 28px) !important; }
+  }
+
+  /* === Tablet/iPad portrait: esconde UFV footer === */
+  @media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+    .tb-btn { padding: 0 8px; }
+    .footer-sep:nth-of-type(3) { display: none; }
+  }
+
+  /* === Acessibilidade: foco visível em todos os botões === */
+  .tb-btn:focus-visible, .tb-icon:focus-visible, .hamburger:focus-visible,
+  .lang-btn:focus-visible, .lang-option:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* === Seletor de idioma (NOVO em v0.4.1) === */
+  .lang-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 0 8px; height: 30px;
+    font-family: var(--font-sans); font-size: 11px;
+    font-weight: 500; letter-spacing: .03em;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .lang-btn:hover {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: rgba(var(--accent-rgb),.4);
+  }
+  .lang-btn:active { transform: scale(.96); }
+  .lang-btn .lang-flag { font-size: 13px; line-height: 1; }
+  .lang-btn .lang-code { font-weight: 600; }
+  .lang-btn .lang-chevron {
+    width: 9px; height: 9px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg);
+    margin-left: 2px;
+    margin-top: -2px;
+    transition: transform .2s;
+  }
+  .lang-btn[aria-expanded="true"] .lang-chevron { transform: rotate(-135deg); margin-top: 2px; }
+
+  .lang-menu {
+    position: fixed;
+    top: 50px; right: 18px;
+    min-width: 220px;
+    background: var(--rail);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.5);
+    padding: 6px;
+    z-index: 9996;
+    opacity: 0; pointer-events: none;
+    transform: translateY(-8px);
+    transition: opacity .18s, transform .18s;
+  }
+  .lang-menu.open { opacity: 1; pointer-events: all; transform: translateY(0); }
+  .lang-option {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 9px 12px;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: background .12s, color .12s;
+  }
+  .lang-option:hover { background: var(--accent-dim); color: var(--accent); }
+  .lang-option[aria-current="true"] {
+    background: var(--accent-dim); color: var(--accent);
+  }
+  .lang-option .lang-flag { font-size: 16px; line-height: 1; }
+  .lang-option .lang-name { flex: 1; }
+  .lang-option .lang-check {
+    color: var(--accent);
+    font-weight: 700;
+    opacity: 0;
+  }
+  .lang-option[aria-current="true"] .lang-check { opacity: 1; }
+
+  /* === Tema CLARO via classe .theme-light no <html> (NOVO v0.4.1) === */
+  /* Aplicado pelo script anti-flash no <head> e pelo applyWrapperTheme() */
+  /* Mantém fallback via setProperty para retrocompatibilidade */
+  html.theme-light {
+    --ink:        #1f262a;
+    --ink-muted:  #4a5a62;
+    --surface:    #f5f6f7;
+    --rail:       #ffffff;
+    --line:       rgba(0,0,0,.1);
+    --accent:     #157a73;
+    --accent-dim: rgba(21,122,115,.10);
+    --accent-glow:rgba(21,122,115,.18);
+    --accent-rgb: 21,122,115;
+    --green:      #2e7d32;
+    --green-dim:  rgba(46,125,50,.1);
+    --amber:      #e65100;
+    --amber-dim:  rgba(230,81,0,.1);
+    --red:        #c62828;
+    --red-dim:    rgba(198,40,40,.1);
+    background:   #f5f6f7;
+    color:        #1f262a;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }}
+
+  /* === Indicador de tema ativo (NOVO em v0.4.1) === */
+  #theme-toggle[data-theme="pesquisai-light"] {
+    color: var(--amber);
+    border-color: rgba(232,184,75,.4);
+    background: var(--amber-dim);
+  }
+  #theme-toggle[data-theme="pesquisai"] {
+    color: var(--ink-muted);
+  }
+  #theme-toggle[data-theme="pesquisai-light"] svg circle { fill: currentColor; }
+
+  /* === Toasts em viewport pequeno === */
+  @media (max-height: 500px) {
+    #toast { bottom: 36px; right: 8px; }
+  }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+          transition-duration: .001ms !important; scroll-behavior: auto !important; }
+    }
+  </style>
+
 </head>
 <body>
 
   <div id="topbar">
     <div class="logo">
       <span class="logo-p">Pesquis</span><span class="logo-ai">AI</span>
-      <span>  <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/CHANGELOG.md" target="_blank" class="logo-tag"> v{__VERSION__} </a> </span>
+      <span>  <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/CHANGELOG.md" target="_blank" class="logo-tag"> v0.4.1 </a> </span>
     </div>
 
     <div class="status">
@@ -735,7 +615,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       <span data-i18n="ui.restore">Restaurar</span>
     </button>
 
-    <a href="{__DRIVE_URL__}" target="_blank" class="tb-btn btn-drive">
+    <a href="__DRIVE_URL__" target="_blank" class="tb-btn btn-drive">
       <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
       <span data-i18n="ui.drive">Drive</span>
     </a>
@@ -753,7 +633,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
       <span data-i18n="ui.restore">Restaurar</span>
     </button>
-    <a href="{__DRIVE_URL__}" target="_blank" class="tb-btn btn-drive" onclick="toggleMobileMenu()">
+    <a href="__DRIVE_URL__" target="_blank" class="tb-btn btn-drive" onclick="toggleMobileMenu()">
       <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
       <span data-i18n="ui.drive">Drive</span>
     </a>
@@ -778,7 +658,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
 
  <iframe
   id="terminal-frame"
-  src="{__TERMINAL_URL__}"
+  src="__TERMINAL_URL__"
   allow="clipboard-read; clipboard-write"
   tabindex="0"
   autofocus
@@ -1095,8 +975,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     // ════════════════════════════════════════════════════════════
 
     const BASE = location.origin;
-    const LANGS = {__LANGS_JSON__};
-    const I18N = {__I18N_JSON__};
+    const LANGS = {"pt_BR": {"code": "pt_BR", "name": "Português (Brasil)", "flag": "🇧🇷", "short": "PT"}, "en_US": {"code": "en_US", "name": "English (United States)", "flag": "🇺🇸", "short": "EN"}, "es_ES": {"code": "es_ES", "name": "Español (España)", "flag": "🇪🇸", "short": "ES"}, "fr_FR": {"code": "fr_FR", "name": "Français (France)", "flag": "🇫🇷", "short": "FR"}};
+    const I18N = {"pt_BR": {"ui.backup": "Salvar backup", "ui.restore": "Restaurar", "ui.drive": "Drive", "ui.close": "Fechar", "ui.cancel": "Cancelar", "ui.loading": "Carregando…", "ui.status_active": "agente ativo", "ui.exporting": "Exportando sessão…", "dashboard.title": "Dashboard de Saúde", "providers.title": "Conectar Provedor de IA", "providers.select": "Selecione o provedor para configurar a API key:", "providers.saved_keys": "Chaves salvas no Drive:", "providers.add_new": "Novo provedor", "providers.search": "Buscar provedor…", "providers.api_key": "API KEY", "providers.back": "← Voltar", "providers.save_connect": "Salvar e Conectar", "providers.var": "Variável", "providers.key_required": "Insira a API key.", "providers.select_required": "Selecione um provedor.", "providers.saving": "Salvando…", "providers.connected": "conectado", "providers.updated": "atualizado", "providers.no_saved_keys": "Nenhuma chave salva ainda.", "providers.edit": "Editar", "providers.delete": "Excluir", "providers.confirm_delete": "Excluir chave de", "providers.deleted": "excluído", "sessions.refresh": "↻ Atualizar", "sessions.title": "Histórico de Sessões", "sessions.search_placeholder": "🔍 Buscar por id ou conteúdo…", "shortcuts.title": "Atalhos de Teclado", "shortcuts.copy": "Copiar seleção", "shortcuts.copy_hint": "Segure o Shift e selecione", "shortcuts.interrupt": "Interromper comando", "shortcuts.paste": "Colar (Chrome)", "shortcuts.menu": "Menu e opções", "shortcuts.model": "Alterar modelo", "shortcuts.history_prev": "Histórico anterior", "shortcuts.history_next": "Histórico seguinte", "theme.toggle": "Alternar tema", "theme.light": "Tema claro (UI + terminal)", "theme.dark": "Tema escuro (UI + terminal)", "theme.terminal_reloaded": "Terminal recarregado com novo tema", "languages.label": "Idioma", "languages.switched_to": "Idioma alterado para", "success_messages.backup_saved": "Backup salvo", "memory.title": "Memória PesquisAI", "memory.subtitle": "Camada de memória persistente do agente", "memory.tooltip": "Memória PesquisAI (segundo cérebro)", "memory.status_ready": "🟢 Ativa", "memory.status_disabled": "⚪ Desativada", "memory.status_no_vault": "🟡 Sem vault", "memory.status_read_only": "🟡 Somente leitura", "memory.status_error": "🔴 Erro", "memory.notes_count": "Notas", "memory.notes_unit": "", "memory.tags_count": "Tags", "memory.links_count": "Wikilinks", "memory.avg_len": "Tam. médio", "memory.recent_daily": "Daily notes", "memory.recent_notes": "Notas recentes", "memory.no_notes": "Nenhuma nota ainda. O agente salvará aqui automaticamente.", "memory.templates": "Templates", "memory.open_vault": "Abrir Drive", "memory.refresh": "Atualizar", "memory.search_placeholder": "🔍 Buscar…", "memory.new_note": "+ Nova nota", "memory.new_note_title": "Nova nota", "memory.new_note_dialog_title": "📝 Nova nota", "memory.field_path": "Caminho (ex: research/minha-nota.md)", "memory.field_title": "Título", "memory.field_template": "Template", "memory.field_tags": "Tags (separadas por vírgula, opcional)", "memory.create": "Criar", "memory.save": "💾 Salvar", "memory.delete": "🗑 Excluir", "memory.tab_edit": "Editar", "memory.tab_preview": "Preview", "memory.tab_split": "Dividido", "memory.body_placeholder": "Selecione uma nota à esquerda ou crie uma nova.", "memory.empty_editor": "Selecione uma nota na lista ou crie uma nova.", "memory.dirty": "não salvo", "memory.note_title": "Título", "memory.no_results": "Nenhum resultado para a busca.", "agents.title": "Diretrizes do Agente", "agents.subtitle": "Regras e princípios do PesquisAI (AGENTS.md)", "agents.loading": "Carregando diretrizes…", "agents.error": "Erro ao carregar diretrizes do agente.", "agents.copy_ok": "Diretrizes copiadas!", "agents.copy": "Copiar", "agents.open_source": "Ver fonte"}, "en_US": {"ui.backup": "Save backup", "ui.restore": "Restore", "ui.drive": "Drive", "ui.close": "Close", "ui.cancel": "Cancel", "ui.loading": "Loading…", "ui.status_active": "agent active", "ui.exporting": "Exporting session…", "dashboard.title": "Health Dashboard", "providers.title": "Connect AI Provider", "providers.select": "Select the provider to configure the API key:", "providers.saved_keys": "Keys saved on Drive:", "providers.add_new": "New provider", "providers.search": "Search provider…", "providers.api_key": "API KEY", "providers.back": "← Back", "providers.save_connect": "Save and Connect", "providers.var": "Variable", "providers.key_required": "Enter the API key.", "providers.select_required": "Select a provider.", "providers.saving": "Saving…", "providers.connected": "connected", "providers.updated": "updated", "providers.no_saved_keys": "No saved keys yet.", "providers.edit": "Edit", "providers.delete": "Delete", "providers.confirm_delete": "Delete key for", "providers.deleted": "deleted", "sessions.refresh": "↻ Refresh", "sessions.title": "Session History", "sessions.search_placeholder": "🔍 Search by id or content…", "shortcuts.title": "Keyboard Shortcuts", "shortcuts.copy": "Copy selection", "shortcuts.copy_hint": "Hold Shift and select", "shortcuts.interrupt": "Interrupt command", "shortcuts.paste": "Paste (Chrome)", "shortcuts.menu": "Menu and options", "shortcuts.model": "Change model", "shortcuts.history_prev": "Previous history", "shortcuts.history_next": "Next history", "theme.toggle": "Toggle theme", "theme.light": "Light theme (UI + terminal)", "theme.dark": "Dark theme (UI + terminal)", "theme.terminal_reloaded": "Terminal reloaded with new theme", "languages.label": "Language", "languages.switched_to": "Language switched to", "success_messages.backup_saved": "Backup saved", "memory.title": "PesquisAI Memory", "memory.subtitle": "Agent's persistent memory layer", "memory.tooltip": "PesquisAI Memory (second brain)", "memory.status_ready": "🟢 Active", "memory.status_disabled": "⚪ Disabled", "memory.status_no_vault": "🟡 No vault", "memory.status_read_only": "🟡 Read-only", "memory.status_error": "🔴 Error", "memory.notes_count": "Notes", "memory.notes_unit": "", "memory.tags_count": "Tags", "memory.links_count": "Wikilinks", "memory.avg_len": "Avg. length", "memory.recent_daily": "Daily notes", "memory.recent_notes": "Recent notes", "memory.no_notes": "No notes yet. The agent will save here automatically.", "memory.templates": "Templates", "memory.open_vault": "Open Drive", "memory.refresh": "Refresh", "memory.search_placeholder": "🔍 Search…", "memory.new_note": "+ New note", "memory.new_note_title": "New note", "memory.new_note_dialog_title": "📝 New note", "memory.field_path": "Path (e.g. research/my-note.md)", "memory.field_title": "Title", "memory.field_template": "Template", "memory.field_tags": "Tags (comma-separated, optional)", "memory.create": "Create", "memory.save": "💾 Save", "memory.delete": "🗑 Delete", "memory.tab_edit": "Edit", "memory.tab_preview": "Preview", "memory.tab_split": "Split", "memory.body_placeholder": "Select a note on the left or create a new one.", "memory.empty_editor": "Select a note from the list or create a new one.", "memory.dirty": "unsaved", "memory.note_title": "Title", "memory.no_results": "No results for the search.", "agents.title": "Agent Guidelines", "agents.subtitle": "PesquisAI rules and principles (AGENTS.md)", "agents.loading": "Loading guidelines…", "agents.error": "Error loading agent guidelines.", "agents.copy_ok": "Guidelines copied!", "agents.copy": "Copy", "agents.open_source": "View source"}, "es_ES": {"ui.backup": "Guardar copia", "ui.restore": "Restaurar", "ui.drive": "Drive", "ui.close": "Cerrar", "ui.cancel": "Cancelar", "ui.loading": "Cargando…", "ui.status_active": "agente activo", "ui.exporting": "Exportando sesión…", "dashboard.title": "Panel de Salud", "providers.title": "Conectar Proveedor de IA", "providers.select": "Seleccione el proveedor para configurar la API key:", "providers.saved_keys": "Claves guardadas en Drive:", "providers.add_new": "Nuevo proveedor", "providers.search": "Buscar proveedor…", "providers.api_key": "API KEY", "providers.back": "← Volver", "providers.save_connect": "Guardar y Conectar", "providers.var": "Variable", "providers.key_required": "Ingrese la API key.", "providers.select_required": "Seleccione un proveedor.", "providers.saving": "Guardando…", "providers.connected": "conectado", "providers.updated": "actualizado", "providers.no_saved_keys": "Aún no hay claves guardadas.", "providers.edit": "Editar", "providers.delete": "Eliminar", "providers.confirm_delete": "Eliminar clave de", "providers.deleted": "eliminado", "sessions.refresh": "↻ Actualizar", "sessions.title": "Historial de Sesiones", "sessions.search_placeholder": "🔍 Buscar por id o contenido…", "shortcuts.title": "Atajos de Teclado", "shortcuts.copy": "Copiar selección", "shortcuts.copy_hint": "Mantenga Shift y seleccione", "shortcuts.interrupt": "Interrumpir comando", "shortcuts.paste": "Pegar (Chrome)", "shortcuts.menu": "Menú y opciones", "shortcuts.model": "Cambiar modelo", "shortcuts.history_prev": "Historial anterior", "shortcuts.history_next": "Historial siguiente", "theme.toggle": "Alternar tema", "theme.light": "Tema claro (UI + terminal)", "theme.dark": "Tema oscuro (UI + terminal)", "theme.terminal_reloaded": "Terminal recargado con nuevo tema", "languages.label": "Idioma", "languages.switched_to": "Idioma cambiado a", "success_messages.backup_saved": "Copia guardada", "memory.title": "Memoria PesquisAI", "memory.subtitle": "Capa de memoria persistente del agente", "memory.tooltip": "Memoria PesquisAI (segundo cerebro)", "memory.status_ready": "🟢 Activa", "memory.status_disabled": "⚪ Desactivada", "memory.status_no_vault": "🟡 Sin vault", "memory.status_read_only": "🟡 Solo lectura", "memory.status_error": "🔴 Error", "memory.notes_count": "Notas", "memory.notes_unit": "", "memory.tags_count": "Etiquetas", "memory.links_count": "Wikienlaces", "memory.avg_len": "Tam. medio", "memory.recent_daily": "Daily notes", "memory.recent_notes": "Notas recientes", "memory.no_notes": "Aún no hay notas. El agente guardará aquí automáticamente.", "memory.templates": "Plantillas", "memory.open_vault": "Abrir Drive", "memory.refresh": "Actualizar", "memory.search_placeholder": "🔍 Buscar…", "memory.new_note": "+ Nueva nota", "memory.new_note_title": "Nueva nota", "memory.new_note_dialog_title": "📝 Nueva nota", "memory.field_path": "Ruta (ej: research/mi-nota.md)", "memory.field_title": "Título", "memory.field_template": "Plantilla", "memory.field_tags": "Etiquetas (separadas por coma, opcional)", "memory.create": "Crear", "memory.save": "💾 Guardar", "memory.delete": "🗑 Eliminar", "memory.tab_edit": "Editar", "memory.tab_preview": "Vista previa", "memory.tab_split": "Dividido", "memory.body_placeholder": "Selecciona una nota a la izquierda o crea una nueva.", "memory.empty_editor": "Selecciona una nota de la lista o crea una nueva.", "memory.dirty": "no guardado", "memory.note_title": "Título", "memory.no_results": "Sin resultados para la búsqueda.", "agents.title": "Directrices del Agente", "agents.subtitle": "Reglas y principios del PesquisAI (AGENTS.md)", "agents.loading": "Cargando directrices…", "agents.error": "Error al cargar las directrices del agente.", "agents.copy_ok": "¡Directrices copiadas!", "agents.copy": "Copiar", "agents.open_source": "Ver fuente"}, "fr_FR": {"ui.backup": "Sauvegarder", "ui.restore": "Restaurer", "ui.drive": "Drive", "ui.close": "Fermer", "ui.cancel": "Annuler", "ui.loading": "Chargement…", "ui.status_active": "agent actif", "ui.exporting": "Exportation de la session…", "dashboard.title": "Tableau de bord de santé", "providers.title": "Connecter un fournisseur d'IA", "providers.select": "Sélectionnez le fournisseur pour configurer la clé API:", "providers.saved_keys": "Clés enregistrées sur Drive:", "providers.add_new": "Nouveau fournisseur", "providers.search": "Rechercher un fournisseur…", "providers.api_key": "CLÉ API", "providers.back": "← Retour", "providers.save_connect": "Enregistrer et connecter", "providers.var": "Variable", "providers.key_required": "Entrez la clé API.", "providers.select_required": "Sélectionnez un fournisseur.", "providers.saving": "Enregistrement…", "providers.connected": "connecté", "providers.updated": "mis à jour", "providers.no_saved_keys": "Aucune clé enregistrée pour l'instant.", "providers.edit": "Modifier", "providers.delete": "Supprimer", "providers.confirm_delete": "Supprimer la clé de", "providers.deleted": "supprimé", "sessions.refresh": "↻ Actualiser", "sessions.title": "Historique des sessions", "sessions.search_placeholder": "🔍 Rechercher par id ou contenu…", "shortcuts.title": "Raccourcis clavier", "shortcuts.copy": "Copier la sélection", "shortcuts.copy_hint": "Maintenez Shift et sélectionnez", "shortcuts.interrupt": "Interrompre la commande", "shortcuts.paste": "Coller (Chrome)", "shortcuts.menu": "Menu et options", "shortcuts.model": "Changer de modèle", "shortcuts.history_prev": "Historique précédent", "shortcuts.history_next": "Historique suivant", "theme.toggle": "Basculer le thème", "theme.light": "Thème clair (UI + terminal)", "theme.dark": "Thème sombre (UI + terminal)", "theme.terminal_reloaded": "Terminal rechargé avec le nouveau thème", "languages.label": "Langue", "languages.switched_to": "Langue changée en", "success_messages.backup_saved": "Sauvegarde enregistrée", "memory.title": "Mémoire PesquisAI", "memory.subtitle": "Couche de mémoire persistante de l'agent", "memory.tooltip": "Mémoire PesquisAI (deuxième cerveau)", "memory.status_ready": "🟢 Active", "memory.status_disabled": "⚪ Désactivée", "memory.status_no_vault": "🟡 Pas de vault", "memory.status_read_only": "🟡 Lecture seule", "memory.status_error": "🔴 Erreur", "memory.notes_count": "Notes", "memory.notes_unit": "", "memory.tags_count": "Étiquettes", "memory.links_count": "Wikiliens", "memory.avg_len": "Taille moy.", "memory.recent_daily": "Daily notes", "memory.recent_notes": "Notes récentes", "memory.no_notes": "Aucune note pour l'instant. L'agent enregistrera ici automatiquement.", "memory.templates": "Modèles", "memory.open_vault": "Ouvrir Drive", "memory.refresh": "Actualiser", "memory.search_placeholder": "🔍 Rechercher…", "memory.new_note": "+ Nouvelle note", "memory.new_note_title": "Nouvelle note", "memory.new_note_dialog_title": "📝 Nouvelle note", "memory.field_path": "Chemin (ex: research/ma-note.md)", "memory.field_title": "Titre", "memory.field_template": "Modèle", "memory.field_tags": "Étiquettes (séparées par virgule, optionnel)", "memory.create": "Créer", "memory.save": "💾 Enregistrer", "memory.delete": "🗑 Supprimer", "memory.tab_edit": "Éditer", "memory.tab_preview": "Aperçu", "memory.tab_split": "Divisé", "memory.body_placeholder": "Sélectionnez une note à gauche ou créez-en une nouvelle.", "memory.empty_editor": "Sélectionnez une note dans la liste ou créez-en une nouvelle.", "memory.dirty": "non enregistré", "memory.note_title": "Titre", "memory.no_results": "Aucun résultat pour la recherche.", "agents.title": "Directives de l'Agent", "agents.subtitle": "Règles et principes du PesquisAI (AGENTS.md)", "agents.loading": "Chargement des directives…", "agents.error": "Erreur lors du chargement des directives de l'agent.", "agents.copy_ok": "Directives copiées !", "agents.copy": "Copier", "agents.open_source": "Voir la source"}};
     const LANG_COOKIE = "pesquisai_lang";
     const THEME_COOKIE = "pesquisai_theme";
     const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 ano
@@ -1492,7 +1372,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       const fr = document.getElementById("terminal-frame");
       if (!fr) return;
       const theme = document.documentElement.getAttribute("data-theme") || "pesquisai";
-      const origSrc = (fr.src || "{__TERMINAL_URL__}").split("?")[0];
+      const origSrc = (fr.src || "__TERMINAL_URL__").split("?")[0];
       fr.src = "about:blank";
       // Uma nova sessão pode ter sido criada — invalida cache de histórico.
       _sessionsCache = { data: null, ts: 0 };
@@ -2076,7 +1956,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       // Se houver mudanças não salvas, pedir confirmação (a menos que force=true)
       if (!force && _memoryDirty && _memoryCurrent) {
         var _confirmed = false;
-        pesquisaiConfirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nFechar mesmo assim?", function() {
+        pesquisaiConfirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\nFechar mesmo assim?", function() {
           if (_confirmed) return; _confirmed = true;
           _doCloseMemory();
         });
@@ -2347,7 +2227,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         if (isSelected) styles += "background:var(--accent-dim);color:var(--accent);font-weight:700;";
         else if (isToday) styles += "background:rgba(var(--accent-rgb),.12);color:var(--accent);font-weight:600;";
         else styles += "color:var(--ink);";
-         h += '<div class="mem-cal-day" style="' + styles + '" onclick="loadMemoryNote(\\'' + path + '\\')">';
+         h += '<div class="mem-cal-day" style="' + styles + '" onclick="loadMemoryNote(\'' + path + '\')">';
         h += d;
         if (hasNote) {
           h += '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--accent);"></div>';
@@ -2396,7 +2276,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     async function loadMemoryNote(path) {
       if (_memoryDirty && _memoryCurrent && _memoryCurrent.path !== path) {
         var _confirmed = false;
-        pesquisaiConfirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nDescartar e abrir outra nota?", function() {
+        pesquisaiConfirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\nDescartar e abrir outra nota?", function() {
           if (_confirmed) return; _confirmed = true;
           _continueLoadMemoryNote(path);
         });
@@ -2634,7 +2514,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     async function openCreateNoteDialog() {
       if (_memoryDirty && _memoryCurrent) {
         var _confirmed = false;
-        pesquisaiConfirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\\nContinuar?", function() {
+        pesquisaiConfirm("Há mudanças não salvas em '" + _memoryCurrent.path + "'.\nContinuar?", function() {
           if (_confirmed) return; _confirmed = true;
           _continueOpenCreateNoteDialog();
         });
@@ -2925,398 +2805,4 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 </body>
-</html>"""
-
-    # ── Injeta dicionário de idiomas como JSON válido ─────────
-    import json as _json
-    langs_dict = {l["code"]: l for l in SUPPORTED_LANGUAGES}
-
-    # Substitui placeholders do template (feito DEPOIS da f-string)
-    html = html.replace("{__TERMINAL_URL__}", terminal_url)
-    html = html.replace("{__DRIVE_URL__}", drive_url)
-    html = html.replace("{__VERSION__}", VERSION)
-    html = html.replace("{RESPONSIVE_CSS}", RESPONSIVE_CSS)
-
-    i18n_inline: dict[str, dict[str, str]] = {
-        "pt_BR": {
-            "ui.backup": "Salvar backup", "ui.restore": "Restaurar",
-            "ui.drive": "Drive", "ui.close": "Fechar", "ui.cancel": "Cancelar",
-            "ui.loading": "Carregando…", "ui.status_active": "agente ativo",
-            "ui.exporting": "Exportando sessão…",
-            "dashboard.title": "Dashboard de Saúde",
-            "providers.title": "Conectar Provedor de IA",
-            "providers.select": "Selecione o provedor para configurar a API key:",
-            "providers.saved_keys": "Chaves salvas no Drive:",
-            "providers.add_new": "Novo provedor",
-            "providers.search": "Buscar provedor…",
-            "providers.api_key": "API KEY", "providers.back": "← Voltar",
-            "providers.save_connect": "Salvar e Conectar",
-            "providers.var": "Variável",
-            "providers.key_required": "Insira a API key.",
-            "providers.select_required": "Selecione um provedor.",
-            "providers.saving": "Salvando…",
-            "providers.connected": "conectado",
-            "providers.updated": "atualizado",
-            "providers.no_saved_keys": "Nenhuma chave salva ainda.",
-            "providers.edit": "Editar",
-            "providers.delete": "Excluir",
-            "providers.confirm_delete": "Excluir chave de",
-            "providers.deleted": "excluído",
-            "sessions.refresh": "↻ Atualizar",
-            "sessions.title": "Histórico de Sessões",
-            "sessions.search_placeholder": "🔍 Buscar por id ou conteúdo…",
-            "shortcuts.title": "Atalhos de Teclado",
-            "shortcuts.copy": "Copiar seleção", "shortcuts.copy_hint": "Segure o Shift e selecione",
-            "shortcuts.interrupt": "Interromper comando", "shortcuts.paste": "Colar (Chrome)",
-            "shortcuts.menu": "Menu e opções", "shortcuts.model": "Alterar modelo",
-            "shortcuts.history_prev": "Histórico anterior", "shortcuts.history_next": "Histórico seguinte",
-            "theme.toggle": "Alternar tema", "theme.light": "Tema claro (UI + terminal)",
-            "theme.dark": "Tema escuro (UI + terminal)",
-            "theme.terminal_reloaded": "Terminal recarregado com novo tema",
-            "languages.label": "Idioma", "languages.switched_to": "Idioma alterado para",
-            "success_messages.backup_saved": "Backup salvo",
-            # v0.5.1.2 — Memória PesquisAI
-            "memory.title": "Memória PesquisAI",
-            "memory.subtitle": "Camada de memória persistente do agente",
-            "memory.tooltip": "Memória PesquisAI (segundo cérebro)",
-            "memory.status_ready": "🟢 Ativa",
-            "memory.status_disabled": "⚪ Desativada",
-            "memory.status_no_vault": "🟡 Sem vault",
-            "memory.status_read_only": "🟡 Somente leitura",
-            "memory.status_error": "🔴 Erro",
-            "memory.notes_count": "Notas",
-            "memory.notes_unit": "",
-            "memory.tags_count": "Tags",
-            "memory.links_count": "Wikilinks",
-            "memory.avg_len": "Tam. médio",
-            "memory.recent_daily": "Daily notes",
-            "memory.recent_notes": "Notas recentes",
-            "memory.no_notes": "Nenhuma nota ainda. O agente salvará aqui automaticamente.",
-            "memory.templates": "Templates",
-            "memory.open_vault": "Abrir Drive",
-            "memory.refresh": "Atualizar",
-            # v0.5.1.4 — Editor de notas (split view)
-            "memory.search_placeholder": "🔍 Buscar…",
-            "memory.new_note": "+ Nova nota",
-            "memory.new_note_title": "Nova nota",
-            "memory.new_note_dialog_title": "📝 Nova nota",
-            "memory.field_path": "Caminho (ex: research/minha-nota.md)",
-            "memory.field_title": "Título",
-            "memory.field_template": "Template",
-            "memory.field_tags": "Tags (separadas por vírgula, opcional)",
-            "memory.create": "Criar",
-            "memory.save": "💾 Salvar",
-            "memory.delete": "🗑 Excluir",
-            "memory.tab_edit": "Editar",
-            "memory.tab_preview": "Preview",
-            "memory.tab_split": "Dividido",
-            "memory.body_placeholder": "Selecione uma nota à esquerda ou crie uma nova.",
-            "memory.empty_editor": "Selecione uma nota na lista ou crie uma nova.",
-            "memory.dirty": "não salvo",
-            "memory.note_title": "Título",
-            "memory.no_results": "Nenhum resultado para a busca.",
-            # v0.5.1.2 hotfix — Diretrizes do Agente
-            "agents.title": "Diretrizes do Agente",
-            "agents.subtitle": "Regras e princípios do PesquisAI (AGENTS.md)",
-            "agents.loading": "Carregando diretrizes…",
-            "agents.error": "Erro ao carregar diretrizes do agente.",
-            "agents.copy_ok": "Diretrizes copiadas!",
-            "agents.copy": "Copiar",
-            "agents.open_source": "Ver fonte",
-        },
-        "en_US": {
-            "ui.backup": "Save backup", "ui.restore": "Restore",
-            "ui.drive": "Drive", "ui.close": "Close", "ui.cancel": "Cancel",
-            "ui.loading": "Loading…", "ui.status_active": "agent active",
-            "ui.exporting": "Exporting session…",
-            "dashboard.title": "Health Dashboard",
-            "providers.title": "Connect AI Provider",
-            "providers.select": "Select the provider to configure the API key:",
-            "providers.saved_keys": "Keys saved on Drive:",
-            "providers.add_new": "New provider",
-            "providers.search": "Search provider…",
-            "providers.api_key": "API KEY", "providers.back": "← Back",
-            "providers.save_connect": "Save and Connect",
-            "providers.var": "Variable",
-            "providers.key_required": "Enter the API key.",
-            "providers.select_required": "Select a provider.",
-            "providers.saving": "Saving…",
-            "providers.connected": "connected",
-            "providers.updated": "updated",
-            "providers.no_saved_keys": "No saved keys yet.",
-            "providers.edit": "Edit",
-            "providers.delete": "Delete",
-            "providers.confirm_delete": "Delete key for",
-            "providers.deleted": "deleted",
-            "sessions.refresh": "↻ Refresh",
-            "sessions.title": "Session History",
-            "sessions.search_placeholder": "🔍 Search by id or content…",
-            "shortcuts.title": "Keyboard Shortcuts",
-            "shortcuts.copy": "Copy selection", "shortcuts.copy_hint": "Hold Shift and select",
-            "shortcuts.interrupt": "Interrupt command", "shortcuts.paste": "Paste (Chrome)",
-            "shortcuts.menu": "Menu and options", "shortcuts.model": "Change model",
-            "shortcuts.history_prev": "Previous history", "shortcuts.history_next": "Next history",
-            "theme.toggle": "Toggle theme", "theme.light": "Light theme (UI + terminal)",
-            "theme.dark": "Dark theme (UI + terminal)",
-            "theme.terminal_reloaded": "Terminal reloaded with new theme",
-            "languages.label": "Language", "languages.switched_to": "Language switched to",
-            "success_messages.backup_saved": "Backup saved",
-            # v0.5.1.2 — PesquisAI Memory
-            "memory.title": "PesquisAI Memory",
-            "memory.subtitle": "Agent's persistent memory layer",
-            "memory.tooltip": "PesquisAI Memory (second brain)",
-            "memory.status_ready": "🟢 Active",
-            "memory.status_disabled": "⚪ Disabled",
-            "memory.status_no_vault": "🟡 No vault",
-            "memory.status_read_only": "🟡 Read-only",
-            "memory.status_error": "🔴 Error",
-            "memory.notes_count": "Notes",
-            "memory.notes_unit": "",
-            "memory.tags_count": "Tags",
-            "memory.links_count": "Wikilinks",
-            "memory.avg_len": "Avg. length",
-            "memory.recent_daily": "Daily notes",
-            "memory.recent_notes": "Recent notes",
-            "memory.no_notes": "No notes yet. The agent will save here automatically.",
-            "memory.templates": "Templates",
-            "memory.open_vault": "Open Drive",
-            "memory.refresh": "Refresh",
-            # v0.5.1.4 — Note editor (split view)
-            "memory.search_placeholder": "🔍 Search…",
-            "memory.new_note": "+ New note",
-            "memory.new_note_title": "New note",
-            "memory.new_note_dialog_title": "📝 New note",
-            "memory.field_path": "Path (e.g. research/my-note.md)",
-            "memory.field_title": "Title",
-            "memory.field_template": "Template",
-            "memory.field_tags": "Tags (comma-separated, optional)",
-            "memory.create": "Create",
-            "memory.save": "💾 Save",
-            "memory.delete": "🗑 Delete",
-            "memory.tab_edit": "Edit",
-            "memory.tab_preview": "Preview",
-            "memory.tab_split": "Split",
-            "memory.body_placeholder": "Select a note on the left or create a new one.",
-            "memory.empty_editor": "Select a note from the list or create a new one.",
-            "memory.dirty": "unsaved",
-            "memory.note_title": "Title",
-            "memory.no_results": "No results for the search.",
-            # v0.5.1.2 hotfix — Agent Guidelines
-            "agents.title": "Agent Guidelines",
-            "agents.subtitle": "PesquisAI rules and principles (AGENTS.md)",
-            "agents.loading": "Loading guidelines…",
-            "agents.error": "Error loading agent guidelines.",
-            "agents.copy_ok": "Guidelines copied!",
-            "agents.copy": "Copy",
-            "agents.open_source": "View source",
-        },
-        "es_ES": {
-            "ui.backup": "Guardar copia", "ui.restore": "Restaurar",
-            "ui.drive": "Drive", "ui.close": "Cerrar", "ui.cancel": "Cancelar",
-            "ui.loading": "Cargando…", "ui.status_active": "agente activo",
-            "ui.exporting": "Exportando sesión…",
-            "dashboard.title": "Panel de Salud",
-            "providers.title": "Conectar Proveedor de IA",
-            "providers.select": "Seleccione el proveedor para configurar la API key:",
-            "providers.saved_keys": "Claves guardadas en Drive:",
-            "providers.add_new": "Nuevo proveedor",
-            "providers.search": "Buscar proveedor…",
-            "providers.api_key": "API KEY", "providers.back": "← Volver",
-            "providers.save_connect": "Guardar y Conectar",
-            "providers.var": "Variable",
-            "providers.key_required": "Ingrese la API key.",
-            "providers.select_required": "Seleccione un proveedor.",
-            "providers.saving": "Guardando…",
-            "providers.connected": "conectado",
-            "providers.updated": "actualizado",
-            "providers.no_saved_keys": "Aún no hay claves guardadas.",
-            "providers.edit": "Editar",
-            "providers.delete": "Eliminar",
-            "providers.confirm_delete": "Eliminar clave de",
-            "providers.deleted": "eliminado",
-            "sessions.refresh": "↻ Actualizar",
-            "sessions.title": "Historial de Sesiones",
-            "sessions.search_placeholder": "🔍 Buscar por id o contenido…",
-            "shortcuts.title": "Atajos de Teclado",
-            "shortcuts.copy": "Copiar selección", "shortcuts.copy_hint": "Mantenga Shift y seleccione",
-            "shortcuts.interrupt": "Interrumpir comando", "shortcuts.paste": "Pegar (Chrome)",
-            "shortcuts.menu": "Menú y opciones", "shortcuts.model": "Cambiar modelo",
-            "shortcuts.history_prev": "Historial anterior", "shortcuts.history_next": "Historial siguiente",
-            "theme.toggle": "Alternar tema", "theme.light": "Tema claro (UI + terminal)",
-            "theme.dark": "Tema oscuro (UI + terminal)",
-            "theme.terminal_reloaded": "Terminal recargado con nuevo tema",
-            "languages.label": "Idioma", "languages.switched_to": "Idioma cambiado a",
-            "success_messages.backup_saved": "Copia guardada",
-            # v0.5.1.2 — Memoria PesquisAI
-            "memory.title": "Memoria PesquisAI",
-            "memory.subtitle": "Capa de memoria persistente del agente",
-            "memory.tooltip": "Memoria PesquisAI (segundo cerebro)",
-            "memory.status_ready": "🟢 Activa",
-            "memory.status_disabled": "⚪ Desactivada",
-            "memory.status_no_vault": "🟡 Sin vault",
-            "memory.status_read_only": "🟡 Solo lectura",
-            "memory.status_error": "🔴 Error",
-            "memory.notes_count": "Notas",
-            "memory.notes_unit": "",
-            "memory.tags_count": "Etiquetas",
-            "memory.links_count": "Wikienlaces",
-            "memory.avg_len": "Tam. medio",
-            "memory.recent_daily": "Daily notes",
-            "memory.recent_notes": "Notas recientes",
-            "memory.no_notes": "Aún no hay notas. El agente guardará aquí automáticamente.",
-            "memory.templates": "Plantillas",
-            "memory.open_vault": "Abrir Drive",
-            "memory.refresh": "Actualizar",
-            # v0.5.1.4 — Editor de notas (split view)
-            "memory.search_placeholder": "🔍 Buscar…",
-            "memory.new_note": "+ Nueva nota",
-            "memory.new_note_title": "Nueva nota",
-            "memory.new_note_dialog_title": "📝 Nueva nota",
-            "memory.field_path": "Ruta (ej: research/mi-nota.md)",
-            "memory.field_title": "Título",
-            "memory.field_template": "Plantilla",
-            "memory.field_tags": "Etiquetas (separadas por coma, opcional)",
-            "memory.create": "Crear",
-            "memory.save": "💾 Guardar",
-            "memory.delete": "🗑 Eliminar",
-            "memory.tab_edit": "Editar",
-            "memory.tab_preview": "Vista previa",
-            "memory.tab_split": "Dividido",
-            "memory.body_placeholder": "Selecciona una nota a la izquierda o crea una nueva.",
-            "memory.empty_editor": "Selecciona una nota de la lista o crea una nueva.",
-            "memory.dirty": "no guardado",
-            "memory.note_title": "Título",
-            "memory.no_results": "Sin resultados para la búsqueda.",
-            # v0.5.1.2 hotfix — Directrices del Agente
-            "agents.title": "Directrices del Agente",
-            "agents.subtitle": "Reglas y principios del PesquisAI (AGENTS.md)",
-            "agents.loading": "Cargando directrices…",
-            "agents.error": "Error al cargar las directrices del agente.",
-            "agents.copy_ok": "¡Directrices copiadas!",
-            "agents.copy": "Copiar",
-            "agents.open_source": "Ver fuente",
-        },
-        "fr_FR": {
-            "ui.backup": "Sauvegarder", "ui.restore": "Restaurer",
-            "ui.drive": "Drive", "ui.close": "Fermer", "ui.cancel": "Annuler",
-            "ui.loading": "Chargement…", "ui.status_active": "agent actif",
-            "ui.exporting": "Exportation de la session…",
-            "dashboard.title": "Tableau de bord de santé",
-            "providers.title": "Connecter un fournisseur d'IA",
-            "providers.select": "Sélectionnez le fournisseur pour configurer la clé API:",
-            "providers.saved_keys": "Clés enregistrées sur Drive:",
-            "providers.add_new": "Nouveau fournisseur",
-            "providers.search": "Rechercher un fournisseur…",
-            "providers.api_key": "CLÉ API", "providers.back": "← Retour",
-            "providers.save_connect": "Enregistrer et connecter",
-            "providers.var": "Variable",
-            "providers.key_required": "Entrez la clé API.",
-            "providers.select_required": "Sélectionnez un fournisseur.",
-            "providers.saving": "Enregistrement…",
-            "providers.connected": "connecté",
-            "providers.updated": "mis à jour",
-            "providers.no_saved_keys": "Aucune clé enregistrée pour l'instant.",
-            "providers.edit": "Modifier",
-            "providers.delete": "Supprimer",
-            "providers.confirm_delete": "Supprimer la clé de",
-            "providers.deleted": "supprimé",
-            "sessions.refresh": "↻ Actualiser",
-            "sessions.title": "Historique des sessions",
-            "sessions.search_placeholder": "🔍 Rechercher par id ou contenu…",
-            "shortcuts.title": "Raccourcis clavier",
-            "shortcuts.copy": "Copier la sélection", "shortcuts.copy_hint": "Maintenez Shift et sélectionnez",
-            "shortcuts.interrupt": "Interrompre la commande", "shortcuts.paste": "Coller (Chrome)",
-            "shortcuts.menu": "Menu et options", "shortcuts.model": "Changer de modèle",
-            "shortcuts.history_prev": "Historique précédent", "shortcuts.history_next": "Historique suivant",
-            "theme.toggle": "Basculer le thème", "theme.light": "Thème clair (UI + terminal)",
-            "theme.dark": "Thème sombre (UI + terminal)",
-            "theme.terminal_reloaded": "Terminal rechargé avec le nouveau thème",
-            "languages.label": "Langue", "languages.switched_to": "Langue changée en",
-            "success_messages.backup_saved": "Sauvegarde enregistrée",
-            # v0.5.1.2 — Mémoire PesquisAI
-            "memory.title": "Mémoire PesquisAI",
-            "memory.subtitle": "Couche de mémoire persistante de l'agent",
-            "memory.tooltip": "Mémoire PesquisAI (deuxième cerveau)",
-            "memory.status_ready": "🟢 Active",
-            "memory.status_disabled": "⚪ Désactivée",
-            "memory.status_no_vault": "🟡 Pas de vault",
-            "memory.status_read_only": "🟡 Lecture seule",
-            "memory.status_error": "🔴 Erreur",
-            "memory.notes_count": "Notes",
-            "memory.notes_unit": "",
-            "memory.tags_count": "Étiquettes",
-            "memory.links_count": "Wikiliens",
-            "memory.avg_len": "Taille moy.",
-            "memory.recent_daily": "Daily notes",
-            "memory.recent_notes": "Notes récentes",
-            "memory.no_notes": "Aucune note pour l'instant. L'agent enregistrera ici automatiquement.",
-            "memory.templates": "Modèles",
-            "memory.open_vault": "Ouvrir Drive",
-            "memory.refresh": "Actualiser",
-            # v0.5.1.4 — Éditeur de notes (split view)
-            "memory.search_placeholder": "🔍 Rechercher…",
-            "memory.new_note": "+ Nouvelle note",
-            "memory.new_note_title": "Nouvelle note",
-            "memory.new_note_dialog_title": "📝 Nouvelle note",
-            "memory.field_path": "Chemin (ex: research/ma-note.md)",
-            "memory.field_title": "Titre",
-            "memory.field_template": "Modèle",
-            "memory.field_tags": "Étiquettes (séparées par virgule, optionnel)",
-            "memory.create": "Créer",
-            "memory.save": "💾 Enregistrer",
-            "memory.delete": "🗑 Supprimer",
-            "memory.tab_edit": "Éditer",
-            "memory.tab_preview": "Aperçu",
-            "memory.tab_split": "Divisé",
-            "memory.body_placeholder": "Sélectionnez une note à gauche ou créez-en une nouvelle.",
-            "memory.empty_editor": "Sélectionnez une note dans la liste ou créez-en une nouvelle.",
-            "memory.dirty": "non enregistré",
-            "memory.note_title": "Titre",
-            "memory.no_results": "Aucun résultat pour la recherche.",
-            # v0.5.1.2 hotfix — Directives de l'Agent
-            "agents.title": "Directives de l'Agent",
-            "agents.subtitle": "Règles et principes du PesquisAI (AGENTS.md)",
-            "agents.loading": "Chargement des directives…",
-            "agents.error": "Erreur lors du chargement des directives de l'agent.",
-            "agents.copy_ok": "Directives copiées !",
-            "agents.copy": "Copier",
-            "agents.open_source": "Voir la source",
-        },
-    }
-
-    html = html.replace("{__LANGS_JSON__}", _json.dumps(langs_dict, ensure_ascii=False))
-    html = html.replace("{__I18N_JSON__}", _json.dumps(i18n_inline, ensure_ascii=False))
-
-    # Salva o HTML no diretório wrapper
-    os.makedirs(WRAPPER_DIR, exist_ok=True)
-    with open(os.path.join(WRAPPER_DIR, "index.html"), "w", encoding="utf-8") as fh:
-        fh.write(html)
-    return html
-
-
-# ── Retrocompatibilidade ───────────────────────────────────────
-# Código antigo pode importar ``create_wrapper_html_responsive`` (nome longo).
-# Mantemos o alias para não quebrar importações legadas.
-create_wrapper_html_responsive = create_wrapper_html
-
-
-def main() -> None:
-    """Função principal para testar a geração standalone."""
-    print(f"\n{next_joke('computacao')}")
-    print("📱 Gerando wrapper v0.4.1 (responsivo + tema + idioma)...")
-    html = create_wrapper_html(
-        terminal_url="http://localhost:8000",
-        drive_url="https://drive.google.com/drive/my-drive",
-    )
-    print(f"✅ Wrapper gerado: {len(html):,} caracteres")
-    print(f"📂 Salvo em: {os.path.join(WRAPPER_DIR, 'index.html')}")
-    print(f"📱 Contém 'mobile-menu': {'mobile-menu' in html}")
-    print(f"🍔 Contém 'hamburger-btn': {'hamburger-btn' in html}")
-    print(f"🌐 Contém seletor de idioma: {'lang-btn' in html}")
-    print(f"🎨 Contém toggleTheme com reload: {'terminal_reloaded' in html}")
-    print(f"📐 Media queries: {html.count('@media')}")
-    print(f"🗣️ Idiomas suportados: {len(SUPPORTED_LANGUAGES)} (pt_BR, en_US, es_ES, fr_FR)")
-
-
-if __name__ == "__main__":
-    main()
+</html>

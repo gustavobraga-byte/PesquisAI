@@ -24,6 +24,17 @@ Compatível com o PesquisAI principal (v0.2.1+).
 ═════════════════════════════════════════════════════════════════════════
 Histórico de versões:
 ════════════════════════════════════════════════════════════════════════
+  v0.5.1.8 — 🐛 3 bugfixes: provider buttons, session restore, backup confirm
+            • BUG 1 (provider): JSON.stringify em onclick gerava SyntaxError
+              em Python string tripla — trocado por data-provider +
+              this.dataset.provider
+            • BUG 2 (session history): "opencode session restore <id>"
+              restaurava dados mas iniciava opencode do zero
+              (linha 1600: ; {_opencode_bin}). Trocado para
+              "opencode -s <id>" com no_fallback=true, + location.reload()
+              para reconectar ao ttyd com a sessão correta.
+            • FEATURE 3 (backup restore): pesquisaiConfirm() adicionado
+              em doRestore(file) para confirmar antes de importar backup.
   v0.5.1.4 — 🧠 Editor de Memória Obsidian no botão 🧠
     v0.5.1.5 — 🔧 Botões não funcionavam (SyntaxError JS em string multilinha)
             • NOVO split view no overlay de Memória: lista de notas
@@ -120,11 +131,11 @@ Histórico de versões:
 """
 
 # ── Versão semântica (SemVer) ──────────────────────────────────
-__version__: str = "0.5.1.5"
+__version__: str = "0.5.1.8"
 
 # ── Metadados do release ───────────────────────────────────────
-__release_date__: str = "2026-07-01"
-__codename__: str = "obsidian memory editor (navigate + edit inside the 🧠 button)"
+__release_date__: str = "2026-07-10"
+__codename__: str = "🐛 3 bugfixes: provider buttons, session restore, backup confirm"
 
 # ── Identidade do projeto ──────────────────────────────────────
 __author__: str = "Gustavo Bastos Braga"

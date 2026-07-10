@@ -538,7 +538,7 @@ def start_ttyd(lang: str | None = None):
     greeting = get_greeting(full_lang)
     # Escapar aspas para o bash -c "..."
     safe_prompt = greeting.replace('"', '\\"').replace("'", "\\'")
-    bash_cmd = f'{opencode_bin} --prompt "{safe_prompt}" --yolo ; exec bash'
+    bash_cmd = f'{opencode_bin} --prompt "{safe_prompt}" ; exec bash'
 
     # v0.4.2.5: construir args com --index (touch handlers)
     base_args = ["ttyd", "-p", str(TERMINAL_PORT), "bash", "-i", "-c", bash_cmd]
@@ -739,7 +739,8 @@ def start_wrapper_server():
                 return
             
             if p == "/api/sessions":
-                r = _run(cmd=["opencode", "session", "list", "--format", "json"])
+                cmd = [_opencode_bin or "opencode", "session", "list", "--format", "json"]
+                r = _run(cmd=cmd)
                 try:
                     sessions = json.loads(r.stdout) if r.stdout.strip() else []
                 except Exception:
@@ -1472,8 +1473,48 @@ def start_wrapper_server():
 
             if p == "/api/apikey":
                 provider = body.get("provider", "").strip()
+                action   = body.get("action", "save").strip().lower()
                 env_var  = body.get("env", "").strip()
                 key      = body.get("apikey", "").strip()
+
+                if action == "delete":
+                    if not provider:
+                        self._json(400, {"error": "provider obrigatório para exclusão."})
+                        return
+                    existing = load_encrypted_keys(DRIVE_BACKUP_DIR)
+                    # Verifica existência ANTES de dar pop, para não rejeitar chaves
+                    # corrompidas/vazias (valor "" é falsy mas a entrada existe).
+                    provider_exists = provider in existing
+                    env_exists = f"_env_{provider}" in existing
+                    if not provider_exists and not env_exists:
+                        self._json(404, {"error": f"Chave não encontrada: {provider}"})
+                        return
+                    removed_key = existing.pop(provider, None)
+                    removed_env = existing.pop(f"_env_{provider}", None)
+                    if not save_encrypted_keys(DRIVE_BACKUP_DIR, existing):
+                        self._json(500, {"error": "Falha ao salvar chaves após exclusão."})
+                        return
+                    # Remove do env atual (se houver)
+                    env_name = removed_env or env_var
+                    if env_name:
+                        os.environ.pop(env_name, None)
+                        _env.pop(env_name, None)
+                    # Remove do ~/.bashrc
+                    bashrc = os.path.expanduser("~/.bashrc")
+                    try:
+                        marker = f"# opencode-key-{provider}"
+                        if os.path.exists(bashrc):
+                            with open(bashrc, "r") as f:
+                                lines = f.readlines()
+                            lines = [l for l in lines if marker not in l]
+                            with open(bashrc, "w") as f:
+                                f.writelines(lines)
+                    except Exception:
+                        pass
+                    self._json(200, {"ok": True, "deleted": provider})
+                    return
+
+                # Ação padrão: salvar/atualizar chave
                 if not key or not provider:
                     self._json(400, {"error": "provider e apikey obrigatórios."})
                     return
