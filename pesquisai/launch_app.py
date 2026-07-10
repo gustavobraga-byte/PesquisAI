@@ -538,7 +538,7 @@ def start_ttyd(lang: str | None = None):
     greeting = get_greeting(full_lang)
     # Escapar aspas para o bash -c "..."
     safe_prompt = greeting.replace('"', '\\"').replace("'", "\\'")
-    bash_cmd = f'{opencode_bin} --prompt "{safe_prompt}" ; exec bash'
+    bash_cmd = f'{opencode_bin} --prompt "{safe_prompt}" --yolo ; exec bash'
 
     # v0.4.2.5: construir args com --index (touch handlers)
     base_args = ["ttyd", "-p", str(TERMINAL_PORT), "bash", "-i", "-c", bash_cmd]
