@@ -6,7 +6,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow.svg)]()
 [![SisPPG/UFV](https://img.shields.io/badge/SisPPG-10356285004-blue.svg)](http://sisppg.ufv.br)
-[![Versão](https://img.shields.io/badge/versão-0.5.1.5-orange.svg)]()
+[![Versão](https://img.shields.io/badge/versão-0.5.1.8-orange.svg)]()
 
 > Ecossistema de agentes de IA para acelerar a pesquisa científica.
 
@@ -90,6 +90,7 @@ O PesquisAI opera por módulos especializados (*skills*). Cada skill conecta o a
 | `skill-dados-brasil` | Indicadores e datasets oficiais complementares | [@gustavobraga-byte](https://github.com/gustavobraga-byte) |
 | `skill-agrobr` | Dados do agronegócio (produção, pecuária, CAR) | [@gustavobraga-byte](https://github.com/gustavobraga-byte) |
 | `skill-obsidian-memory` | Memória persistente via Obsidian vault no Google Drive 🧠 | [@gustavobraga-byte](https://github.com/gustavobraga-byte) |
+| `skill-memorial-ufv` | Geração automática de Memorial RSC-PCCTAE conforme normas UFV/ABNT 📜 | [@gustavobraga-byte](https://github.com/gustavobraga-byte) |
 
 ---
 
@@ -120,6 +121,7 @@ Google Colab
         ├── skill-analise-qualitativa
         ├── scientific-skills
         ├── skill-obsidian-memory  ← memória persistente (v0.5.0+)
+        ├── skill-memorial-ufv    ← Memorial RSC-PCCTAE UFV/ABNT (v0.5.1.8+)
         └── pesquisai (instruções do agente)
 ```
 
