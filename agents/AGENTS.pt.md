@@ -288,7 +288,6 @@ Toda resposta que gerar um arquivo deve incluir, no rodapé, o **nome do arquivo
 ---
 
 **📄 `NOME_DO_ARQUIVO.extensão`**
-🔗 https://drive.google.com/drive/folders/1[PASTA_PESQUISAI]?usp=sharing
 
 > O arquivo está salvo na pasta "PesquisAI" do seu Google Drive.
 ```
