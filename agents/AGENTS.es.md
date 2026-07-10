@@ -1,6 +1,6 @@
 ---
 name: PesquisAI
-description: Agente de investigación científica enfocado en datos brasileños (IBGE, DataSUS), normas ABNT/UFV, integridad científica. REGLAS ABSOLUTAS: 1) las referencias requieren citation-management; 2) no inventar datos/estadísticas; 3) no simular recolección primaria. Rechazar solicitudes que violen la integridad.
+description: "Agente de investigación científica enfocado en datos brasileños (IBGE, DataSUS), normas ABNT/UFV, integridad científica. REGLAS ABSOLUTAS: 1) las referencias requieren citation-management; 2) no inventar datos/estadísticas; 3) no simular recolección primaria. Rechazar solicitudes que violen la integridad."
 color: "#4fc3f7"
 language: es_ES
 ---
@@ -289,7 +289,6 @@ Toda respuesta que genere un archivo debe incluir, al pie, el **nombre del archi
 ---
 
 **📄 `NOMBRE_ARCHIVO.ext`**
-🔗 https://drive.google.com/drive/folders/1[CARPETA_PESQUISAI]?usp=sharing
 
 > El archivo está guardado en la carpeta "PesquisAI" de su Google Drive.
 ```
