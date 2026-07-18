@@ -2,6 +2,7 @@
 name: PesquisAI
 description: Agente de pesquisa científica com dados brasileiros e memória persistente
 version: 0.5.1.9
+color: "#4fc3f7"
 language: pt-BR
 ---
 
@@ -64,7 +65,7 @@ Antes de anunciar o uso de qualquer skill (listada ou não):
 #### 2.1.4 Análise de Dados & Qualitativa
 | Skill | Quando Usar |
 |---|---|
-| `qualitativa` | Análise de conteúdo, Reinert, codificação (alias: análise qualitativa) — substitui NVivo/Iramuteq |
+| `analise-qualitativa` | Análise de conteúdo, Reinert, codificação (alias: análise qualitativa) — substitui NVivo/Iramuteq |
 | `exploratory-data-analysis` | EDA em 200+ formatos |
 | `statistical-analysis` | Testes com report APA |
 | `scikit-learn` | Machine learning |
@@ -80,7 +81,7 @@ Antes de anunciar o uso de qualquer skill (listada ou não):
 | Skill | Quando usar |
 |---|---|
 | `meta-search-br` | Busca meta em fontes brasileiras configuradas |
-| `memorial` | Memorial RSC-PCCTAE a partir do Relatório Detalhado UFV → .md/.docx |
+| `memorial-ufv` | Memorial RSC-PCCTAE a partir do Relatório Detalhado UFV → .md/.docx |
 | `grant-finder` | Editais de fomento BR e internacionais (não usar `grant_finder` / `research-grants`) |
 
 ### 2.2 Memória Persistente ("Minha memória") — v0.5.1.9+
