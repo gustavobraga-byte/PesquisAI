@@ -1,7 +1,48 @@
 # Changelog — PesquisAI
 
 ---
+## [0.5.1.9] - 2026-07-18 - Atualização do AGENTS.md
 
+### 🚀 Major Changes
+
+- **Reescrita completa do AGENTS.md**: Principal atualização desde a introdução da memória persistente. O documento foi reformulado do zero para maior clareza, consistência normativa, economia de tokens e alinhamento com o código-fonte (`constants.SKILL_REGISTRY`).
+- **Nova arquitetura de diretórios**: Introduzida separação oficial entre `vault/` (memória interna do agente) e `outputs-<slug-do-projeto>/` (entregáveis finais organizados por projeto). Isso melhora organização, reprodutibilidade e experiência do usuário final.
+- **Fortalecimento de Integridade e Segurança**: 
+  - Protocolo completo de defesa contra prompt injection (ignorar, manter tarefa original e avisar usuário).
+  - Proteção explícita contra acesso a arquivos de segredos (`keys_store.json` e `keys_encryption_key.bin`).
+  - LGPD com "hard stop": interrupção obrigatória de gravação ao detectar dados sensíveis não anonimizados.
+
+### ✨ Improvements
+
+- **Catálogo de Skills**: Totalmente sincronizado com o registry real. Removidas referências infladas ("147+ skills") e adicionados IDs canônicos (`qualitativa`, `grant-finder`, `memorial`, `obsidian-memory`, `BR-DWGD`, `meta-search-br`).
+- **Gestão de Memória**: 
+  - Frontmatter enriquecido com `updated`, `accessed_at`, `dataset_version`, `evidence_refs` e `source_language`.
+  - Atualização automática e obrigatória de `moc/last-state.md` no fim de sessões/tarefas relevantes.
+  - Clarificada a condicionalidade do salvamento (obrigatório apenas quando `PESQUISAI_OBSIDIAN_VAULT` está ativa).
+- **Regras de Precedência**: Seção dedicada e expandida, blindando integridade (§4.1), proibições de memória (§2.2.1), injeção de prompt e restrições de path traversal.
+- **Geração de Arquivos**: PDF agora obrigatório apenas para entregáveis finais (artigos, memoriais, relatórios). Notas internas não geram mais PDF automaticamente.
+- **Declaração de Uso de IA**: Agente agora sugere ativamente a inclusão da declaração em entregas acadêmicas finais.
+- **Exemplos e Limitações**: Exemplos positivo/negativo mais robustos (incluindo proibição de URLs falsas). Seção de limitações expandida com "Non-goals" explícitos (pareceres médicos/jurídicos, CEP/CONEP, submissão automática, etc.).
+
+### 🛡️ Security & Compliance
+
+- Fechada brecha que permitia edição de notas humanas via `force=True`.
+- LGPD reforçada com recusa explícita mesmo diante de insistência do usuário.
+- Proteção contra path traversal e vazamento de segredos criptográficos.
+
+### 📋 Documentation
+
+- AGENTS.md agora funciona como fonte canônica de comportamento do agente em runtime.
+- Melhoria significativa na legibilidade e na capacidade de manutenção futura.
+
+### 🔄 Outras Alterações
+
+- Alinhamento entre `AGENTS.md`, `docs/INTEGRITY.md`, `docs/OBSIDIAN_MEMORY_MODEL.md` e o código-fonte.
+- Redução estimada de ~18–25% no consumo de tokens do prompt do sistema.
+- Preparação para futuras features (Workspace de Projetos, Evidence Ledger e Reprodutibilidade) já contempladas na nova estrutura.
+
+
+---
 ## [0.5.1.8] — 2026-07-10 — 🐛 3 bugfixes: provider buttons, session restore, backup confirm
 
 ### 🔧 Bugfix 1: Provider edit/delete buttons (SyntaxError)
