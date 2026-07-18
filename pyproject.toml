@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pesquisai-additions"
-version = "0.5.1"
-description = "PesquisAI v0.5.1 — obsidian autopilot (autonomous saving) + grant_finder + i18n (4 idiomas) + skills (grant-finder, meta-search-br, obsidian-memory)"
+version = "0.5.1.9"
+description = "PesquisAI v0.5.1.9 — obsidian autopilot (autonomous saving) + grant_finder + i18n (4 idiomas) + skills (grant-finder, meta-search-br, obsidian-memory)"
 authors = [
     { name = "Gustavo Bastos Braga", email = "gustavo.braga@ufv.br" },
 ]
