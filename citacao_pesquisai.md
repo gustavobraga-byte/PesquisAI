@@ -10,7 +10,7 @@
 
 ```
 BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.2.1. Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão 0.5.1.9. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -21,7 +21,7 @@ Verificar autenticidade em: http://sisppg.ufv.br
 ### Formato simplificado (para nota de rodapé):
 
 ```
-PesquisAI, versão 1.0, desenvolvido por Gustavo Bastos Braga (UFV, 2026). Disponível em:
+PesquisAI, versão 0.5.1.9., desenvolvido por Gustavo Bastos Braga (UFV, 2026). Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 ```
 
@@ -61,7 +61,7 @@ https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 
 ```
 BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para
-pesquisa científica. Versão 0.2.1. Viçosa: Universidade Federal de Viçosa,
+pesquisa científica. Versão 0.5.1.9. Viçosa: Universidade Federal de Viçosa,
 2026. Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
@@ -76,7 +76,7 @@ Acesso em: DD mês. AAAA.
 | **Tipo** | Software / Computer Program |
 | **Autor** | Braga, Gustavo Bastos |
 | **Título** | PesquisAI: agente de inteligência artificial para pesquisa científica |
-| **Versão** | 1.0 |
+| **Versão** | 0.5.1.9. |
 | **Ano** | 2026 |
 | **Instituição** | Universidade Federal de Viçosa (UFV) |
 | **URL** | https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/ |
@@ -94,7 +94,7 @@ Acesso em: DD mês. AAAA.
   author       = {Gustavo Bastos Braga},
   title        = {{PesquisAI}: Agente de Intelig{\^e}ncia Artificial para Pesquisa Cient{\'\i}fica},
   year         = {2026},
-  version      = {0.2.1},
+  version      = { 0.5.1.9.},
   institution  = {Universidade Federal de Vi{\c{c}}osa (UFV)},
   url          = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/},
   note         = {Acessado em: DD m{\^e}s AAAA}
