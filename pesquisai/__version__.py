@@ -131,11 +131,11 @@ Histórico de versões:
 """
 
 # ── Versão semântica (SemVer) ──────────────────────────────────
-__version__: str = "0.5.1.8"
+__version__: str = "0.5.1.9"
 
 # ── Metadados do release ───────────────────────────────────────
-__release_date__: str = "2026-07-10"
-__codename__: str = "🐛 3 bugfixes: provider buttons, session restore, backup confirm"
+__release_date__: str = "2026-07-18"
+__codename__: str = "Update do AGENTS.md"
 
 # ── Identidade do projeto ──────────────────────────────────────
 __author__: str = "Gustavo Bastos Braga"
