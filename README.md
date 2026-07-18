@@ -147,7 +147,7 @@ O PesquisAI **não substitui** o julgamento humano e apresenta as seguintes limi
 
 ```
 BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.5.1.5. Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão 0.5.1.9. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -163,7 +163,7 @@ Verificar autenticidade em: http://sisppg.ufv.br
   title        = {{PesquisAI}: Agente de Intelig{\^e}ncia Artificial
                   para Pesquisa Cient{\'\i}fica},
   year         = {2026},
-  version      = {0.5.1.5},
+  version      = {0.5.1.9},
   institution  = {Universidade Federal de Vi{\c{c}}osa (UFV)},
   url          = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/}
 }
