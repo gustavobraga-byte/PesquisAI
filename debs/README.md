@@ -40,7 +40,7 @@ A versão offline está disponível no seguinte formato:
 
 | Arquivo | Versão | Tamanho | Descrição |
 |---------|--------|---------|-----------|
-| `pesquisai_0.5.1.10-1_amd64.deb` | 0.5.1.10 | ~865 KB | Pacote DEB para sistemas Debian/Ubuntu amd64 |
+| `pesquisai_0.5.1.9_amd64.deb` | 0.5.1.10 | ~865 KB | Pacote DEB para sistemas Debian/Ubuntu amd64 |
 
 ---
 
