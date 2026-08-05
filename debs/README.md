@@ -52,7 +52,7 @@ Você pode instalar o PesquisAI diretamente do GitHub com um único comando:
 
 ```bash
 # Instale o PesquisAI baixando e instalando diretamente do GitHub
-wget -qO - https://github.com/gustavobraga-byte/PesquisAI/releases/latest/download/pesquisai_0.5.1.10-1_amd64.deb | \
+wget -qO - https://github.com/gustavobraga-byte/PesquisAI/debs/pesquisai_0.5.1.9_amd64.deb | \
   sudo dpkg -i - && \
   sudo apt-get install -f -y
 ```
@@ -61,7 +61,7 @@ Alternativamente, você também pode usar o `curl`:
 
 ```bash
 # Usando curl
-curl -L https://github.com/gustavobraga-byte/PesquisAI/releases/latest/download/pesquisai_0.5.1.10-1_amd64.deb | \
+curl -L https://github.com/gustavobraga-byte/PesquisAI/debs/pesquisai_0.5.1.9_amd64.deb | \
   sudo dpkg -i - && \
   sudo apt-get install -f -y
 ```
@@ -70,10 +70,10 @@ curl -L https://github.com/gustavobraga-byte/PesquisAI/releases/latest/download/
 
 ```bash
 # Baixe o pacote diretamente do GitHub Releases
-wget https://github.com/gustavobraga-byte/PesquisAI/releases/latest/download/pesquisai_0.5.1.10-1_amd64.deb
+wget https://github.com/gustavobraga-byte/PesquisAI/debs/pesquisai_0.5.1.9_amd64.deb
 
 # Instale o pacote
-sudo dpkg -i pesquisai_0.5.1.10-1_amd64.deb
+sudo dpkg -i pesquisai_0.5.1.9-1_amd64.deb
 
 # Resolva dependências (se houver)
 sudo apt-get install -f
@@ -86,10 +86,10 @@ pesquisai
 
 ```bash
 # Baixe o pacote
-wget https://github.com/gustavobraga-byte/PesquisAI/releases/latest/download/pesquisai_0.5.1.10-1_amd64.deb
+wget https://github.com/gustavobraga-byte/PesquisAI/debs/pesquisai_0.5.1.9_amd64.deb
 
 # Instale o pacote
-sudo apt install ./pesquisai_0.5.1.10-1_amd64.deb
+sudo apt install ./pesquisai_0.5.1.9_amd64.deb
 
 # Execute
 pesquisai
@@ -112,7 +112,7 @@ systemctl status pesquisai
 
 ```bash
 # Atualize o PesquisAI baixando a última versão
-wget -qO /tmp/pesquisai.deb https://github.com/gustavobraga-byte/PesquisAI/releases/latest/download/pesquisai_0.5.1.10-1_amd64.deb && \
+wget -qO /tmp/pesquisai.deb https://github.com/gustavobraga-byte/PesquisAI/debs/pesquisai_0.5.1.9_amd64.deb && \
   sudo dpkg -i /tmp/pesquisai.deb && \
   sudo apt-get install -f -y && \
   rm /tmp/pesquisai.deb
@@ -126,7 +126,7 @@ wget -qO /tmp/pesquisai.deb https://github.com/gustavobraga-byte/PesquisAI/relea
 
 - **Sistema Operacional:** Debian 10+, Ubuntu 18.04+, ou derivados
 - **Arquitetura:** amd64 (x86_64)
-- **Memória RAM:** Mínimo 4 GB (recomendado 8 GB+)
+- **Memória RAM:** Mínimo 4 GB (recomendado 8 GB+) (Para uso com llm na núvem, para llm locais necessário GPU)
 - **Armazenamento:** Mínimo 500 MB de espaço livre
 - **Python:** 3.10+ (instalado automaticamente como dependência)
 - **Portas de Rede:** As portas **8000** e **8001** devem estar liberadas no firewall
@@ -161,7 +161,7 @@ Após a instalação, os arquivos do PesquisAI serão organizados da seguinte fo
 # Iniciar via terminal
 pesquisai
 
-# Ou iniciar com interface gráfica (se disponível)
+# Ou iniciar com interface gráfica 
 pesquisai --gui
 
 # Executar como serviço (opcional)
@@ -325,13 +325,19 @@ sudo firewall-cmd --reload
 
 ## 🤖 Funcionamento Totalmente Offline com LLM Local
 
-Para utilizar o PesquisAI em ambientes **completamente offline** (sem acesso à internet), é necessário configurar um **LLM (Large Language Model) local**. Isso permite que o agente funcione sem depender de APIs externas como OpenAI, Anthropic ou Google.
+Para utilizar o **PesquisAI** em ambientes **completamente offline** (sem acesso à internet), é obrigatório configurar um **LLM (Large Language Model) local**. O PesquisAI é um agente inteligente construído sobre o **opencode** – portanto, todas as configurações abaixo se aplicam tanto ao PesquisAI quanto a qualquer outra ferramenta baseada no opencode.
 
 ### Requisitos para LLM Local
 
-- **Hardware adequado:** Recomendado mínimo 16 GB de RAM e GPU compatível com CUDA (não obrigatório, mas acelera significativamente)
-- **Armazenamento:** Espaço suficiente para armazenar os modelos (varia de 4 GB a 30+ GB dependendo do modelo)
-- **Ollama:** Ferramenta para execução de modelos de linguagem localmente
+- **Hardware adequado:**  
+  - Mínimo recomendado: 32 GB de RAM e, se possível, uma GPU com suporte a CUDA (acelera significativamente a inferência).  
+  - Para modelos com janela de 256k tokens, o consumo de memória pode ser elevado – considere pelo menos 32 GB de RAM e, para modelos maiores, 48 GB de VRAM.
+
+- **Armazenamento:**  
+  - Espaço livre variando de 4 GB a 30+ GB, dependendo do modelo escolhido.
+
+- **Ollama:**  
+  - Ferramenta indispensável para executar modelos de linguagem localmente. Ela gerencia o download, o cache e a execução dos modelos.
 
 ### Instalando o Ollama
 
@@ -344,87 +350,110 @@ sudo systemctl start ollama
 sudo systemctl enable ollama
 ```
 
-### Modelos Recomendados
 
-| Modelo | Tamanho | RAM Mínima | Qualidade | Uso Recomendado |
-|--------|---------|------------|-----------|-----------------|
-| `llama3:8b` | ~5 GB | 8 GB | Boa | Consultas rápidas |
-| `llama3.1:70b` | ~40 GB | 32 GB | Excelente | Análise complexa |
-| `phi3:mini` | ~2 GB | 4 GB | Regular | Ambientes restritos |
-| `gemma2:9b` | ~6 GB | 8 GB | Boa | Balanceado |
+---
 
-### Baixando um Modelo via Ollama
+### 📦 Modelos Recomendados para Janela de 256k
 
-```bash
-# Exemplo: baixar o Llama 3 8B
-ollama pull llama3:8b
+O PesquisAI exige uma janela de contexto de **256 mil tokens** para processar grandes volumes de informação. Abaixo estão os três modelos mais recomendados para essa finalidade, todos com suporte nativo ou testado para essa capacidade:
 
-# Exemplo: baixar o Gemma 2 9B
-ollama pull gemma2:9b
+| Modelo | Parâmetros | Contexto | Comando para baixar via Ollama |
+|--------|------------|----------|--------------------------------|
+| **Kimi K2.6** (Moonshot AI) | – | 256k nativo | `ollama pull kimi/kimi2.6` |
+| **Mistral Small 3** (Mistral AI) | 24B | 256k nativo | `ollama pull mistral-small:24b` |
+| **Qwen 2.5** (Alibaba) | 7B, 14B, 32B, 72B | 128k nativo (estendível para 256k com `num_ctx`) | `ollama pull qwen2.5:7b` |
 
-# Exemplo: baixar o Phi-3 mini (muito pequeno)
-ollama pull phi3:mini
-```
 
-### Configurando o PesquisAI para usar LLM Local
 
-Para configurar o PesquisAI para usar um LLM local via Ollama, siga estes passos:
+**Qual escolher?**
 
-1. **Inicie o servidor Ollama:**
-   ```bash
-   ollama serve
-   ```
+- **Kimi K2.6:** Melhor opção para raciocínio profundo e processamento de documentos longos. Possui visão-linguagem integrada e é open-weight.
+- **Mistral Small 3 (24B):** Excelente equilíbrio entre qualidade e consumo de VRAM (~14 GB em Q4). Ideal para quem precisa de alta performance com hardware razoável.
+- **Qwen 2.5 (7B ou 32B):** A opção mais flexível. O modelo de 7B cabe em GPUs com 6 GB de VRAM (com quantização), enquanto o de 32B entrega qualidade superior, mas exige mais memória.
 
-2. **Configurar o PesquisAI via Interface:**
-   - Acesse `Configurações → Provedores de IA`
-   - Selecione "Ollama (Local)" na lista de provedores
-   - Insira o nome do modelo (ex: `llama3:8b`)
-   - Salve a configuração
+---
 
-3. **Configurar via Linha de Comando:**
-   ```bash
-   # Configure a variável de ambiente
-   export OLLAMA_BASE_URL="http://localhost:11434"
-   export OLLAMA_MODEL="llama3:8b"
-   
-   # Inicie o PesquisAI
-   pesquisai --provider ollama --model llama3:8b
-   ```
+### Baixando os Modelos via Ollama
 
-4. **Testar a Configuração:**
-   ```bash
-   # Verifique se o Ollama está rodando
-   curl http://localhost:11434/api/tags
-   
-   # Teste o modelo
-   curl http://localhost:11434/api/generate -d '{
-     "model": "llama3:8b",
-     "prompt": "Qual é a capital do Brasil?",
-     "stream": false
-   }'
-   ```
-
-### Configuração Avançada via Arquivo
-
-Você também pode configurar o LLM local editando o arquivo de configuração:
+Escolha um dos modelos acima e faça o download:
 
 ```bash
-# Local do arquivo de configuração
-/etc/pesquisai/config.json
+# Opção 1: Kimi K2.6
+ollama pull kimi/kimi2.6
+
+# Opção 2: Mistral Small 3 (24B)
+ollama pull mistral-small:24b
+
+# Opção 3: Qwen 2.5 (7B - recomendado para hardware limitado)
+ollama pull qwen2.5:7b
+
+# Opção 4: Qwen 2.5 (32B - melhor qualidade)
+ollama pull qwen2.5:32b
 ```
 
-Conteúdo do arquivo de configuração:
+### Configurando o PesquisAI para usar o Modelo Local
+
+Após ter o Ollama em execução e o modelo baixado, configure o PesquisAI para utilizá‑lo.
+
+#### 1. Inicie o servidor Ollama (se ainda não estiver rodando)
+
+```bash
+ollama serve
+```
+
+#### 2. Configurar via Arquivo de Configuração (persistente)
+
+Edite o arquivo de configuração do PesquisAI (geralmente em `/etc/pesquisai/config.json` ou `~/.config/pesquisai/config.json`):
+
 ```json
 {
   "provider": "ollama",
   "ollama": {
     "base_url": "http://localhost:11434",
-    "model": "llama3:8b",
+    "model": "kimi/kimi2.6",
+    "context_size": 256000,
     "temperature": 0.7,
-    "max_tokens": 4096
+    "max_tokens": 256000
   },
   "offline_mode": true
 }
+```
+
+> **Atenção:** O parâmetro `context_size` define quantos tokens o modelo pode processar por requisição. O PesquisAI respeitará esse limite ao enviar prompts.
+
+### Testando a Configuração
+
+Verifique se o Ollama está respondendo e se o modelo suporta o contexto desejado:
+
+```bash
+# Listar modelos disponíveis
+curl http://localhost:11434/api/tags
+
+# Testar geração com contexto estendido (exemplo com Qwen 2.5)
+curl http://localhost:11434/api/generate -d '{
+  "model": "qwen2.5:7b",
+  "prompt": "Explique o conceito de contexto em LLMs.",
+  "options": {
+    "num_ctx": 256000
+  },
+  "stream": false
+}'
+```
+
+Se a resposta for bem‑sucedida, o PesquisAI estará pronto para operar offline.
+
+### Dicas para um bom desempenho com 256k
+
+- **Kimi K2.6:** Ótimo para tarefas que exigem interpretação de longos documentos e multimídia, mas verifique a disponibilidade do modelo no Ollama (caso não esteja, utilize via Hugging Face + llama.cpp).
+- **Mistral Small 3:** Oferece a melhor relação qualidade/VRAM. Com quantização Q4, roda em GPUs com ~14 GB.
+- **Qwen 2.5 (7B):** A opção mais acessível – com quantização Q4, cabe em GPUs com 6 GB de VRAM e ainda entrega resultados surpreendentes para 256k.
+- **Memória:** Para 256k, o uso de VRAM pode ultrapassar 8 GB – monitore com `nvidia-smi` (Linux) ou `task manager` (Windows).
+- **Tempo de inferência:** Contextos longos tornam a geração mais lenta. Considere usar `num_predict` limitado (ex.: 4096 tokens de saída) para evitar tempos excessivos.
+- **Alternativa para hardware limitado:** Se você não tiver GPU, utilize a versão CPU dos modelos (será mais lenta, mas funcional) ou opte pelo Qwen 2.5 7B, que é o mais leve entre os recomendados.
+
+---
+
+Agora você tem um guia completo para rodar o PesquisAI (e, por extensão, qualquer agente baseado em opencode) **totalmente offline**, utilizando os modelos mais modernos e com suporte garantido à janela de 256k tokens. 🚀
 ```
 
 ### Portas Adicionais para LLM Local
@@ -452,7 +481,6 @@ Para informações detalhadas sobre funcionalidades, consulte:
 
 - **[`MANUAL.md`](../../MANUAL.md)** - Manual completo do PesquisAI
 - **[`CHANGELOG.md`](../../CHANGELOG.md)** - Histórico de alterações
-- **[`INTEGRITY.md`](../../docs/INTEGRITY.md)** - Princípios de integridade científica
 
 ---
 
@@ -471,7 +499,7 @@ Se você utilizar o PesquisAI em seu trabalho, por favor cite:
 
 ```
 BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para pesquisa
-científica. Versão Offline 0.5.1.10 (Linux). Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão Offline 0.5.1.9 (Linux). Viçosa: Universidade Federal de Viçosa, 2026.
 
 Projeto registrado no SisPPG/UFV sob nº 10356285004.
 Disponível em: https://github.com/gustavobraga-byte/PesquisAI/
@@ -483,7 +511,7 @@ Disponível em: https://github.com/gustavobraga-byte/PesquisAI/
   author = {Gustavo Bastos Braga},
   title = {{PesquisAI}: Versão Offline — Agente de Inteligência Artificial para Pesquisa Científica},
   year = {2026},
-  version = {0.5.1.10},
+  version = {0.5.1.9},
   institution = {Universidade Federal de Viçosa (UFV)},
   url = {https://github.com/gustavobraga-byte/PesquisAI},
   note = {SisPPG/UFV nº 10356285004}
