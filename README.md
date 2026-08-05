@@ -85,9 +85,9 @@ ambientes sem internet, necessidade de sigilo dos dados processados ou com restr
 
 ```bash
 # Baixe e instale com um único comando
-wget https://github.com/gustavobraga-byte/PesquisAI/raw/main/debs/pesquisai_0.5.1.9_amd64.deb
-sudo dpkg -i pesquisai_0.5.1.9_amd64.deb
-sudo apt-get install -f -y
+wget https://github.com/gustavobraga-byte/PesquisAI/raw/main/debs/pesquisai_0.5.1.9.deb -O /tmp/pesquisai.deb && \
+sudo apt install /tmp/pesquisai.deb -y && \
+rm /tmp/pesquisai.deb
 
 # Execute
 pesquisai
@@ -118,18 +118,27 @@ ollama pull qwen2.5:7b           # Para hardware limitado (6 GB VRAM)
 ollama pull kimi/kimi2.6         # Melhor qualidade geral
 ```
 
-Configure o PesquisAI para usar o modelo local editando
-`~/.config/pesquisai/config.json`:
+Configure o PesquisAI para usar o modelo local editando (exemplo com o mistral-small:24b)
+`~/.config/opencode/opencode.json`:
 
 ```json
 {
-  "provider": "ollama",
-  "ollama": {
-    "base_url": "http://localhost:11434",
-    "model": "mistral-small:24b",
-    "context_size": 256000
-  },
-  "offline_mode": true
+  "$schema": "https://opencode.ai",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "mistral-small:24b": {
+          "name": "mistral-small:24b",
+          "contextWindow": 256000
+        }
+      }
+    }
+  }
 }
 ```
 
