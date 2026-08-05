@@ -414,23 +414,31 @@ ollama serve
 
 #### 2. Configurar via Arquivo de Configuração (persistente)
 
-Edite o arquivo de configuração do PesquisAI (geralmente em `/etc/pesquisai/config.json` ou `~/.config/pesquisai/config.json`):
+Edite o arquivo de configuração do PesquisAI ( em  `~/.config/opencode/opencode.json`):
 
 ```json
 {
-  "provider": "ollama",
-  "ollama": {
-    "base_url": "http://localhost:11434",
-    "model": "kimi/kimi2.6",
-    "context_size": 256000,
-    "temperature": 0.7,
-    "max_tokens": 256000
-  },
-  "offline_mode": true
+  "$schema": "https://opencode.ai",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "mistral-small:24b": {
+          "name": "mistral-small:24b",
+          "contextWindow": 256000
+        }
+      }
+    }
+  }
 }
 ```
 
-> **Atenção:** O parâmetro `context_size` define quantos tokens o modelo pode processar por requisição. O PesquisAI respeitará esse limite ao enviar prompts.
+
+> **Atenção:** O parâmetro `contextWindow` define quantos tokens o modelo pode processar por requisição. O PesquisAI respeitará esse limite ao enviar prompts.
 
 ### Testando a Configuração
 
