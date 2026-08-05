@@ -70,7 +70,7 @@ rm /tmp/pesquisai.deb
 
 ### Método 2: Instalação Manual via `apt`
 
-O uso do `apt` para instalar pacotes locais `.deb` é o padrão moderno no Linux, pois ele resolve todas as dependências do sistema em um único passo.
+O uso do `apt` para instalar pacotes locais `.deb` .
 
 ```bash
 # 1. Baixe o pacote direto do repositório
@@ -115,8 +115,6 @@ pesquisai --version
 # Listar arquivos instalados
 dpkg -L pesquisai
 
-# Verificar status do serviço (se aplicável)
-systemctl status pesquisai
 ```
 
 ### Atualização via Terminal
