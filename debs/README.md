@@ -46,54 +46,65 @@ A versão offline está disponível no seguinte formato:
 
 ## 🐧 Instalação no Linux (Debian/Ubuntu)
 
-### Método 1: Instalação via Terminal (Recomendado)
+### Método 1: Instalação via Terminal em Comando Único (Recomendado)
 
-Você pode instalar o PesquisAI diretamente do GitHub com um único comando:
+O comando abaixo baixa o arquivo `.deb` temporariamente, instala usando o `apt` (que já resolve dependências automaticamente) e remove o instalador ao terminar:
 
 ```bash
-# Instale o PesquisAI baixando e instalando diretamente do GitHub
-wget -qO - https://github.com/gustavobraga-byte/PesquisAI/debs/pesquisai_0.5.1.9_amd64.deb | \
-  sudo dpkg -i - && \
-  sudo apt-get install -f -y
+wget https://github.com/gustavobraga-byte/PesquisAI/raw/main/debs/pesquisai_0.5.1.9.deb -O /tmp/pesquisai.deb && \
+sudo apt install /tmp/pesquisai.deb -y && \
+rm /tmp/pesquisai.deb
+
 ```
 
-Alternativamente, você também pode usar o `curl`:
+Alternativamente, usando `curl`:
 
 ```bash
-# Usando curl
-curl -L https://github.com/gustavobraga-byte/PesquisAI/debs/pesquisai_0.5.1.9_amd64.deb | \
-  sudo dpkg -i - && \
-  sudo apt-get install -f -y
+curl -L https://github.com/gustavobraga-byte/PesquisAI/raw/main/debs/pesquisai_0.5.1.9.deb -o /tmp/pesquisai.deb && \
+sudo apt install /tmp/pesquisai.deb -y && \
+rm /tmp/pesquisai.deb
+
 ```
 
-### Método 2: Via dpkg (Download Manual)
+---
+
+### Método 2: Instalação Manual via `apt`
+
+O uso do `apt` para instalar pacotes locais `.deb` é o padrão moderno no Linux, pois ele resolve todas as dependências do sistema em um único passo.
 
 ```bash
-# Baixe o pacote diretamente do GitHub Releases
-wget https://github.com/gustavobraga-byte/PesquisAI/debs/pesquisai_0.5.1.9_amd64.deb
+# 1. Baixe o pacote direto do repositório
+wget https://github.com/gustavobraga-byte/PesquisAI/raw/main/debs/pesquisai_0.5.1.9.deb
 
-# Instale o pacote
-sudo dpkg -i pesquisai_0.5.1.9-1_amd64.deb
+# 2. Instale o pacote local
+sudo apt install ./pesquisai_0.5.1.9.deb -y
 
-# Resolva dependências (se houver)
-sudo apt-get install -f
-
-# Execute o PesquisAI
+# 3. Execute o PesquisAI
 pesquisai
+
 ```
 
-### Método 3: Via apt (Instalação Manual)
+---
+
+### Método 3: Instalação Clássica via `dpkg`
+
+Caso precise usar obrigatoriamente o `dpkg`:
 
 ```bash
-# Baixe o pacote
-wget https://github.com/gustavobraga-byte/PesquisAI/debs/pesquisai_0.5.1.9_amd64.deb
+# 1. Baixe o pacote
+wget https://github.com/gustavobraga-byte/PesquisAI/raw/main/debs/pesquisai_0.5.1.9.deb
 
-# Instale o pacote
-sudo apt install ./pesquisai_0.5.1.9_amd64.deb
+# 2. Instale o pacote
+sudo dpkg -i pesquisai_0.5.1.9.deb
 
-# Execute
+# 3. Corrija possíveis dependências ausentes
+sudo apt-get install -f -y
+
+# 4. Execute
 pesquisai
+
 ```
+
 
 ### Verificando a Instalação
 
