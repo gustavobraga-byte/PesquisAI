@@ -76,6 +76,79 @@ uv sync
 
 ---
 
+### Opção 2 - Uso offline - SO Linux
+
+O PesquisAI pode ser executado **100% offline** em sistemas Debian/Ubuntu, ideal para
+ambientes sem internet, necessidade de sigilo dos dados processados ou com restrições de conectividade.
+
+### Instalação Rápida
+
+```bash
+# Baixe e instale com um único comando
+wget https://github.com/gustavobraga-byte/PesquisAI/raw/main/debs/pesquisai_0.5.1.9_amd64.deb
+sudo dpkg -i pesquisai_0.5.1.9_amd64.deb
+sudo apt-get install -f -y
+
+# Execute
+pesquisai
+```
+
+### Requisitos Mínimos
+
+| Requisito | Especificação |
+|-----------|---------------|
+| **SO** | Debian 10+ / Ubuntu 26.04+ (amd64) |
+| **RAM** | 4 GB (mín.) · 8 GB+ (recomendado) Usando LLM em núvem|
+| **Disco** | 500 MB livres |
+| **Python** | 3.10+ (instalado como dependência) |
+| **Portas** | `8000` (Interface Web) · `8001` (Terminal TTYD) |
+
+### LLM Local (Ollama) — Para Offline Total
+
+Para funcionar **sem nenhuma conexão com a internet**, é necessário um LLM local via
+[Ollama](https://ollama.com):
+
+```bash
+# Instale o Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Baixe um modelo compatível (256k de contexto)
+ollama pull mistral-small:24b    # Melhor custo-benefício (14 GB VRAM)
+ollama pull qwen2.5:7b           # Para hardware limitado (6 GB VRAM)
+ollama pull kimi/kimi2.6         # Melhor qualidade geral
+```
+
+Configure o PesquisAI para usar o modelo local editando
+`~/.config/pesquisai/config.json`:
+
+```json
+{
+  "provider": "ollama",
+  "ollama": {
+    "base_url": "http://localhost:11434",
+    "model": "mistral-small:24b",
+    "context_size": 256000
+  },
+  "offline_mode": true
+}
+```
+
+### Liberar Portas no Firewall (em caso de falha)
+
+```bash
+sudo ufw allow 8000/tcp   # Interface Web
+sudo ufw allow 8001/tcp   # Terminal TTYD
+sudo ufw allow 11434/tcp  # Ollama API (se usar LLM local)
+```
+
+
+
+> 📖 **Documentação completa da versão offline:**
+> [`debs/README.md`](debs/README.md) — inclui solução de problemas, estrutura de
+> diretórios, modelos recomendados e configuração avançada.
+
+---
+
 ## 🛠️ Skills disponíveis
 
 O PesquisAI opera por módulos especializados (*skills*). Cada skill conecta o agente a uma fonte de dados ou capacidade específica.
