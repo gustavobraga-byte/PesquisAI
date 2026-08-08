@@ -1,7 +1,7 @@
 # Changelog — PesquisAI
 
 ---
-## [0.5.1.9] - 2026-07-18 - Atualização do AGENTS.md
+## [0.5.1.9] - 2026-07-18 - Versão Offline para Linux e atualização do AGENTS.md
 
 ### 🚀 Major Changes
 
