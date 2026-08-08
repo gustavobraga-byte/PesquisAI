@@ -5,6 +5,7 @@
 
 ### 🚀 Major Changes
 
+-**Instalador offline para Linux**: Instalador em formato .deb para utilização offline do PesquisAI.
 - **Reescrita completa do AGENTS.md**: Principal atualização desde a introdução da memória persistente. O documento foi reformulado do zero para maior clareza, consistência normativa, economia de tokens e alinhamento com o código-fonte (`constants.SKILL_REGISTRY`).
 - **Nova arquitetura de diretórios**: Introduzida separação oficial entre `vault/` (memória interna do agente) e `outputs-<slug-do-projeto>/` (entregáveis finais organizados por projeto). Isso melhora organização, reprodutibilidade e experiência do usuário final.
 - **Fortalecimento de Integridade e Segurança**: 
