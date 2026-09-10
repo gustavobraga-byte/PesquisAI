@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 
-SUPPORTED_LANGUAGES: list[str] = ["pt_BR", "en_US", "es_ES", "fr_FR"]
+SUPPORTED_LANGUAGES: list[str] = ["pt_BR", "en_US", "es_ES", "fr_FR", "zh_CN"]
 
 
 class Translator:

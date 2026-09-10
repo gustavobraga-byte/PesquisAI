@@ -1966,7 +1966,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       });
       for (const f of ordered) {
         const icon = folderIcons[f] || "📁";
-        const label = f ? f.replace(/\/$/, "") : "(raiz)";
+        const label = f ? f.replace(/\\/$/, "") : "(raiz)";
         const count = folderMap[f];
         html += '<div class="mem-folder-card" data-folder="' + encodeURIComponent(f) + '" onclick="navigateToFolder(decodeURIComponent(this.dataset.folder))" style="padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s;display:flex;align-items:center;gap:10px;">';
         html += '<span style="font-size:16px;">' + icon + '</span>';
@@ -1998,7 +1998,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         "hypothesis/": "💡", "datasource/": "🗄️", "moc/": "🗺️",
         "inbox/": "📥", "assets/": "🎨"
       };
-      html += '<span style="font-size:12px;font-weight:500;color:var(--ink-muted);">' + (iconMap[folderName] || "📁") + ' ' + escapeHtml(folderName.replace(/\/$/, "")) + '</span>';
+      html += '<span style="font-size:12px;font-weight:500;color:var(--ink-muted);">' + (iconMap[folderName] || "📁") + ' ' + escapeHtml(folderName.replace(/\\/$/, "")) + '</span>';
       html += '</div>';
 
       if (folderName === "daily/") {
@@ -2210,9 +2210,9 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         if (typeof marked !== "undefined" && marked.parse) {
           let html = marked.parse(src);
           // Destaque de wikilinks [[nota]] e tags #tag
-          html = html.replace(/\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g,
+          html = html.replace(/\\[\\[([^\\]|#]+)(?:#[^\\]|]+)?(?:\\|([^\\]]+))?\\]\\]/g,
             (m, target, alias) => '<span class="wikilink">[[' + escapeHtml(alias || target) + ']]</span>');
-          html = html.replace(/(^|[\s(])#([a-zA-Z0-9_\-/]+)/g,
+          html = html.replace(/(^|[\\s(])#([a-zA-Z0-9_\\-/]+)/g,
             (m, p, t) => p + '<span class="tag">#' + escapeHtml(t) + '</span>');
           prev.innerHTML = '<div class="mem-preview markdown-body">' + html + '</div>';
         } else {

@@ -30,7 +30,7 @@
 ```
                     DECLARAÇÃO DE USO DE INTELIGÊNCIA ARTIFICIAL
 
-Durante a elaboração deste trabalho, foi utilizada a ferramenta PesquisAI (BRAGA, 2026),
+Durante a elaboração deste trabalho, foi utilizada a ferramenta UFVAI (BRAGA, 2026),
 um agente de inteligência artificial de código aberto especializado em pesquisa
 científica, desenvolvido na Universidade Federal de Viçosa (UFV). A ferramenta foi
 empregada como auxílio nas seguintes etapas:
@@ -47,14 +47,14 @@ do trabalho intelectual de pesquisa, análise e redação. Assumo integral
 responsabilidade pelo conteúdo final deste trabalho, incluindo a acurácia de
 todos os dados, citações, análises e conclusões aqui apresentados.
 
-A ferramenta PesquisAI não foi listada como autora ou coautora deste trabalho,
+A ferramenta UFVAI não foi listada como autora ou coautora deste trabalho,
 em conformidade com os critérios de autoria do International Committee of
 Medical Journal Editors (ICMJE) e com as diretrizes do Committee on Publication
 Ethics (COPE).
 
 Referência da ferramenta:
-BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para
-pesquisa científica. Versão 0.2.1. Viçosa: UFV, 2026. Disponível em:
+BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para
+pesquisa científica. Versão 0.6.10. Viçosa: UFV, 2026. Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Registro SisPPG/UFV nº 10356285004 — http://sisppg.ufv.br
 ```
@@ -69,7 +69,7 @@ Registro SisPPG/UFV nº 10356285004 — http://sisppg.ufv.br
 
 ```
 O processamento e a organização dos dados foram realizados com o auxílio do
-PesquisAI (Braga, 2026), um agente de inteligência artificial especializado em
+UFVAI (Braga, 2026), um agente de inteligência artificial especializado em
 pesquisa científica, executado via Google Colaboratory, com acesso programático
 às bases de dados do Instituto Brasileiro de Geografia e Estatística (IBGE) e
 do Departamento de Informática do Sistema Único de Saúde (DataSUS). Todas as
@@ -89,7 +89,7 @@ permaneceram como trabalho intelectual exclusivo dos autores.
 
 ```
 Os autores declaram que, durante a elaboração deste trabalho, utilizaram o
-PesquisAI (Braga, 2026) como ferramenta auxiliar para [ESPECIFICAR: consulta a
+UFVAI (Braga, 2026) como ferramenta auxiliar para [ESPECIFICAR: consulta a
 bases de dados públicos / formatação de referências / revisão de normalização
 documental]. Todo o conteúdo gerado pela ferramenta foi revisado e validado
 pelos autores, que assumem total responsabilidade pela integridade e precisão
@@ -100,13 +100,13 @@ do manuscrito.
 
 ## Modelo D — Uso Específico para Coleta de Dados
 
-> **Recomendado para:** Trabalhos onde o PesquisAI foi usado basicamente para buscar dados no IBGE ou DataSUS.
+> **Recomendado para:** Trabalhos onde o UFVAI foi usado basicamente para buscar dados no IBGE ou DataSUS.
 
 ### Texto sugerido:
 
 ```
 Os dados demográficos e socioeconômicos utilizados neste estudo foram obtidos
-por meio do PesquisAI (Braga, 2026), um agente de IA que realiza consultas
+por meio do UFVAI (Braga, 2026), um agente de IA que realiza consultas
 automatizadas às APIs oficiais do IBGE (SIDRA) e do DataSUS. Todas as
 extrações foram conferidas diretamente nas plataformas oficiais das respectivas
 instituições. A ferramenta atuou exclusivamente como intermediadora na consulta,
@@ -118,14 +118,14 @@ resultados.
 
 ## Modelo E — Uso para Formatação e Normalização
 
-> **Recomendado para:** Trabalhos onde o PesquisAI foi usado prioritariamente para formatação ABNT/UFV.
+> **Recomendado para:** Trabalhos onde o UFVAI foi usado prioritariamente para formatação ABNT/UFV.
 
 ### Texto sugerido:
 
 ```
 A formatação deste trabalho conforme as normas da Associação Brasileira de
 Normas Técnicas (ABNT) e da Universidade Federal de Viçosa (UFV) foi realizada
-com o auxílio do PesquisAI (Braga, 2026), ferramenta de IA especializada que
+com o auxílio do UFVAI (Braga, 2026), ferramenta de IA especializada que
 incorpora o módulo UFV-ABNT para normalização documental. A adequação final às
 normas foi verificada manualmente pelo autor.
 ```
@@ -139,7 +139,7 @@ normas foi verificada manualmente pelo autor.
 ### Texto sugerido:
 
 ```
-Declaramos o uso do PesquisAI (Braga, 2026), agente de IA para pesquisa
+Declaramos o uso do UFVAI (Braga, 2026), agente de IA para pesquisa
 científica, como ferramenta auxiliar na [ESPECIFICAR ETAPAS]. Todos os
 conteúdos gerados foram revisados e validados pelos autores.
 ```
@@ -156,13 +156,13 @@ Sim. Ferramentas de IA generativa diferem de ferramentas convencionais porque pr
 
 Não. Pelo contrário: a transparência é valorizada pela comunidade científica. Utilizar ferramentas modernas e declará-las adequadamente demonstra rigor metodológico. O problema não é usar IA — é **não declarar** seu uso.
 
-### Posso usar o PesquisAI para escrever seções inteiras?
+### Posso usar o UFVAI para escrever seções inteiras?
 
-O PesquisAI pode auxiliar na estruturação e redação de seções mais objetivas (Métodos, parte dos Resultados descritivos), mas as seções que envolvem interpretação e juízo crítico (Discussão, Conclusão) devem permanecer como trabalho intelectual do pesquisador. A ferramenta é um **copiloto**, não um **substituto**.
+O UFVAI pode auxiliar na estruturação e redação de seções mais objetivas (Métodos, parte dos Resultados descritivos), mas as seções que envolvem interpretação e juízo crítico (Discussão, Conclusão) devem permanecer como trabalho intelectual do pesquisador. A ferramenta é um **copiloto**, não um **substituto**.
 
-### O PesquisAI pode ser considerado autor do meu trabalho?
+### O UFVAI pode ser considerado autor do meu trabalho?
 
-**Não.** Ferramentas de IA não atendem aos critérios de autoria do ICMJE (não podem assumir responsabilidade pelo conteúdo, aprovar versão final, ou responder por integridade do trabalho). O PesquisAI deve ser citado como ferramenta, nunca como autor.
+**Não.** Ferramentas de IA não atendem aos critérios de autoria do ICMJE (não podem assumir responsabilidade pelo conteúdo, aprovar versão final, ou responder por integridade do trabalho). O UFVAI deve ser citado como ferramenta, nunca como autor.
 
 ---
 

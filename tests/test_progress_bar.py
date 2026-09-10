@@ -1,201 +1,169 @@
-"""Testes para progress_bar.py — barra de progresso do setup.
+"""Testes para progress_bar.py — v0.6.7 (painel de boot desde o início).
 
-Cobre:
-  - _html: geracao de HTML (ja testado, mantido e expandido)
-  - show: atualizacao da barra (modo Colab com mock display, modo terminal)
-  - finish: limpeza da barra
-  - STAGES e COLORS: constantes
-  - Edge cases: step negativo, total zero, percentual > 100
+A antiga barra escura virou driver do painel único (_BootPanel de
+launch_app.py, singleton get_boot_panel()). Cobre:
+  - show(): delegação ao painel compartilhado no modo Colab
+    (mesmo display_id, mensagem abaixo da barra, percentual monotônico);
+  - show(): fallback ASCII legado no terminal / sem o pacote;
+  - finish(): limpeza da saída antes do card final;
+  - Edge cases: step negativo, total zero, step além do total.
 """
 
 import os
+import re
 import sys
-from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from pesquisai import progress_bar
-from pesquisai.progress_bar import _html, show, finish, STAGES, COLORS
+from pesquisai import launch_app, progress_bar
+from pesquisai.progress_bar import show, finish, _STAGE_PCT
 
 
-class TestConstants:
-    """Constantes do modulo."""
-
-    def test_stages_count(self):
-        assert len(STAGES) == 4
-
-    def test_colors_count(self):
-        assert len(COLORS) == 4
-
-    def test_stages_are_strings(self):
-        for s in STAGES:
-            assert isinstance(s, str) and len(s) > 0
-
-    def test_colors_are_hex(self):
-        for c in COLORS:
-            assert c.startswith("#") and len(c) == 7
+class _FakeHTML:
+    def __init__(self, data):
+        self.data = data
 
 
-class TestHtmlGeneration:
-    """Geracao de HTML da barra de progresso."""
+class _DisplayRecorder:
+    def __init__(self):
+        self.calls = []
 
-    def test_html_output_basic(self):
-        html = _html(0, 4, "Testando...", 25)
-        assert "ppbar" in html
-        assert "Testando..." in html
-        assert "25%" in html
-        assert "linear-gradient" in html
+    def display(self, obj, display_id=None):
+        self.calls.append(("create", display_id, obj.data))
 
-    def test_html_with_percentage(self):
-        html = _html(2, 4, "Fazendo...", 50)
-        assert "Fazendo..." in html
-        assert "50%" in html
+    def update_display(self, obj, display_id=None):
+        self.calls.append(("update", display_id, obj.data))
 
-    def test_html_handles_zero_total(self):
-        html = _html(0, 0, "Teste", 0)
-        assert html is not None
-        assert len(html) > 0
-
-    def test_html_handles_negative_step(self):
-        html = _html(-1, 4, "Teste", 0)
-        assert html is not None
-        assert len(html) > 0
-
-    def test_html_percent_preserves_input(self):
-        """_html nao faz clamp; show() faz."""
-        html_over = _html(5, 4, "Over", 200)
-        assert "200%" in html_over
-        assert "Over" in html_over
-
-    def test_html_stage_content(self):
-        html = _html(1, 4, "Mensagem", 25)
-        assert STAGES[1] in html
-        assert "Mensagem" in html
-
-    def test_html_contains_spinner(self):
-        """HTML deve ter animacao de spinner."""
-        html = _html(0, 4, "Test", 0)
-        assert "animation" in html or "ppsp" in html
-
-    def test_html_contains_color(self):
-        """HTML deve usar a cor do estagio atual."""
-        html = _html(0, 4, "Test", 0)
-        assert COLORS[0] in html
-
-    def test_html_last_stage(self):
-        """Ultimo estagio deve aparecer corretamente."""
-        html = _html(3, 4, "Final", 75)
-        assert STAGES[3] in html or "Finalizando" in html
-
-    def test_html_step_beyond_stages(self):
-        """Step > total mostra o ultimo estagio (idx clamped a total-1)."""
-        html = _html(10, 4, "Extra", 100)
-        # idx = min(10, 3) = 3, mostra STAGES[3] = "Iniciando interface"
-        assert STAGES[3] in html
+    @property
+    def last(self):
+        return self.calls[-1][2] if self.calls else ""
 
 
-class TestShowTerminal:
-    """show() no modo terminal (sem IPython)."""
-
-    def test_show_terminal_mode(self, capsys):
-        """No modo terminal, show deve imprimir sem quebrar."""
-        # Forcar modo terminal
-        original = progress_bar.IN_COLAB
-        progress_bar.IN_COLAB = False
-        try:
-            show(1, 4, "Processando...")
-            captured = capsys.readouterr()
-            assert "Processando" in captured.out or len(captured.out) > 0
-        finally:
-            progress_bar.IN_COLAB = original
-            progress_bar._handle = None
-
-    def test_show_clamps_percent(self, capsys):
-        """show deve clampar percentual em 100."""
-        progress_bar.IN_COLAB = False
-        try:
-            show(10, 4, "Over")
-            captured = capsys.readouterr()
-            assert "100%" in captured.out
-        finally:
-            progress_bar.IN_COLAB = True
-            progress_bar._handle = None
-
-    def test_show_zero_total(self, capsys):
-        """show com total=0 nao deve quebrar."""
-        progress_bar.IN_COLAB = False
-        try:
-            show(0, 0, "Zero")
-            captured = capsys.readouterr()
-            # Nao deve levantar excecao
-            assert True
-        finally:
-            progress_bar.IN_COLAB = True
-            progress_bar._handle = None
+def _force_colab(monkeypatch):
+    rec = _DisplayRecorder()
+    monkeypatch.setattr(launch_app, "IN_COLAB", True)
+    monkeypatch.setattr(launch_app, "display", rec.display)
+    monkeypatch.setattr(launch_app, "HTML", _FakeHTML)
+    monkeypatch.setattr(launch_app, "update_display", rec.update_display)
+    monkeypatch.setattr(launch_app, "_BOOT_SINGLETON", None)
+    return rec
 
 
-class TestShowColab:
-    """show() no modo Colab (com mock de display)."""
+def _fill_pct(html: str) -> int:
+    m = re.search(r"bottom:0;width:(\d+)%", html)
+    return int(m.group(1)) if m else -1
 
-    def test_show_creates_handle(self):
-        """No modo Colab, show deve criar um handle de display."""
-        progress_bar.IN_COLAB = True
-        mock_display = MagicMock()
-        mock_html_obj = MagicMock()
-        mock_display.return_value = mock_html_obj
-        with patch("pesquisai.progress_bar.display", mock_display), \
-             patch("pesquisai.progress_bar.HTML", MagicMock(side_effect=lambda x: x)):
-            progress_bar._handle = None
-            try:
-                show(0, 4, "Iniciando")
-                assert mock_display.called
-            finally:
-                progress_bar._handle = None
 
-    def test_show_updates_handle(self):
-        """Se handle ja existe, show deve atualiza-lo."""
-        progress_bar.IN_COLAB = True
-        mock_handle = MagicMock()
-        progress_bar._handle = mock_handle
-        with patch("pesquisai.progress_bar.display", MagicMock()), \
-             patch("pesquisai.progress_bar.HTML", MagicMock(side_effect=lambda x: x)):
-            try:
-                show(1, 4, "Atualizando")
-                assert mock_handle.update.called
-            finally:
-                progress_bar._handle = None
+class TestMapaDeEtapas:
+    """Constantes do mapa de estágios do setup."""
+
+    def test_cobertura_0_a_4(self):
+        for step in range(5):
+            assert step in _STAGE_PCT
+
+    def test_monotonico_e_dentro_da_barra(self):
+        pcts = [_STAGE_PCT[i] for i in sorted(_STAGE_PCT)]
+        assert pcts == sorted(pcts), "percentuais dos estágios regredem"
+        assert all(0 < p < 82 for p in pcts), (
+            "estágios devem terminar abaixo da faixa interna do launch() (82+)"
+        )
+
+
+class TestShowColabPainelUnico:
+    def test_show_delega_ao_painel_compartilhado(self, monkeypatch):
+        rec = _force_colab(monkeypatch)
+        show(1, 4, "Montando Google Drive...")
+        assert {c[1] for c in rec.calls} == {launch_app._BootPanel._DISPLAY_ID}
+        assert "Montando Google Drive" in rec.last
+        # mensagem ativa (spinner) SEMPRE abaixo da barra
+        assert rec.last.index("ufl-barwrap") < rec.last.index("ufl-spin")
+
+    def test_show_consecutivos_acumula_checklist(self, monkeypatch):
+        rec = _force_colab(monkeypatch)
+        show(0, 4, "Preparando...")
+        show(1, 4, "Montando Google Drive...")
+        html = rec.last
+        assert '✓</span><span>Preparando...</span>' in html.replace("…", "...")
+        assert "Montando Google Drive" in html
+
+    def test_show_mesmo_display_sem_duplicar(self, monkeypatch):
+        rec = _force_colab(monkeypatch)
+        for step in range(5):
+            show(step, 4, f"etapa {step}")
+        creates = [c for c in rec.calls if c[0] == "create"]
+        assert len(creates) == 1, "painel deve ser criado UMA única vez"
+
+    def test_show_percentual_monotonico(self, monkeypatch):
+        rec = _force_colab(monkeypatch)
+        for step in range(5):
+            show(step, 4, f"etapa {step}")
+        pcts = [_fill_pct(c[2]) for c in rec.calls]
+        assert pcts == sorted(pcts), f"barra regrediu: {pcts}"
+
+    def test_handoff_launch_continua_a_mesma_barra(self, monkeypatch):
+        rec = _force_colab(monkeypatch)
+        show(4, 4, "Iniciando servidores e interface web")
+        boot = launch_app.get_boot_panel()
+        boot.begin()  # idempotente — não zera
+        boot.active("Preparando a interface web", 98)
+        boot.done(99)
+        boot.finish()
+        pcts = [_fill_pct(c[2]) for c in rec.calls]
+        assert pcts == sorted(pcts) and pcts[-1] == 100
+
+
+class TestShowEdgeCases:
+    def test_total_zero_nao_quebra(self, monkeypatch):
+        rec = _force_colab(monkeypatch)
+        show(0, 0, "Zero")
+        assert rec.last  # renderizou algo
+
+    def test_step_negativo_nao_quebra(self, monkeypatch):
+        rec = _force_colab(monkeypatch)
+        show(-1, 4, "Negativo")
+        assert rec.last
+
+    def test_step_além_do_mapa_usa_fórmula(self, monkeypatch):
+        rec = _force_colab(monkeypatch)
+        show(10, 4, "Além")
+        pct = _fill_pct(rec.last)
+        assert 0 < pct <= 99
+
+
+class TestShowTerminalFallback:
+    def test_ascii_sem_pacote_importavel(self, capsys, monkeypatch):
+        monkeypatch.setattr(progress_bar, "IN_COLAB", False)
+        monkeypatch.setitem(sys.modules, "pesquisai.launch_app", None)
+        show(1, 4, "Montando Google Drive...")
+        out = capsys.readouterr().out
+        assert "Montando Google Drive" in out and "%" in out
+
+    def test_ascii_clampa_percentual(self, capsys, monkeypatch):
+        monkeypatch.setattr(progress_bar, "IN_COLAB", False)
+        monkeypatch.setitem(sys.modules, "pesquisai.launch_app", None)
+        show(10, 4, "Over")
+        out = capsys.readouterr().out
+        m = re.search(r"(\d+)%", out)
+        assert m and int(m.group(1)) <= 100
 
 
 class TestFinish:
-    """finish() limpa a barra."""
+    def test_finish_limpa_saida_no_ipython(self, monkeypatch):
+        limpou = []
+        monkeypatch.setattr(progress_bar, "IN_COLAB", True)
+        monkeypatch.setattr(progress_bar, "_clear_func", lambda wait=False: limpou.append(wait))
+        finish()
+        assert limpou == [True]
 
-    def test_finish_terminal(self, capsys):
-        """No modo terminal, finish imprime newline."""
-        progress_bar.IN_COLAB = False
-        try:
-            finish()
-            captured = capsys.readouterr()
-            # Deve imprimir newline
-            assert "\n" in captured.out or len(captured.out) >= 0
-        finally:
-            progress_bar.IN_COLAB = True
-            progress_bar._handle = None
+    def test_finish_terminal_printa_newline(self, capsys, monkeypatch):
+        monkeypatch.setattr(progress_bar, "IN_COLAB", False)
+        finish()
+        assert "\n" in capsys.readouterr().out
 
-    def test_finish_colab_clears_handle(self):
-        """No modo Colab, finish limpa o handle."""
-        progress_bar.IN_COLAB = True
-        progress_bar._handle = MagicMock()
-        with patch("pesquisai.progress_bar._clear", MagicMock()):
-            try:
-                finish()
-                assert progress_bar._handle is None
-            finally:
-                progress_bar._handle = None
+    def test_finish_tolerante_a_erro_do_clear(self, monkeypatch):
+        def _boom(wait=False):
+            raise RuntimeError("frontend indisponível")
 
-    def test_finish_no_handle(self):
-        """finish sem handle nao deve quebrar."""
-        progress_bar.IN_COLAB = True
-        progress_bar._handle = None
-        with patch("pesquisai.progress_bar._clear", MagicMock()):
-            finish()
-            assert progress_bar._handle is None
+        monkeypatch.setattr(progress_bar, "IN_COLAB", True)
+        monkeypatch.setattr(progress_bar, "_clear_func", _boom)
+        finish()  # não deve lançar

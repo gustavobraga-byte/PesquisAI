@@ -1,15 +1,18 @@
-# 🌍 PesquisAI — Agents Multilíngues
+# 🌍 UFVAI (PesquisAI) — Agents Multilíngues
 
-> Suporte oficial para **4 idiomas** via variantes do `AGENTS.md`.
+> Suporte oficial para **5 idiomas** via variantes do `AGENTS.md`.
 
 ## 📁 Arquivos
 
 | Arquivo | Idioma | Quando Usar |
 |---|---|---|
-| `AGENTS.pt.md` | 🇧🇷 Português (Brasil) | Padrão (default) |
+| `AGENTS.md` (raiz) | 🇧🇷 Português (Brasil) | Padrão (default) — **canônico** (não duplicado em `agents/`) |
 | `AGENTS.en.md` | 🇺🇸 English (United States) | Pesquisadores internacionais |
 | `AGENTS.es.md` | 🇪🇸 Español (España) | Hispanofalantes, América Latina |
 | `AGENTS.fr.md` | 🇫🇷 Français (France) | Francofonia, cooperação internacional |
+| `AGENTS.zh.md` | 🇨🇳 简体中文 (Chinês) | Pesquisadores sinofalantes |
+
+> Em divergências entre variantes, prevalece o original em português (`AGENTS.md`).
 
 ## 🔧 Como Funciona
 
@@ -55,11 +58,13 @@ Cada `AGENTS.<lang>.md` mantém **100% das regras originais**, com:
 
 ### Traduções dos Marcadores de Evidência
 
-| 🇧🇷 pt_BR | 🇺🇸 en_US | 🇪🇸 es_ES | 🇫🇷 fr_FR |
-|---|---|---|---|
-| `[DADO CONFIRMADO]` | `[CONFIRMED DATA]` | `[DATO CONFIRMADO]` | `[DONNÉE CONFIRMÉE]` |
-| `[ESTIMATIVA FUNDAMENTADA]` | `[FUNDAMENTED ESTIMATE]` | `[ESTIMACIÓN FUNDAMENTADA]` | `[ESTIMATION FONDÉE]` |
-| `[SEM DADOS SUFICIENTES]` | `[INSUFFICIENT DATA]` | `[DATOS INSUFICIENTES]` | `[DONNÉES INSUFFISANTES]` |
+| 🇧🇷 pt_BR | 🇺🇸 en_US | 🇪🇸 es_ES | 🇫🇷 fr_FR | 🇨🇳 zh_CN |
+|---|---|---|---|---|
+| `[DADO CONFIRMADO]` | `[CONFIRMED DATA]` | `[DATO CONFIRMADO]` | `[DONNÉE CONFIRMÉE]` | `[DADO CONFIRMADO]`* |
+| `[ESTIMATIVA FUNDAMENTADA]` | `[FUNDAMENTED ESTIMATE]` | `[ESTIMACIÓN FUNDAMENTADA]` | `[ESTIMATION FONDÉE]` | `[ESTIMATIVA FUNDAMENTADA]`* |
+| `[SEM DADOS SUFICIENTES]` | `[INSUFFICIENT DATA]` | `[DATOS INSUFICIENTES]` | `[DONNÉES INSUFFISANTES]` | `[SEM DADOS SUFICIENTES]`* |
+
+\* A variante chinesa (`AGENTS.zh.md`) mantém os marcadores **no original em português** (strings canônicas, acompanhadas de glossário em chinês no corpo do texto) — não traduza nem altere essas strings.
 
 ## ➕ Adicionar Novo Idioma
 

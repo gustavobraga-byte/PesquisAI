@@ -102,6 +102,8 @@ def _normalize(lang: str, default: str) -> str:
         return "es_ES"
     if lang.lower().startswith("fr"):
         return "fr_FR"
-    if lang in ("pt_BR", "en_US", "es_ES", "fr_FR"):
+    if lang.lower().startswith("zh"):
+        return "zh_CN"
+    if lang in ("pt_BR", "en_US", "es_ES", "fr_FR", "zh_CN"):
         return lang
     return default

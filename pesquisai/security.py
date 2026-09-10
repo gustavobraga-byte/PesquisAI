@@ -1,5 +1,5 @@
 """
-security.py — Módulo de segurança do PesquisAI v0.2.1
+security.py — Módulo de segurança do UFVAI/PesquisAI v0.6.0
 
 Funcionalidades:
   1. Criptografia das chaves de API com Fernet (AES-128-CBC + HMAC-SHA256)
@@ -514,6 +514,54 @@ def _check_injection(cmd: str) -> str | None:
     return None
 
 
+def _split_segments(cmd: str) -> list[str]:
+    """Divide o comando em segmentos por '&&' FORA de aspas duplas.
+
+    v0.6.0: permite validar cada segmento contra a allowlist, fechando a
+    lacuna em que apenas o 1º token era verificado (ex.: `ls && bash x`).
+    """
+    segs: list[str] = []
+    buf: list[str] = []
+    in_quote = False
+    i = 0
+    while i < len(cmd):
+        ch = cmd[i]
+        if ch == '"':
+            in_quote = not in_quote
+            buf.append(ch)
+        elif (not in_quote) and ch == "&" and i + 1 < len(cmd) and cmd[i + 1] == "&":
+            segs.append("".join(buf))
+            buf = []
+            i += 2
+            continue
+        else:
+            buf.append(ch)
+        i += 1
+    segs.append("".join(buf))
+    return segs
+
+
+def _validate_segment(seg: str) -> str | None:
+    """Valida um único segmento contra os prefixos permitidos."""
+    seg = seg.strip()
+    if not seg:
+        return "Segmento vazio antes/depois de '&&'"
+    # export VAR=value (usado pelo modal de provedores)
+    if seg.startswith("export ") and "=" in seg:
+        return None
+    allowed = any(seg == p.strip() or seg.startswith(p) for p in ALLOWED_COMMAND_PREFIXES)
+    if not allowed:
+        return (
+            "Comando não permitido no segmento após '&&'. Prefixos aceitos: "
+            + ", ".join(ALLOWED_COMMAND_PREFIXES)
+        )
+    if seg.startswith("opencode -s "):
+        rest = seg[len("opencode -s "):].strip()
+        if not rest or not all(c.isalnum() or c in "_-." for c in rest):
+            return "session_id inválido após 'opencode -s' (use apenas alfanuméricos, _, -, .)"
+    return None
+
+
 def sanitize_command(cmd: str) -> tuple[bool, str]:
     """Valida e sanitiza um comando contra command injection.
 
@@ -542,29 +590,11 @@ def sanitize_command(cmd: str) -> tuple[bool, str]:
     if inject_err:
         return False, inject_err
 
-    # Verifica prefixos permitidos
-    allowed = any(cmd_stripped.startswith(p) for p in ALLOWED_COMMAND_PREFIXES)
-
-    # export VAR=value && opencode (usado pelo modal de providers)
-    if not allowed and cmd_stripped.startswith("export "):
-        partes = cmd_stripped.split("&&", 1)
-        # 'export NOME=valor' ou 'export "NOME=valor"' no lado esquerdo
-        if partes[0].strip().startswith("export ") and "=" in partes[0]:
-            allowed = True
-
-    # opencode -s <session_id> — valida explicitamente o session_id
-    # (mesmo se o prefixo "opencode" já passou, precisamos garantir que
-    # o argumento após -s contém apenas chars seguros: alnum + _-.)
-    if cmd_stripped.startswith("opencode -s "):
-        rest = cmd_stripped[len("opencode -s "):].strip()
-        if not rest or not all(c.isalnum() or c in "_-." for c in rest):
-            return False, "session_id inválido após 'opencode -s' (use apenas alfanuméricos, _, -, .)"
-        allowed = True
-
-    if not allowed:
-        return False, (
-            f"Comando não permitido. Prefixos aceitos: "
-            f"{', '.join(ALLOWED_COMMAND_PREFIXES)}"
-        )
+    # v0.6.0: valida TODOS os segmentos separados por '&&' (fora de aspas).
+    # Fecha a lacuna em que só o 1º token era checado (RCE via segundo comando).
+    for _seg in _split_segments(cmd_stripped):
+        seg_err = _validate_segment(_seg)
+        if seg_err:
+            return False, seg_err
 
     return True, cmd_stripped

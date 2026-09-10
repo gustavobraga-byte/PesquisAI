@@ -1,39 +1,53 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
-  <circle cx="95" cy="95" r="46" stroke="#38BDF8" stroke-width="7" fill="none" />
-  
-  <line x1="128" y1="128" x2="162" y2="162" stroke="#38BDF8" stroke-width="9" stroke-linecap="round" />
+  <!-- Lupa UFVAI: lente + cabo diagonal + rede de nós da pesquisa (símbolo do PesquisAI original,
+       repintado com as cores UFVAI: azul profundo #1f2831 + dourado #b29149/#d4b56a) -->
+  <defs>
+    <linearGradient id="lens" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#d4b56a"/>
+      <stop offset="100%" stop-color="#8f7536"/>
+    </linearGradient>
+  </defs>
 
-  <g stroke="#475569" stroke-width="1.5">
-    <line x1="80" y1="80" x2="100" y2="75" />
-    <line x1="80" y1="80" x2="95" y2="95" />
-    <line x1="80" y1="80" x2="73" y2="100" />
-    <line x1="100" y1="75" x2="115" y2="90" />
-    <line x1="100" y1="75" x2="95" y2="95" />
-    <line x1="115" y1="90" x2="110" y2="110" />
-    <line x1="115" y1="90" x2="95" y2="95" />
-    <line x1="110" y1="110" x2="90" y2="115" />
-    <line x1="110" y1="110" x2="95" y2="95" />
-    <line x1="90" y1="115" x2="73" y2="100" />
-    <line x1="90" y1="115" x2="95" y2="95" />
-    <line x1="73" y1="100" x2="95" y2="95" />
-    
-    <line x1="80" y1="80" x2="85" y2="88" />
-    <line x1="100" y1="75" x2="85" y2="88" />
-    <line x1="73" y1="100" x2="85" y2="88" />
-    <line x1="95" y1="95" x2="85" y2="88" />
-    <line x1="115" y1="90" x2="105" y2="103" />
-    <line x1="110" y1="110" x2="105" y2="103" />
-    <line x1="95" y1="95" x2="105" y2="103" />
-    <line x1="85" y1="88" x2="105" y2="103" />
+  <!-- Lente da lupa -->
+  <circle cx="92" cy="92" r="48" fill="#1f2831"/>
+  <circle cx="92" cy="92" r="48" fill="none" stroke="url(#lens)" stroke-width="6"/>
+
+  <!-- Cabo da lupa -->
+  <line x1="127" y1="127" x2="166" y2="166" stroke="url(#lens)" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Rede de nós da pesquisa dentro da lente -->
+  <g stroke="#b29149" stroke-width="1.6" opacity="0.85">
+    <line x1="76" y1="78" x2="96" y2="74"/>
+    <line x1="76" y1="78" x2="90" y2="92"/>
+    <line x1="76" y1="78" x2="70" y2="96"/>
+    <line x1="96" y1="74" x2="110" y2="88"/>
+    <line x1="96" y1="74" x2="90" y2="92"/>
+    <line x1="110" y1="88" x2="106" y2="106"/>
+    <line x1="110" y1="88" x2="90" y2="92"/>
+    <line x1="106" y1="106" x2="88" y2="110"/>
+    <line x1="106" y1="106" x2="90" y2="92"/>
+    <line x1="88" y1="110" x2="70" y2="96"/>
+    <line x1="88" y1="110" x2="90" y2="92"/>
+    <line x1="70" y1="96" x2="90" y2="92"/>
+
+    <line x1="76" y1="78" x2="82" y2="86"/>
+    <line x1="96" y1="74" x2="82" y2="86"/>
+    <line x1="70" y1="96" x2="82" y2="86"/>
+    <line x1="90" y1="92" x2="82" y2="86"/>
+    <line x1="110" y1="88" x2="102" y2="100"/>
+    <line x1="106" y1="106" x2="102" y2="100"/>
+    <line x1="90" y1="92" x2="102" y2="100"/>
+    <line x1="82" y1="86" x2="102" y2="100"/>
   </g>
 
-  <circle cx="95" cy="95" r="5.5" fill="#34D399" />
-  <circle cx="80" cy="80" r="4.5" fill="#38BDF8" />
-  <circle cx="100" cy="75" r="4.5" fill="#38BDF8" />
-  <circle cx="115" cy="90" r="4.5" fill="#38BDF8" />
-  <circle cx="110" cy="110" r="4.5" fill="#38BDF8" />
-  <circle cx="90" cy="115" r="4.5" fill="#38BDF8" />
-  <circle cx="73" cy="100" r="4.5" fill="#38BDF8" />
-  <circle cx="85" cy="88" r="4" fill="#818CF8" />
-  <circle cx="105" cy="103" r="4" fill="#818CF8" />
+  <!-- Nós (vértices da rede) -->
+  <circle cx="90" cy="92" r="5.5" fill="#d4b56a"/>
+  <circle cx="76" cy="78" r="4.5" fill="#b29149"/>
+  <circle cx="96" cy="74" r="4.5" fill="#b29149"/>
+  <circle cx="110" cy="88" r="4.5" fill="#b29149"/>
+  <circle cx="106" cy="106" r="4.5" fill="#b29149"/>
+  <circle cx="88" cy="110" r="4.5" fill="#b29149"/>
+  <circle cx="70" cy="96" r="4.5" fill="#b29149"/>
+  <circle cx="82" cy="86" r="4" fill="#c9a54f"/>
+  <circle cx="102" cy="100" r="4" fill="#c9a54f"/>
 </svg>

@@ -1,6 +1,6 @@
-# 📎 Citação do PesquisAI
+# 📎 Citação do UFVAI
 
-## Como citar o PesquisAI em trabalhos acadêmicos
+## Como citar o UFVAI em trabalhos acadêmicos
 
 ---
 
@@ -9,8 +9,8 @@
 ### Formato completo (recomendado para Referências Bibliográficas):
 
 ```
-BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.5.1.9. Viçosa: Universidade Federal de Viçosa, 2026.
+BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para pesquisa
+científica. Versão 0.6.17. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -21,7 +21,7 @@ Verificar autenticidade em: http://sisppg.ufv.br
 ### Formato simplificado (para nota de rodapé):
 
 ```
-PesquisAI, versão 0.5.1.9., desenvolvido por Gustavo Bastos Braga (UFV, 2026). Disponível em:
+UFVAI, versão 0.6.17, desenvolvido por Gustavo Bastos Braga (UFV, 2026). Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 ```
 
@@ -60,8 +60,8 @@ https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 ## Referência completa no padrão ABNT (copie e cole):
 
 ```
-BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para
-pesquisa científica. Versão 0.5.1.9. Viçosa: Universidade Federal de Viçosa,
+BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para
+pesquisa científica. Versão 0.6.17. Viçosa: Universidade Federal de Viçosa,
 2026. Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
@@ -75,8 +75,8 @@ Acesso em: DD mês. AAAA.
 |---|---|
 | **Tipo** | Software / Computer Program |
 | **Autor** | Braga, Gustavo Bastos |
-| **Título** | PesquisAI: agente de inteligência artificial para pesquisa científica |
-| **Versão** | 0.5.1.9. |
+| **Título** | UFVAI: agente de inteligência artificial para pesquisa científica |
+| **Versão** | 0.6.17 |
 | **Ano** | 2026 |
 | **Instituição** | Universidade Federal de Viçosa (UFV) |
 | **URL** | https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/ |
@@ -90,11 +90,11 @@ Acesso em: DD mês. AAAA.
 ## BibTeX (para usuários LaTeX):
 
 ```bibtex
-@software{braga2026pesquisai,
+@software{braga2026ufvai,
   author       = {Gustavo Bastos Braga},
-  title        = {{PesquisAI}: Agente de Intelig{\^e}ncia Artificial para Pesquisa Cient{\'\i}fica},
+  title        = {{UFVAI}: Agente de Intelig{\^e}ncia Artificial para Pesquisa Cient{\'\i}fica},
   year         = {2026},
-  version      = { 0.5.1.9.},
+  version      = {0.6.17},
   institution  = {Universidade Federal de Vi{\c{c}}osa (UFV)},
   url          = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/},
   note         = {Acessado em: DD m{\^e}s AAAA}
@@ -104,3 +104,7 @@ Acesso em: DD mês. AAAA.
 ---
 
 *Documento elaborado conforme NBR 6023:2018 (ABNT) e normas da UFV.*
+
+---
+
+🌐 Site oficial: https://gustavobraga-byte.github.io/ufvaisite/ (demonstração, novidades, slides e como citar).

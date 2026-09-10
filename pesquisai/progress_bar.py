@@ -1,106 +1,78 @@
 """
-progress_bar.py — Barra de progresso visual para o setup do PesquisAI.
+progress_bar.py — v0.6.7: painel de boot do UFVAI desde o INÍCIO do carregamento.
 
-Funciona tanto no Google Colab (HTML interativo) quanto em terminal (ASCII).
+A antiga barra escura (#0d0f10, spinner colorido) foi APOSENTADA. Agora os
+estágios iniciais do run() — Preparando → Google Drive → Dependências →
+Skills → Interface — alimentam o MESMO painel leve no tema da logomarca
+oficial usado pelo _BootPanel de launch_app.py:
+
+  · mesma linguagem visual (papel off-white, wordmark "UFV" navy + "AI" dourado);
+  · MESMO display_id ("ufvai_boot_panel") → a barra nunca reinicia nem duplica;
+  · mensagens/checkpoints SEMPRE abaixo da barra de progresso.
+
+O PesquisAI.ipynb embute uma réplica mínima deste painel ainda na fase de
+clone do repositório (antes do pacote existir em /tmp), então a barra nasce
+no primeiro segundo e é continuada aqui sem solução de continuidade.
+
+API pública preservada: show(step, total, message) / finish().
+Fora do Colab (sem IPython) mantém o fallback ASCII legado.
 """
 
-import time
-from typing import Optional
-
-# ── Detecção de ambiente Colab ──────────────────────────────
+# ── Detecção de ambiente IPython/Colab ──────────────────────
 IN_COLAB: bool = False
-_handle = None
-_clear = None
 
 try:
-    from IPython.display import display, HTML, clear_output as _clear_func
-    _clear = _clear_func
+    from IPython.display import clear_output as _clear_func
+
     IN_COLAB = True
-except ImportError:
-    display = None
-    HTML = None
+except ImportError:  # terminal puro (.deb/offline)
+    _clear_func = None
 
-STAGES: list[str] = [
-    "Configurando Google Drive",
-    "Instalando dependências",
-    "Instalando skills",
-    "Iniciando interface",
-]
-
-COLORS: list[str] = ["#4fc3f7", "#5dba7e", "#e8b84b", "#a47de0"]
-
-
-def _html(step: int, total: int, message: str, percent: int) -> str:
-    """Gera o HTML da barra de progresso para exibição no Colab."""
-    if total <= 0:
-        total = 1
-    idx = min(step, total - 1)
-    stage = STAGES[idx] if idx < len(STAGES) else "Finalizando"
-    color = COLORS[idx % len(COLORS)]
-    return f"""<div id="ppbar" style="
-    max-width:680px; margin:20px auto 16px; padding:16px 22px;
-    background:#0d0f10; border:1px solid rgba(255,255,255,.07);
-    border-radius:10px; font-family:system-ui,-apple-system,sans-serif;
-">
-    <div style="display:flex; align-items:center; gap:11px; margin-bottom:12px;">
-        <div style="
-            width:24px; height:24px; border-radius:50%;
-            border:3px solid {color}; border-top-color:transparent;
-            animation:ppsp 0.85s linear infinite;
-        "></div>
-        <div>
-            <div style="color:#e8e6e0; font-size:14px; font-weight:600;">
-                {stage}
-            </div>
-            <div style="color:#8a8780; font-size:11.5px; margin-top:1px;">
-                {message}
-            </div>
-        </div>
-        <div style="margin-left:auto; color:{color}; font-size:13px; font-weight:700;">
-            {percent}%
-        </div>
-    </div>
-    <div style="
-        width:100%; height:5px; background:rgba(255,255,255,.05);
-        border-radius:3px; overflow:hidden;
-    ">
-        <div style="
-            width:{percent}%; height:100%;
-            background:linear-gradient(90deg, {color}, {color}cc);
-            border-radius:3px; transition:width .35s ease;
-        "></div>
-    </div>
-    <style>
-        @keyframes ppsp{{to{{transform:rotate(360deg)}}}}
-    </style>
-</div>"""
+# Percentuais dos estágios do setup dentro da jornada completa de boot.
+# O launch() continua EXATAMENTE de onde este mapa termina (82 → 99 → 100),
+# garantindo barra monotônica (nunca regressiva) de ponta a ponta.
+_STAGE_PCT: dict[int, int] = {0: 6, 1: 20, 2: 48, 3: 72, 4: 80}
 
 
 def show(step: int = 0, total: int = 4, message: str = "Iniciando...") -> None:
-    """Atualiza a barra de progresso com o passo atual."""
-    global _handle
+    """Atualiza o painel de boot com o estágio atual do setup.
+
+    Delega ao painel compartilhado (launch_app.get_boot_panel()): cada
+    chamada conclui a linha anterior com ✓ e revela a nova mensagem como
+    linha ativa (spinner) ABAIXO da barra dourada. Erros de renderização
+    NUNCA interrompem o setup.
+    """
     if total <= 0:
         total = 1
-    percent = min(int((step / total) * 100), 100)
-    html = _html(step, total, message, percent)
+    pct = _STAGE_PCT.get(int(step))
+    if pct is None:
+        pct = min(max(int(round(100 * step / total)), 2), 99)
 
-    if IN_COLAB and display and HTML:
-        if _handle is None:
-            _handle = display(HTML(html), display_id=True)
-        else:
-            _handle.update(HTML(html))
-    else:
-        bar = "█" * (percent // 4) + "░" * (25 - percent // 4)
-        idx = min(step, total - 1)
-        stage = STAGES[idx] if idx < len(STAGES) else "Finalizando"
-        print(f"\r  {stage:<38} {bar} {percent:>3}%  {message}", end="", flush=True)
+    try:
+        from pesquisai.launch_app import get_boot_panel
+
+        get_boot_panel().active(message.rstrip(".").strip() + "...", pct)
+        return
+    except Exception:
+        pass
+
+    # ── Fallback ASCII (terminal/offline sem painel disponível) ──
+    if IN_COLAB:
+        return
+    bar = "█" * (pct // 4) + "░" * (25 - pct // 4)
+    print(f"\r  {message:<42} {bar} {pct:>3}%", end="", flush=True)
 
 
 def finish() -> None:
-    """Limpa a barra de progresso ao finalizar."""
-    global _handle
-    if IN_COLAB and _clear:
-        _clear(wait=True)
-        _handle = None
+    """Encerra a fase de setup: limpa a saída antes da mensagem final/botão.
+
+    Mantém o contrato legado — logs de instalação e o próprio painel saem
+    de cena para o card final (logomarca + botão) aparecer limpo.
+    """
+    if IN_COLAB and _clear_func is not None:
+        try:
+            _clear_func(wait=True)
+        except Exception:
+            pass
     else:
         print()

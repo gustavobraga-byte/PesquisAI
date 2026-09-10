@@ -77,6 +77,8 @@ def get_default_vault_path() -> Optional[str]:
     Returns:
         O caminho do vault validado, ou ``None`` se não foi possível
         detectar ou se a validação falhou.
+    v0.6.9-5 offline: se o vault explícito for read-only e estivermos
+    fora do Colab, faz fallback para ~/PesquisAI/vault (não altera Colab).
     """
     explicit = os.environ.get("PESQUISAI_OBSIDIAN_VAULT", "").strip()
     if explicit:
@@ -89,6 +91,16 @@ def get_default_vault_path() -> Optional[str]:
                 explicit,
             )
             return None
+        # v0.6.9-5: offline — se o vault do Drive está sem escrita, usa local
+        if not _is_in_colab() and validated and not os.access(validated, os.W_OK):
+            _local_fallback = str(Path.home() / "PesquisAI" / "vault")
+            if Path(_local_fallback).is_dir() and os.access(_local_fallback, os.W_OK):
+                import logging
+                logging.getLogger("pesquisai.obsidian").info(
+                    "Vault do Drive sem escrita (%s) — fallback offline para %s",
+                    validated, _local_fallback,
+                )
+                return _local_fallback
         return validated
 
     # Convenção: subpasta "vault" dentro da pasta PesquisAI no Drive
@@ -110,6 +122,10 @@ def get_default_vault_path() -> Optional[str]:
         home_obsidian = Path.home() / "Obsidian" / "PesquisAI"
         if home_obsidian.is_dir():
             return str(home_obsidian)
+        # v0.6.9-5 offline: fallback padrão do .deb → ~/PesquisAI/vault
+        local_vault = Path.home() / "PesquisAI" / "vault"
+        if local_vault.is_dir():
+            return str(local_vault)
 
     return None
 

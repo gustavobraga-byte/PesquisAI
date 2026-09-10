@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 gustavobraga-byte
+Copyright (c) 2026 Gustavo Bastos Braga — Universidade Federal de Viçosa (DER/UFV)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,21 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## NOTICE — Marca e Termos de Uso (v2.2, 10/09/2026)
+
+1. **Marca:** "UFVAI", sua logomarca e identidade visual pertencem à Universidade
+   Federal de Viçosa / DER. A licença MIT cobre o CÓDIGO-FONTE; não confere direito de
+   usar a marca para produtos ou serviços derivados que sugiram endosso institucional.
+   Atribuição de origem ao repositório oficial é requerida em redistribuições.
+2. **Termos de Uso:** a RELAÇÃO DE USO do programa (ativação com nome+e-mail, telemetria
+   opt-out sem cookies, integridade acadêmica, limitações) é regida pelos Termos de Uso v2.2
+   (`docs/TERMS_OF_USE.md`, versão técnica `terms_version=6`), que complementam — sem restringir
+   os direitos da MIT sobre o código — esta licença. Versões anteriores: v2.1 (25/08/2026),
+   v2.0 (22/08/2026).
+3. **Integridade científica:** o uso em atividade científica deve observar a Portaria
+   CNPq nº 2.664/2026 (declaração de uso de IA generativa) e declarar o apoio do UFVAI
+   (ver `declaracao_uso_ia.md`).
+4. **Privacidade:** ver `PRIVACY.md` (v1.1, 10/09/2026) e `TELEMETRY.md` (v0.6.17).

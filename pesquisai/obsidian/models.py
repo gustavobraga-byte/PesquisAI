@@ -316,9 +316,20 @@ class TagIndex:
 def _parse_date(value: Any) -> Optional[_dt.date]:
     if not value:
         return None
+    if isinstance(value, _dt.datetime):
+        return value.date()
     if isinstance(value, _dt.date):
         return value
     if isinstance(value, str):
+        # Tenta ISO 8601 completo (ex: 2026-08-26T23:10:00-03:00) via fromisoformat
+        try:
+            return _dt.date.fromisoformat(value.split("T")[0])
+        except Exception:
+            pass
+        try:
+            return _dt.datetime.fromisoformat(value).date()
+        except Exception:
+            pass
         for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"):
             try:
                 return _dt.datetime.strptime(value, fmt).date()

@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pesquisai-additions"
-version = "0.5.1.9"
-description = "PesquisAI v0.5.1.9 — obsidian autopilot (autonomous saving) + grant_finder + i18n (4 idiomas) + skills (grant-finder, meta-search-br, obsidian-memory)"
+version = "0.6.17"
+description = "UFVAI v0.6.17 (engine PesquisAI) — obsidian autopilot + grant_finder + i18n (5 idiomas incl. 简体中文) + termos v6 nome+IP + memória instantânea (singleton BM25 + warm-up + prefetch) + responsiva mobile + IP ipify + heartbeat no clique + idioma inicial detectado"
 authors = [
     { name = "Gustavo Bastos Braga", email = "gustavo.braga@ufv.br" },
 ]

@@ -283,16 +283,17 @@ RESPONSIVE_CSS: str = """
     --surface:    #f5f6f7;
     --rail:       #ffffff;
     --line:       rgba(0,0,0,.1);
-    --accent:     #157a73;
-    --accent-dim: rgba(21,122,115,.10);
-    --accent-glow:rgba(21,122,115,.18);
-    --accent-rgb: 21,122,115;
+    --accent:     #8a6d33;
+    --accent-dim: rgba(138,109,51,.10);
+    --accent-glow:rgba(138,109,51,.18);
+    --accent-rgb: 138,109,51;
     --green:      #2e7d32;
     --green-dim:  rgba(46,125,50,.1);
-    --amber:      #e65100;
-    --amber-dim:  rgba(230,81,0,.1);
+    --amber:      #a67c00;
+    --amber-dim:  rgba(166,124,0,.12);
     --red:        #c62828;
     --red-dim:    rgba(198,40,40,.1);
+    --ov-dim:     rgba(30,42,52,.38);   /* v0.6.5: backdrop de modais no claro */
     background:   #f5f6f7;
     color:        #1f262a;
     --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
@@ -302,7 +303,7 @@ RESPONSIVE_CSS: str = """
   /* === Indicador de tema ativo (NOVO em v0.4.1) === */
   #theme-toggle[data-theme="pesquisai-light"] {
     color: var(--amber);
-    border-color: rgba(232,184,75,.4);
+    border-color: rgba(166,124,0,.4);
     background: var(--amber-dim);
   }
   #theme-toggle[data-theme="pesquisai"] {
@@ -315,10 +316,75 @@ RESPONSIVE_CSS: str = """
     #toast { bottom: 36px; right: 8px; }
   }
 
-    @media (prefers-reduced-motion: reduce) {
+    /* === v0.6.5: Splash de carregamento do terminal (boot) === */
+  #boot-splash {
+    position: fixed; inset: 0; z-index: 200000;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px;
+    background: var(--surface, #141c24);
+    transition: opacity .45s ease;
+  }
+  #boot-splash.hide { opacity: 0; pointer-events: none; }
+  .boot-logo { width: 128px; height: auto; border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+  .boot-spinner { width: 32px; height: 32px; border-radius: 50%;
+    border: 3px solid rgba(var(--accent-rgb), .18);
+    border-top-color: var(--accent);
+    animation: bootspin .8s linear infinite; }
+  @keyframes bootspin { to { transform: rotate(360deg); } }
+  .boot-status { font-size: 13px; color: var(--ink-muted);
+    font-family: var(--font-sans); letter-spacing: .02em; }
+  .boot-bar { width: min(320px, 60vw); height: 4px; border-radius: 2px;
+    overflow: hidden; background: rgba(var(--accent-rgb), .15);
+    position: relative; }
+  .boot-bar::after { content: ""; position: absolute; left: -40%;
+    top: 0; bottom: 0; width: 40%; border-radius: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: bootslide 1.4s ease-in-out infinite; }
+  @keyframes bootslide { to { left: 100%; } }
+  .boot-error { color: var(--red); font-size: 12.5px;
+    max-width: 70vw; text-align: center; line-height: 1.5; }
+  .boot-retry { margin-top: 4px; padding: 8px 16px;
+    background: var(--accent-dim); color: var(--accent);
+    border: 1px solid rgba(var(--accent-rgb), .35);
+    border-radius: var(--radius); cursor: pointer;
+    font-size: 12px; font-family: var(--font-sans); }
+
+  @media (prefers-reduced-motion: reduce) {
       * { animation-duration: .001ms !important; animation-iteration-count: 1 !important;
           transition-duration: .001ms !important; scroll-behavior: auto !important; }
     }
+
+  /* === v0.6.10: Memória UFVAI responsiva (mobile + tablet) === */
+  @media (max-width: 767px) {
+    #memory-overlay > div { width: 95vw !important; max-width: 95vw !important; height: 92vh !important; max-height: 92vh !important; flex-direction: column !important; }
+    #memory-sidebar { width: 100% !important; max-height: 38vh; border-right: none !important; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+    #memory-editor-pane { flex: 1; min-height: 0; display:flex; flex-direction:column; }
+    #memory-editor-body { flex-direction: column !important; flex:1; min-height:0; overflow:hidden; }
+    #memory-list { -webkit-overflow-scrolling: touch; }
+    #memory-search-input { font-size: 14px !important; padding: 8px 10px !important; }
+    #memory-note-meta { flex-wrap: wrap; }
+    #memory-editor, #memory-preview { padding: 12px !important; font-size: 13px !important; }
+    #memory-editor { min-height: 120px; flex: 1 1 40% !important; }
+    #memory-preview { min-height: 150px; flex: 1 1 60% !important; overflow-y:auto !important; -webkit-overflow-scrolling:touch; display:block !important; }
+    #memory-overlay .modal-title { font-size: 14px !important; }
+    /* v0.6.12 fix: garante preview visível no mobile mesmo quando em modo preview */
+    #memory-editor-body #memory-preview[style*="display: none"] { display:none !important; }
+    #memory-editor-body #memory-preview:not([style*="display: none"]) { display:block !important; }
+  }
+  @media (max-width: 479px) {
+    #memory-overlay > div { width: 100vw !important; max-width: 100vw !important; height: 100vh !important; max-height: 100vh !important; border-radius: 0 !important; }
+    #memory-sidebar { max-height: 42vh; }
+  }
+  @media (max-width: 380px) {
+    #memory-sidebar { max-height: 44vh; }
+    #memory-list { font-size: 11px !important; }
+  }
+  /* Touch: alvos ≥44px no mobile */
+  @media (max-width: 767px) {
+    .mem-note-item, .mem-folder-card { min-height: 44px; }
+    #memory-btn-save, #memory-btn-delete, #memory-overlay .modal-close { min-height: 44px; min-width: 44px; }
+  }
   </style>
 """
 
@@ -333,10 +399,15 @@ SUPPORTED_LANGUAGES: list[dict[str, str]] = [
     {"code": "en_US", "name": "English (United States)", "flag": "🇺🇸", "short": "EN"},
     {"code": "es_ES", "name": "Español (España)",     "flag": "🇪🇸", "short": "ES"},
     {"code": "fr_FR", "name": "Français (France)",    "flag": "🇫🇷", "short": "FR"},
+    {"code": "zh_CN", "name": "中文（简体）",           "flag": "🇨🇳", "short": "ZH"},
 ]
 
 
-def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
+def create_wrapper_html(
+    terminal_url: str,
+    drive_url: str,
+    session_token: str | None = None,
+) -> str:
     """Cria a versão v0.4.1 do wrapper HTML do PesquisAI.
 
     Versão drop-in que substitui o HTML estático do launch_app.py por
@@ -363,16 +434,35 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#0d0f10">
-  <title>PesquisAI</title>
+  <title>UFVAI</title>
+  <!-- v0.6.6: favicon UFVAI (SVG + PNG fallback + apple-touch) -->
+  <link rel="icon" type="image/svg+xml" href="/assets/ico.svg">
+  <link rel="alternate icon" type="image/png" sizes="64x64" href="/assets/ufvai-64.png">
+  <link rel="apple-touch-icon" sizes="256x256" href="/assets/icon.png">
+  <script>
+    // v0.6.6: no Colab a UI é servida via /proxy/8001/ — links absolutos "/assets/…"
+    // quebram; reescreve os favicons com o prefixo do pathname atual.
+    (function(){try{
+      var p=location.pathname.replace(/[^/]*$/,"");
+      if(p==="/"||p==="") return; // raiz local: links absolutos já funcionam
+      var h=document.head;
+      var mk=function(rel,type,sizes,href){var l=document.createElement("link");l.rel=rel;if(type)l.type=type;if(sizes)l.sizes=sizes;l.href=p+href.replace(/^\\//,"");h.appendChild(l);};
+      mk("icon","image/svg+xml",null,"/assets/ico.svg");
+      mk("alternate icon","image/png","64x64","/assets/ufvai-64.png");
+      mk("apple-touch-icon",null,"256x256","/assets/icon.png");
+    }catch(e){}})();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Montserrat:wght@600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
   <!-- github-markdown-css: estilização markdown para o modal de Diretrizes -->
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css" as="style">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css">
   <!-- marked.js: preload para acelerar renderização de markdown -->
-  <link rel="preload" href="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" as="script">
+  <!-- v0.6.0: marked.js EMBUTIDO (offline-first) com fallback CDN -->
+  <script src="/vendor/marked.min.js"></script>
+  <script>if(typeof marked==="undefined"){document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></scr'+'ipt>');}</script>
   <script>
     // ═══════════════════════════════════════════════════════════
     // 🛡️ ANTI-FLASH: aplica tema ANTES de qualquer renderização
@@ -410,24 +500,25 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { background: #0d0f10; color: #e8e6e0; }  /* anti-flash dark */
+    html { background: #141c24; color: #e8e6e0; }  /* anti-flash dark · UFVAI */
 
     :root {
       --ink:        #e8e6e0;
       --ink-muted:  #9a9790;
-      --surface:    #0d0f10;
-      --rail:       #151819;
+      --surface:    #141c24;
+      --rail:       #1f2831;
       --line:       rgba(255,255,255,.07);
-      --accent:     #46a39b;
+      --accent:     #b29149;
       --accent-dim: rgba(var(--accent-rgb),.12);
       --accent-glow:rgba(var(--accent-rgb),.22);
-      --accent-rgb: 70,163,155;
+      --accent-rgb: 178,145,73;
       --green:      #5dba7e;
       --green-dim:  rgba(93,186,126,.12);
-      --amber:      #e8b84b;
-      --amber-dim:  rgba(232,184,75,.12);
+      --amber:      #D1A705;
+      --amber-dim:  rgba(209,167,5,.14);
       --red:        #e07070;
       --red-dim:    rgba(224,112,112,.12);
+      --ov-dim:     rgba(4,7,11,.8);      /* v0.6.5: backdrop de modais no escuro */
       --radius:     5px;
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
       --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -456,8 +547,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     }
 
     .logo { display: flex; align-items: baseline; gap: 2px; }
-    .logo-p  { font-family:"Syne",sans-serif; font-weight:800; font-size:17px; color:var(--ink); letter-spacing:-.5px; }
-    .logo-ai { font-family:"Syne",sans-serif; font-weight:700; font-size:17px; color:var(--accent); letter-spacing:-.5px; }
+    .logo-p  { font-family:"Montserrat","Syne",sans-serif; font-weight:700; font-size:17px; color:var(--ink); letter-spacing:-0.02em; }
+    .logo-ai { font-family:"Montserrat","Syne",sans-serif; font-weight:600; font-size:17px; color:var(--accent); letter-spacing:-0.02em; margin-left:-0.02em; }
     .logo-tag {
       margin-left:9px; font-size:10px; color:var(--ink-muted);
       letter-spacing:.07em; padding:1px 6px;
@@ -514,14 +605,14 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
 
     #modal-overlay {
       position: fixed; inset: 0;
-      background: rgba(0,0,0,.72);
+      background: var(--ov-dim);
       display: flex; align-items: center; justify-content: center;
       z-index: 99999; opacity: 0; pointer-events: none;
       transition: opacity .2s;
     }
     #modal-overlay.open { opacity: 1; pointer-events: all; }
     #modal {
-      background: #181b1e; border: 1px solid rgba(255,255,255,.1);
+      background: var(--rail); border: 1px solid var(--line);
       border-radius: 8px; padding: 24px; width: 400px; max-width: 90vw;
       box-shadow: 0 24px 64px rgba(0,0,0,.6);
     }
@@ -683,10 +774,32 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   {RESPONSIVE_CSS}
 </head>
 <body>
+<script>
+/* v0.6.0 segurança — token de sessão em todo fetch /api/* (same-origin) */
+(function(){
+  var __T = "__UFVAI_TOKEN__";
+  if (!__T) return;
+  var _of = window.fetch;
+  window.fetch = function(input, init){
+    try {
+      var url = (typeof input === "string") ? input : (input && input.url) || "";
+      var u = new URL(url, location.href);
+      if (u.origin === location.origin && u.pathname.indexOf("/api/") === 0) {
+        init = init || {};
+        var h = new Headers((init && init.headers) || {});
+        h.set("X-UFVAI-Token", __T);
+        init.headers = h;
+        return _of.call(window, input, init);
+      }
+    } catch(e){}
+    try { return _of.apply(window, arguments); } catch(e2){ throw e2; }
+  };
+})();
+</script>
 
   <div id="topbar">
     <div class="logo">
-      <span class="logo-p">Pesquis</span><span class="logo-ai">AI</span>
+      <span class="logo-p">UFV</span><span class="logo-ai">AI</span>
       <span>  <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/CHANGELOG.md" target="_blank" class="logo-tag"> v{__VERSION__} </a> </span>
     </div>
 
@@ -699,6 +812,9 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       <button class="tb-icon" onclick="openHealth()" title="Dashboard de Saúde" data-i18n-title="dashboard.title">
         <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
       </button>
+      <button class="tb-icon" onclick="openManual()" title="Manual do UFVAI" data-i18n-title="manual.title">
+        <svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      </button>
       <button class="tb-icon" onclick="openSessions()" title="Histórico de Sessões" data-i18n-title="sessions.title">
         <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
       </button>
@@ -706,13 +822,16 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/></svg>
       </button>
       <button class="tb-icon" onclick="openAgents()" title="Diretrizes do Agente" data-i18n-title="agents.title">
-        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7M9 11h7"/></svg>
+        <svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M9 12h6M9 16h4"/></svg>
       </button>
-      <button class="tb-icon" onclick="openMemory()" id="memory-btn" title="Memória PesquisAI" data-i18n-title="memory.tooltip">
+      <button class="tb-icon" onclick="openMemory()" id="memory-btn" title="Memória UFVAI" data-i18n-title="memory.tooltip">
         <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 3 1.5 5 3 7l1 1v3a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-3l1-1c1.5-2 3-4 3-7a7 7 0 0 0-7-7z"/><path d="M9 22h6"/><path d="M12 2v20"/></svg>
       </button>
       <button class="tb-icon" onclick="toggleTheme()" id="theme-toggle" title="Alternar tema" data-theme="pesquisai" data-i18n-title="theme.toggle">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
+      <button class="tb-icon" onclick="openTelemetry()" id="telemetry-btn" title="Telemetria (Admin)" style="display:none !important" data-i18n-title="telemetry.title">
+        <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/></svg>
       </button>
       <button class="lang-btn" id="lang-btn" onclick="toggleLangMenu()" aria-haspopup="true" aria-expanded="false" title="Idioma / Language">
         <span class="lang-flag" id="lang-flag">🇧🇷</span>
@@ -763,10 +882,11 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </button>
     <div style="height:1px;background:var(--line);margin:8px 0;"></div>
     <button class="modal-close" onclick="openHealth(); toggleMobileMenu();">🩺 <span data-i18n="dashboard.title">Dashboard de Saúde</span></button>
+    <button class="modal-close" onclick="openManual(); toggleMobileMenu();">📘 <span data-i18n="manual.title">Manual do UFVAI</span></button>
     <button class="modal-close" onclick="openSessions(); toggleMobileMenu();">📜 <span data-i18n="sessions.title">Histórico de Sessões</span></button>
     <button class="modal-close" onclick="openShortcuts(); toggleMobileMenu();">⌨️ <span data-i18n="shortcuts.title">Atalhos de Teclado</span></button>
     <button class="modal-close" onclick="openAgents(); toggleMobileMenu();">📋 <span data-i18n="agents.title">Diretrizes do Agente</span></button>
-    <button class="modal-close" onclick="openMemory(); toggleMobileMenu();">🧠 <span data-i18n="memory.title">Memória PesquisAI</span></button>
+    <button class="modal-close" onclick="openMemory(); toggleMobileMenu();">🧠 <span data-i18n="memory.title">Memória UFVAI</span></button>
     <button class="modal-close" onclick="toggleTheme(); toggleMobileMenu();">◑ <span data-i18n="theme.toggle">Alternar Tema</span></button>
     <button class="modal-close" onclick="toggleLangMenu();">🌐 <span data-i18n="languages.label">Idioma</span></button>
   </div>
@@ -776,17 +896,31 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     <!-- Preenchido dinamicamente por buildLangMenu() -->
   </div>
 
+  <!-- v0.6.5: Splash de carregamento — polling /api/ttyd_ready antes de
+       apontar o iframe; elimina ERR_CONNECTION_REFUSED visível e dá
+       feedback imediato no boot, troca de idioma e restauração. -->
+  <div id="boot-splash" role="status" aria-live="polite">
+    <img class="boot-logo" src="/assets/logo-oficial-288.jpg" alt="UFVAI"
+         onerror="this.style.display='none'">
+    <div class="boot-spinner" aria-hidden="true"></div>
+    <div class="boot-status" id="boot-status" data-i18n="boot.starting">Iniciando terminal…</div>
+    <div class="boot-bar" aria-hidden="true"></div>
+    <div class="boot-error" id="boot-error" style="display:none;"></div>
+    <button class="boot-retry" id="boot-retry" style="display:none;"
+            onclick="location.reload()" data-i18n="boot.retry">↻ Recarregar</button>
+  </div>
+
  <iframe
   id="terminal-frame"
-  src="{__TERMINAL_URL__}"
+  src="about:blank"
+  data-terminal-url="{__TERMINAL_URL__}"
   allow="clipboard-read; clipboard-write"
   tabindex="0"
-  autofocus
   style="width:100%; height:calc(100% - 90px); border:none; outline:none;">
 </iframe>
 
   <div id="footer">
-    <span class="footer-brand">PesquisAI</span>
+    <span class="footer-brand">UFVAI</span>
     <span class="footer-sep"></span>
     <a href="mailto:gustavo.braga@ufv.br" class="footer-link">
       <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
@@ -825,8 +959,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
-  <div id="provider-overlay" onclick="if(event.target===this)closeProvider()" style="position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:520px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
+  <div id="provider-overlay" onclick="if(event.target===this)closeProvider()" style="position:fixed;inset:0;background:var(--ov-dim);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+    <div style="background:var(--rail);border:1px solid var(--line);border-radius:10px;padding:24px;width:520px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div id="prov-step0">
         <div class="modal-title">🔌 <span data-i18n="providers.title">Conectar Provedor de IA</span></div>
         <p style="font-size:11.5px;color:var(--ink-muted);margin-bottom:14px;line-height:1.6;" data-i18n="providers.saved_keys">Chaves salvas no Drive:</p>
@@ -862,8 +996,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
-  <div id="health-overlay" onclick="if(event.target===this)closeHealth()" style="position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:440px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
+  <div id="health-overlay" onclick="if(event.target===this)closeHealth()" style="position:fixed;inset:0;background:var(--ov-dim);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+    <div style="background:var(--rail);border:1px solid var(--line);border-radius:10px;padding:24px;width:440px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div class="modal-title">🩺 <span data-i18n="dashboard.title">Dashboard de Saúde</span></div>
       <div id="health-list" style="max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;">
         <div class="modal-empty" data-i18n="ui.loading">Carregando diagnóstico…</div>
@@ -872,8 +1006,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
-  <div id="sessions-overlay" onclick="if(event.target===this)closeSessions()" style="position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:520px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
+  <div id="sessions-overlay" onclick="if(event.target===this)closeSessions()" style="position:fixed;inset:0;background:var(--ov-dim);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+    <div style="background:var(--rail);border:1px solid var(--line);border-radius:10px;padding:24px;width:520px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div class="modal-title">📜 <span data-i18n="sessions.title">Histórico de Sessões</span></div>
       <input id="session-search" class="session-search" placeholder="🔍 Buscar por id ou conteúdo…" oninput="filterSessions()" data-i18n-placeholder="sessions.search_placeholder">
       <div id="session-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;">
@@ -886,8 +1020,8 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
-  <div id="shortcuts-overlay" onclick="if(event.target===this)closeShortcuts()" style="position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:24px;width:420px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
+  <div id="shortcuts-overlay" onclick="if(event.target===this)closeShortcuts()" style="position:fixed;inset:0;background:var(--ov-dim);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+    <div style="background:var(--rail);border:1px solid var(--line);border-radius:10px;padding:24px;width:420px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div class="modal-title">⌨️ <span data-i18n="shortcuts.title">Atalhos de Teclado</span></div>
       <div style="border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;">
         <div class="shortcut-row"><span data-i18n="shortcuts.copy">Copiar seleção</span><span class="shortcut-key" data-i18n="shortcuts.copy_hint">Segure o Shift e selecione</span></div>
@@ -903,13 +1037,13 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   </div>
 
   <!-- Modal de Diretrizes do Agente (v0.4.2 + markdown render v0.4.2.1) — HOTFIX v0.5.1.2 -->
-  <div id="agents-overlay" onclick="if(event.target===this)closeAgents()" style="position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div id="agents-modal" class="modal-shell" style="border-radius:10px;padding:0;width:680px;max-width:94vw;max-height:88vh;box-shadow:0 28px 72px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;">
+  <div id="agents-overlay" onclick="if(event.target===this)closeAgents()" style="position:fixed;inset:0;background:var(--ov-dim);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+    <div id="agents-modal" class="modal-shell" style="background:var(--rail);border:1px solid var(--line);border-radius:10px;padding:0;width:680px;max-width:94vw;max-height:88vh;box-shadow:0 28px 72px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;">
       <div style="padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;">
         <span style="font-size:18px;">📋</span>
         <div style="flex:1;min-width:0;">
           <div class="modal-title" style="margin-bottom:2px;" data-i18n="agents.title">Diretrizes do Agente</div>
-          <div style="font-size:10.5px;color:var(--ink-muted);" data-i18n="agents.subtitle">Regras e princípios do PesquisAI (AGENTS.md)</div>
+          <div style="font-size:10.5px;color:var(--ink-muted);" data-i18n="agents.subtitle">Regras e princípios do UFVAI (AGENTS.md)</div>
         </div>
         <span id="agents-lang-badge" style="font-size:10px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;color:var(--ink-muted);font-family:var(--font-sans);">PT-BR</span>
         <button onclick="closeAgents()" class="modal-close" style="width:auto;padding:4px 10px;font-size:11px;" aria-label="Fechar">✕</button>
@@ -924,14 +1058,34 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </div>
   </div>
 
-  <!-- Modal de Memória PesquisAI (v0.5.1.4 — navegar + editar) -->
-  <div id="memory-overlay" onclick="if(event.target===this)closeMemory()" style="position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
-    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:0;width:980px;max-width:96vw;max-height:92vh;box-shadow:0 28px 72px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;">
+  <!-- Modal do Manual do UFVAI (v0.6.9 — MANUAL.md renderizado) -->
+  <div id="manual-overlay" onclick="if(event.target===this)closeManual()" style="position:fixed;inset:0;background:var(--ov-dim);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+    <div id="manual-modal" class="modal-shell" style="background:var(--rail);border:1px solid var(--line);border-radius:10px;padding:0;width:720px;max-width:94vw;max-height:88vh;box-shadow:0 28px 72px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;">
+      <div style="padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">📘</span>
+        <div style="flex:1;min-width:0;">
+          <div class="modal-title" style="margin-bottom:2px;" data-i18n="manual.title">Manual do UFVAI</div>
+          <div style="font-size:10.5px;color:var(--ink-muted);" data-i18n="manual.subtitle">Guia completo de uso (MANUAL.md)</div>
+        </div>
+        <button onclick="closeManual()" class="modal-close" style="width:auto;padding:4px 10px;font-size:11px;" aria-label="Fechar">✕</button>
+      </div>
+      <div id="manual-content" class="markdown-body" style="flex:1;overflow-y:auto;padding:22px 26px;font-size:12.5px;line-height:1.65;color:var(--ink);" data-i18n="manual.loading">Carregando manual…</div>
+      <div style="padding:10px 18px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;background:rgba(255,255,255,.02);">
+        <button onclick="reloadManual()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;">↻ <span data-i18n="ui.loading">Recarregar</span></button>
+        <div style="flex:1;"></div>
+        <a id="manual-source-link" href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/MANUAL.md" target="_blank" class="footer-link" style="font-size:10.5px;" data-i18n="manual.open_source">Ver fonte</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Memória UFVAI (v0.5.1.4 — navegar + editar) -->
+  <div id="memory-overlay" onclick="if(event.target===this)closeMemory()" style="position:fixed;inset:0;background:var(--ov-dim);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+    <div style="background:var(--rail);border:1px solid var(--line);border-radius:10px;padding:0;width:980px;max-width:96vw;max-height:92vh;box-shadow:0 28px 72px rgba(0,0,0,.7);display:flex;flex-direction:column;overflow:hidden;">
       <!-- Header -->
       <div style="padding:14px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;">
         <span style="font-size:18px;">🧠</span>
         <div style="flex:1;min-width:0;">
-          <div class="modal-title" style="margin-bottom:2px;" data-i18n="memory.title">Memória PesquisAI</div>
+          <div class="modal-title" style="margin-bottom:2px;" data-i18n="memory.title">Memória UFVAI</div>
           <div id="memory-subtitle" style="font-size:10.5px;color:var(--ink-muted);" data-i18n="memory.subtitle">Camada de memória persistente do agente</div>
         </div>
         <span id="memory-status-badge" style="font-size:10px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;color:var(--ink-muted);font-family:var(--font-sans);">…</span>
@@ -1000,8 +1154,37 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   </div>
 
   <!-- Sub-modal: criar nova nota (v0.5.1.4) -->
-  <div id="memory-new-overlay" onclick="if(event.target===this)closeCreateNoteDialog()" style="position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:100000;opacity:0;pointer-events:none;transition:opacity .15s;">
-    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:18px;width:420px;max-width:92vw;box-shadow:0 16px 40px rgba(0,0,0,.6);">
+  <!-- v0.6.4: Painel Admin de Telemetria -->
+  <div id="telemetry-overlay" onclick="if(event.target===this)closeTelemetry()" style="position:fixed;inset:0;background:var(--ov-dim);display:flex;align-items:center;justify-content:center;z-index:100000;opacity:0;pointer-events:none;transition:opacity .2s;">
+    <div style="background:var(--rail);border:1px solid var(--line);border-radius:10px;padding:22px;width:460px;max-width:92vw;max-height:86vh;overflow:auto;box-shadow:0 28px 72px rgba(0,0,0,.7);">
+      <div class="modal-title" data-i18n="telemetry.title">📊 Telemetria (Admin)</div>
+      <div id="tel-status" style="font-size:11.5px;line-height:1.6;color:var(--ink-muted);margin-bottom:14px;">…</div>
+      <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="telemetry.mid">ID de medição (G-XXXXXXXXXX)</label>
+      <input id="tel-mid" type="text" placeholder="G-CMVTFP2M6F" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;font-family:var(--font-mono);outline:none;margin-bottom:10px;" />
+      <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="telemetry.secret">API Secret (Measurement Protocol)</label>
+      <input id="tel-secret" type="password" placeholder="••••••••••••" autocomplete="off" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;font-family:var(--font-mono);outline:none;margin-bottom:6px;" />
+      <div style="font-size:10.5px;line-height:1.5;color:var(--ink-muted);margin-bottom:14px;">
+        GA4 → Admin → Fluxos de dados → Eventos de Measurement Protocol → Configurar.
+        O secret é gravado localmente (<code>~/.config/ufvai_telemetry.json</code>, permissão 600)
+        e nunca é exibido novamente. Deixe em branco para manter o já salvo. Guia completo: TELEMETRY.md §0.
+      </div>
+      <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;">✉️ URL de contato — recebe o e-mail dos usuários que aceitaram (opcional)</label>
+      <input id="tel-contact" type="text" placeholder="https://script.google.com/macros/s/SEU_ID/exec" autocomplete="off" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;font-family:var(--font-mono);outline:none;margin-bottom:6px;" />
+      <div id="tel-contact-status" style="font-size:10.5px;line-height:1.5;color:var(--ink-muted);margin-bottom:14px;">
+        Canal recomendado (Google, grátis): Planilha + <b>Apps Script</b> — cada aceite de contato
+        chega como nova linha na sua planilha. Passo a passo pronto: TELEMETRY.md §Passo 9.
+        Vazio = usuários NÃO são encaminhados (fica só o contador anônimo no GA4).
+      </div>
+      <div id="tel-msg" style="font-size:11.5px;margin-bottom:10px;display:none;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn-ghost" onclick="closeTelemetry()" style="padding:9px 16px;">Fechar</button>
+        <button class="btn-ghost" onclick="saveTelemetry()" id="tel-save-btn" style="padding:9px 16px;background:var(--accent);color:#000;border-color:var(--accent);font-weight:600;">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="memory-new-overlay" onclick="if(event.target===this)closeCreateNoteDialog()" style="position:fixed;inset:0;background:var(--ov-dim);display:flex;align-items:center;justify-content:center;z-index:100000;opacity:0;pointer-events:none;transition:opacity .15s;">
+    <div style="background:var(--rail);border:1px solid var(--line);border-radius:8px;padding:18px;width:420px;max-width:92vw;box-shadow:0 16px 40px rgba(0,0,0,.6);">
       <div style="font-size:13px;font-weight:600;margin-bottom:14px;" data-i18n="memory.new_note_dialog_title">📝 Nova nota</div>
       <label style="display:block;font-size:11px;color:var(--ink-muted);margin-bottom:4px;" data-i18n="memory.field_path">Caminho (ex: research/minha-nota.md)</label>
       <input id="memory-new-path" type="text" placeholder="research/minha-nota.md" style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:7px 9px;font-size:12px;font-family:var(--font-mono);outline:none;margin-bottom:10px;" />
@@ -1090,7 +1273,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   </style>
   <script>
     // ════════════════════════════════════════════════════════════
-    // PesquisAI v0.4.1 — Patch corretivo
+    // UFVAI v0.4.1 — Patch corretivo (marca v0.6.0)
     // (1) Responsividade, (2) Tema recarrega terminal, (3) Idioma UI
     // ════════════════════════════════════════════════════════════
 
@@ -1134,6 +1317,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       if (nav.startsWith("en")) return "en_US";
       if (nav.startsWith("es")) return "es_ES";
       if (nav.startsWith("fr")) return "fr_FR";
+      if (nav.startsWith("zh")) return "zh_CN";
       // 5. Padrão
       return "pt_BR";
     }
@@ -1180,26 +1364,41 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       try { localStorage.setItem(LANG_COOKIE, lang); } catch (e) {}
     }
 
-    function setLang(lang) {
-      // Persiste no backend (se disponível) + recarrega para aplicar
-      // traduções do backend também
+    async function setLang(lang) {
+      // v0.6.1: AGUARDA o backend reiniciar o ttyd (saudação no novo idioma)
+      // ANTES de recarregar a página — antes, o reload em 700ms interrompia
+      // o restart (~3-4s) e o iframe reconectava num terminal morto/antigo.
+      // v0.6.5: splash imediato ("Reiniciando terminal…") durante o restart;
+      // se falhar, splash some + toast de erro (sem reload às cegas).
       setCookie(LANG_COOKIE, lang);
-      try {
-        fetch(BASE + "/api/lang", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lang: lang })
-        }).catch(() => {});
-      } catch (e) {}
-      // Aplica imediatamente o que dá (UI strings)
-      applyLang(lang);
-      // Toast feedback
       const dict = I18N[lang] || I18N["pt_BR"];
       toast("🌐 " + (dict["languages.switched_to"] || lang), "info");
-      // Fecha menu
       closeLangMenu();
-      // Recarrega para que backend traduza também (toasts, modais completos)
-      setTimeout(() => location.reload(), 700);
+      applyLang(lang);
+      showBootSplash(dict["boot.restarting"] || "Reiniciando terminal…");
+      let ok = false;
+      try {
+        const ctrl = new AbortController();
+        // v0.6.5: backend espera a porta abrir com retry (~worst 22s); 35s de folga
+        const timer = setTimeout(() => ctrl.abort(), 35000);
+        const resp = await fetch(BASE + "/api/lang", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lang: lang }),
+          signal: ctrl.signal
+        });
+        clearTimeout(timer);
+        ok = resp.ok;
+      } catch (e) { ok = false; }
+      if (!ok) {
+        hideBootSplash();
+        toast("❌ " + ((I18N[_currentLang] || I18N["pt_BR"])["boot.failed"] ||
+              "Falha ao reiniciar o terminal. Tente novamente."), "err");
+        return;
+      }
+      // Recarrega para aplicar traduções do backend (toasts, modais completos).
+      // O backend só responde depois que a porta do ttyd já aceita conexões.
+      setTimeout(() => location.reload(), 400);
     }
 
     function buildLangMenu() {
@@ -1488,17 +1687,25 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     }
 
     // Recarrega o iframe do ttyd (usado após salvar key/trocar tema/restaurar sessão)
-    function reloadTerminalFrame() {
+    async function reloadTerminalFrame() {
       const fr = document.getElementById("terminal-frame");
       if (!fr) return;
       const theme = document.documentElement.getAttribute("data-theme") || "pesquisai";
-      const origSrc = (fr.src || "{__TERMINAL_URL__}").split("?")[0];
+      // v0.6.5: fonte da verdade agora é data-terminal-url (src pode ser
+      // about:blank enquanto o splash aguarda /api/ttyd_ready).
+      let origSrc = "";
+      try { origSrc = (fr.dataset && fr.dataset.terminalUrl) || ""; } catch (e) {}
+      if (!origSrc && fr.src && fr.src.indexOf("about:") !== 0) origSrc = fr.src;
+      origSrc = (origSrc || "{__TERMINAL_URL__}").split("?")[0];
+      if (!origSrc || origSrc === "about:blank") return;
       fr.src = "about:blank";
       // Uma nova sessão pode ter sido criada — invalida cache de histórico.
       _sessionsCache = { data: null, ts: 0 };
-      setTimeout(() => {
-        fr.src = origSrc + "?theme=" + theme + "&t=" + Date.now();
-      }, 3500);
+      // v0.6.5: reconecta somente com a porta respondendo (evita erro do
+      // Chrome dentro do iframe); se morto, delega ao boot com splash.
+      const quick = await waitTerminalReady(3000);
+      if (!quick) { bootTerminal(25000); return; }
+      fr.src = origSrc + "?theme=" + theme + "&t=" + Date.now();
     }
 
     // ── Gestão de chaves salvas ─────────────────────────────────
@@ -1809,6 +2016,11 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         // (que restaura dados mas depois inicia opencode do zero — linha 1600 do launch_app.py).
         // Em vez disso, usa "opencode -s <id>" com no_fallback=true para iniciar o opencode
         // diretamente na sessão desejada, mesmo padrão do /api/restore (doRestore()).
+        // v0.6.5: splash imediato — o backend só responde quando a porta do
+        // terminal novo já aceita conexões (ou erro).
+        showBootSplash((I18N[_currentLang] || I18N["pt_BR"])["boot.restoring"] ||
+                       "Restaurando sessão…");
+        closeSessions();
         const r = await fetch(BASE + "/api/run_terminal", {
           method: "POST",
           headers: {"Content-Type":"application/json"},
@@ -1819,16 +2031,15 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
           // Invalida cache para que a próxima abertura mostre a sessão atual
           _sessionsCache = { data: null, ts: 0 };
           toast("✅ Sessão " + sessionId + " restaurada! Recarregando página…", "ok");
-          closeSessions();
-          // 🐛 CORREÇÃO v0.5.1.8: usa location.reload() com delay igual a doRestore()
-          // para recarregar a página inteira e reconectar ao ttyd aberto com
-          // opencode -s <sessionId>.
-          setTimeout(() => location.reload(), 2500);
+          // Splash permanece cobrindo a tela; reload reconecta ao terminal pronto.
+          setTimeout(() => location.reload(), 600);
         } else {
+          hideBootSplash();
           toast("❌ Erro ao restaurar: " + (d.error || r.status), "err");
           loadSessions(true);
         }
       } catch(e) {
+        hideBootSplash();
         toast("❌ " + e.message, "err");
         loadSessions(true);
       }
@@ -1841,6 +2052,74 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     function closeShortcuts() {
       const o = document.getElementById("shortcuts-overlay");
       o.style.opacity = "0"; o.style.pointerEvents = "none";
+    }
+
+    // ── Painel Admin de Telemetria (v0.6.4) ─────────────────────
+    function openTelemetry() {
+      // v0.6.8: painel invisível ao usuário comum - só abre para admin
+      // Admin pode abrir via: URL ?admin=1, ou localStorage.setItem('ufvai_admin','1'), ou Ctrl+Shift+Alt+T
+      const isAdmin = new URLSearchParams(window.location.search).has('admin') || localStorage.getItem('ufvai_admin') === '1';
+      if (!isAdmin) {
+        // Silenciosamente ignora para usuário comum - telemetria continua via opt-in dos Termos
+        console.debug('Telemetria: painel restrito ao admin');
+        return;
+      }
+      const o = document.getElementById("telemetry-overlay");
+      o.style.opacity = "1"; o.style.pointerEvents = "all";
+      fetch(BASE + "/api/admin/telemetry").then(r=>r.json()).then(s=>{
+        const st = document.getElementById("tel-status");
+        if(!s.configured){
+          st.innerHTML = "<span style='color:var(--amber)'>● Não configurada</span> — preencha os campos abaixo para ativar a coleta.";
+        } else if(s.enabled){
+          st.innerHTML = "<span style='color:var(--green)'>● Ativa</span> · ID <code>" + s.measurement_id + "</code> (" + s.source + ") · consentimento do usuário: " + (s.consent_analytics ? "sim" : "aguardando opt-in");
+        } else {
+          let why = [];
+          if(s.kill_switch) why.push("kill-switch UFVAI_TELEMETRY=0");
+          if(!s.consent_accepted) why.push("Termos não aceitos");
+          else if(!s.consent_analytics) why.push("usuário não autorizou estatísticas");
+          st.innerHTML = "<span style='color:var(--red)'>● Inativa</span> · ID <code>" + s.measurement_id + "</code> · motivo: " + why.join("; ");
+        }
+        // v0.6.7: canal de contato — prefill da URL salva + status
+        const cIn = document.getElementById("tel-contact");
+        if(cIn && typeof s.contact_endpoint_url === "string") cIn.value = s.contact_endpoint_url;
+        const cs = document.getElementById("tel-contact-status");
+        if(cs){
+          const src = s.contact_endpoint_source === "env" ? "variável de ambiente" :
+                      (s.contact_endpoint_set ? "salva no painel" : "");
+          cs.innerHTML = (s.contact_endpoint_set ? "✉️ Canal de contato <b>ativo</b> ("+src+"). "
+                        : "✉️ Canal de contato inativo — vazio = usuários NÃO são encaminhados (só contador anônimo no GA4). ") +
+                        "Canal recomendado (Google, grátis): Planilha + <b>Apps Script</b> — TELEMETRY.md §Passo 9.";
+        }
+      }).catch(()=>{ document.getElementById("tel-status").textContent = "Falha ao consultar estado."; });
+    }
+    function closeTelemetry() {
+      const o = document.getElementById("telemetry-overlay");
+      o.style.opacity = "0"; o.style.pointerEvents = "none";
+    }
+    // Atalho secreto admin: Ctrl+Shift+Alt+T libera painel de telemetria
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.shiftKey && e.altKey && e.key.toLowerCase() === 't') {
+        localStorage.setItem('ufvai_admin', '1');
+        openTelemetry();
+      }
+    });
+
+    async function saveTelemetry() {
+      const mid = document.getElementById("tel-mid").value.trim();
+      const sec = document.getElementById("tel-secret").value.trim();
+      const contact = document.getElementById("tel-contact").value.trim(); // v0.6.7
+      const msg = document.getElementById("tel-msg");
+      msg.style.display = "block";
+      msg.textContent = "Salvando…"; msg.style.color = "var(--ink-muted)";
+      try{
+        const r = await fetch(BASE + "/api/admin/telemetry", {method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({measurement_id:mid, api_secret:sec, contact_endpoint:contact})});
+        const j = await r.json();
+        msg.textContent = j.message || (j.ok ? "Salvo." : "Erro.");
+        msg.style.color = j.ok ? "var(--green)" : "var(--red)";
+        if(j.ok && j.state){ document.getElementById("tel-secret").value=""; openTelemetry(); }
+      }catch(e){ msg.textContent = "Falha de rede."; msg.style.color = "var(--red)"; }
     }
 
     // ── Diretrizes do Agente (HOTFIX v0.5.1.2) ──────────────────
@@ -1918,8 +2197,59 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
           el.textContent = mdText;
         }
       } catch (e) {
-        el.textContent = mdText;
         console.error("Erro ao renderizar markdown:", e);
+      }
+    }
+
+    // ── v0.6.9: Manual do UFVAI (botão 📘 ao lado do Dashboard de Saúde) ──
+    let _manualCache = null;
+
+    async function openManual() {
+      const overlay = document.getElementById("manual-overlay");
+      if (overlay) {
+        overlay.style.opacity = "1";
+        overlay.style.pointerEvents = "all";
+      }
+      await loadManual();
+    }
+
+    function closeManual() {
+      const overlay = document.getElementById("manual-overlay");
+      if (overlay) {
+        overlay.style.opacity = "0";
+        overlay.style.pointerEvents = "none";
+      }
+    }
+
+    function reloadManual() {
+      _manualCache = null;
+      loadManual();
+    }
+
+    async function loadManual(forceReload = false) {
+      const contentEl = document.getElementById("manual-content");
+      if (!contentEl) return;
+      if (!forceReload && _manualCache) {
+        renderAgentsContent(contentEl, _manualCache);
+        return;
+      }
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      contentEl.textContent = dict["manual.loading"] || "Carregando manual…";
+      try {
+        const r = await fetch(BASE + "/api/manual");
+        const d = await r.json();
+        if (d.ok && d.content) {
+          _manualCache = d.content;
+          renderAgentsContent(contentEl, d.content);
+        } else {
+          // v0.6.9: fallback — abre o manual no GitHub
+          const gh = d.github || "https://github.com/gustavobraga-byte/PesquisAI/blob/main/MANUAL.md";
+          contentEl.innerHTML = (dict["manual.error"] || "Manual não encontrado localmente.")
+            + ' <a href="' + gh + '" target="_blank" style="color:var(--gold,#b8912f)">'
+            + (dict["manual.open_source"] || "Abrir no GitHub") + " ↗</a>";
+        }
+      } catch (e) {
+        contentEl.textContent = (dict["manual.error"] || "Erro") + " — " + e.message;
       }
     }
 
@@ -1962,7 +2292,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       });
     }
 
-    // ── Memória PesquisAI (v0.5.1.4 — navegar + editar) ────────
+    // ── Memória UFVAI (v0.5.1.4 — navegar + editar) ────────
     // Estado:
     //   _memoryTree      — lista plana de notas carregada do /api/obsidian/tree
     //   _memoryStatus    — {status, root, writable, notes_count, ...}
@@ -1998,9 +2328,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         list.innerHTML = '<div class="modal-empty" style="padding:14px;">' +
           (dict["ui.loading"] || "Carregando…") + '</div>';
       }
-      // v0.5.1.8: cache de 5s — evita nova requisição se cache for recente
+      // v0.6.17: cache de 120s + stale-while-revalidate — abertura instantânea
+      // (render imediato do cache; se >30s, revalida em background sem bloquear)
       const now = Date.now();
-      if (!force && _memoryCache.tree && (now - _memoryCache.ts) < 5000) {
+      if (!force && _memoryCache.tree && (now - _memoryCache.ts) < 120000) {
         _memoryStatus = _memoryCache.status;
         _memoryTree = _memoryCache.tree;
         renderMemoryHeader(_memoryCache.status, dict);
@@ -2010,6 +2341,14 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             const lastDaily = findLastDaily();
             if (lastDaily) loadMemoryNote(lastDaily.path);
           }
+        }
+        // v0.6.17: stale-while-revalidate — cache >30s atualiza em background
+        if (now - _memoryCache.ts > 30000) {
+          fetch(BASE + "/api/obsidian?include=tree").then(r=>r.json()).then(d=>{
+            if (d && d.ok) {
+              _memoryCache = { tree: d.tree || [], status: d, ts: Date.now() };
+            }
+          }).catch(()=>{});
         }
         return;
       }
@@ -2162,17 +2501,24 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
           if (matches.length) filtered.push({ folder: folder.folder, notes: matches });
         }
         const total = filtered.reduce((s, f) => s + f.notes.length, 0);
-        if (cnt) cnt.textContent = total + " " + (dict["memory.notes_count"] || "notas");
+        if (cnt) {
+          if (total > _memorySearchLimit) cnt.textContent = Math.min(total, _memorySearchLimit) + " de " + total + " " + (dict["memory.notes_count"] || "notas") + " · paginado";
+          else cnt.textContent = total + " " + (dict["memory.notes_count"] || "notas");
+        }
         if (total === 0) {
           list.innerHTML = '<div class="modal-empty" style="padding:14px;font-size:11.5px;">' +
             (dict["memory.no_results"] || "Nenhum resultado para '" + escapeHtml(q) + "'.") + '</div>';
           return;
         }
         let html = "";
+        let _shown = 0;
         for (const folder of filtered) {
+          if (_shown >= _memorySearchLimit) break;
           const label = folder.folder || "📁 (raiz)";
-          html += '<div class="mem-folder-label">' + escapeHtml(label) + '</div>';
+          html += '<div class="mem-folder-label">' + escapeHtml(label) + ' (' + folder.notes.length + ')</div>';
           for (const n of folder.notes) {
+            if (_shown >= _memorySearchLimit) break;
+            _shown++;
             const active = (_memoryCurrent && _memoryCurrent.path === n.path) ? " active" : "";
             const human  = n.is_pesquisai_generated ? "" : " human";
             const tagHtml = (n.tags || []).slice(0, 3).map(t =>
@@ -2184,6 +2530,9 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
                     (tagHtml ? '<div style="margin-top:3px;">' + tagHtml + '</div>' : '') +
                     '</div>';
           }
+        }
+        if (total > _memorySearchLimit) {
+          html += '<div style="padding:10px;text-align:center;"><button onclick="_loadMoreMemoryResults()" class="modal-close" style="width:auto;padding:6px 14px;font-size:11px;">Mostrar mais (' + (total - _memorySearchLimit) + ' restantes)</button></div>';
         }
         list.innerHTML = html;
         return;
@@ -2226,7 +2575,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       });
       for (const f of ordered) {
         const icon = folderIcons[f] || "📁";
-        const label = f ? f.replace(/\/$/, "") : "(raiz)";
+        const label = f ? f.replace(/\\/$/, "") : "(raiz)";
         const count = folderMap[f];
         const isDaily = f === "daily/";
         html += '<div class="mem-folder-card" data-folder="' + encodeURIComponent(f) + '" onclick="navigateToFolder(decodeURIComponent(this.dataset.folder))" style="padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s;display:flex;align-items:center;gap:10px;">';
@@ -2262,7 +2611,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         "hypothesis/": "💡", "datasource/": "🗄️", "moc/": "🗺️",
         "inbox/": "📥", "assets/": "🎨"
       };
-      html += '<span style="font-size:12px;font-weight:500;color:var(--ink-muted);">' + (iconMap[folderName] || "📁") + ' ' + escapeHtml(folderName.replace(/\/$/, "")) + '</span>';
+      html += '<span style="font-size:12px;font-weight:500;color:var(--ink-muted);">' + (iconMap[folderName] || "📁") + ' ' + escapeHtml(folderName.replace(/\\/$/, "")) + '</span>';
       html += '</div>';
 
       if (folderName === "daily/") {
@@ -2384,12 +2733,45 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
 
     // ── Busca ──────────────────────────────────────────────────────
     let _searchDebounce = null;
+    let _memorySearchLimit = 50; // v0.6.10: paginação para vaults grandes (evita renderizar 1000+ divs)
     function searchMemory(q) {
       if (_searchDebounce) clearTimeout(_searchDebounce);
       _searchDebounce = setTimeout(() => {
         _memorySearch = q;
+        _memorySearchLimit = 50; // reseta paginação a cada nova busca
         renderMemorySidebar();
-      }, 150);
+        // v0.6.10: para queries ≥3 chars, tenta BM25 server-side (ranking melhor que substring)
+        if ((q||"").trim().length >= 3) {
+          fetch(BASE + "/api/obsidian/search?q=" + encodeURIComponent(q) + "&limit=20")
+            .then(r=>r.json()).then(d=>{
+              if (d && Array.isArray(d.results) && d.results.length) {
+                // renderiza resultados BM25 como lista plana (ranking já ordenado)
+                const list = document.getElementById("memory-list");
+                const cnt  = document.getElementById("memory-count");
+                const dict = I18N[_currentLang] || I18N["pt_BR"];
+                if (!list) return;
+                if (cnt) cnt.textContent = d.results.length + " " + (dict["memory.notes_count"] || "notas") + " · BM25";
+                let html = '<div class="mem-folder-label">🔎 BM25 — top ' + d.results.length + '</div>';
+                for (const r of d.results.slice(0, 20)) {
+                  const n = r.note || r;
+                  const active = (_memoryCurrent && _memoryCurrent.path === n.path) ? " active" : "";
+                  const tagHtml = (n.tags || []).slice(0,3).map(t=>'<span style="display:inline-block;font-size:9px;padding:0 4px;background:var(--accent-dim);color:var(--accent);border-radius:2px;margin-right:2px;">#'+escapeHtml(String(t).replace(/^#/,""))+'</span>').join("");
+                  html += '<div class="mem-note-item'+active+'" data-path="'+encodeURIComponent(n.path)+'" onclick="loadMemoryNote(decodeURIComponent(this.dataset.path))">'
+                       + '<div class="mem-note-title">' + escapeHtml(n.title || n.path) + '</div>'
+                       + '<div class="mem-note-path">' + escapeHtml(n.path) + ' · score ' + (r.score!=null?Number(r.score).toFixed(2):"") + '</div>'
+                       + (r.snippet?'<div style="font-size:10.5px;color:var(--ink-muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+escapeHtml(r.snippet)+'</div>':"")
+                       + (tagHtml?'<div style="margin-top:3px;">'+tagHtml+'</div>':"")
+                       + '</div>';
+                }
+                list.innerHTML = html;
+              }
+            }).catch(()=>{});
+        }
+      }, 200);
+    }
+    function _loadMoreMemoryResults(){
+      _memorySearchLimit += 50;
+      renderMemorySidebar();
     }
 
     // ── Carregar nota no editor ───────────────────────────────────
@@ -2492,9 +2874,9 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         if (typeof marked !== "undefined" && marked.parse) {
           let html = marked.parse(src);
           // Destaque de wikilinks [[nota]] e tags #tag
-          html = html.replace(/\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|([^\]]+))?\]\]/g,
+          html = html.replace(/\\[\\[([^\\]|#]+)(?:#[^\\]|]+)?(?:\\|([^\\]]+))?\\]\\]/g,
             (m, target, alias) => '<span class="wikilink">[[' + escapeHtml(alias || target) + ']]</span>');
-          html = html.replace(/(^|[\s(])#([a-zA-Z0-9_\-/]+)/g,
+          html = html.replace(/(^|[\\s(])#([a-zA-Z0-9_\\-/]+)/g,
             (m, p, t) => p + '<span class="tag">#' + escapeHtml(t) + '</span>');
           prev.innerHTML = '<div class="mem-preview">' + html + '</div>';
         } else {
@@ -2508,7 +2890,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     // ── Editor: input → dirty ─────────────────────────────────────
     function onEditorInput() {
       if (!_memoryDirty) { _memoryDirty = true; markDirty(); }
-      if (_memoryTab === "split") renderPreview();
+      if (_memoryTab === "split" || _memoryTab === "preview") renderPreview();
     }
 
     function markDirty() {
@@ -2763,7 +3145,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         root.classList.remove("theme-light");
         root.setAttribute("data-theme", "pesquisai");
         // Garante que o body está com fundo escuro (anti-flash)
-        root.style.backgroundColor = "#0d0f10";
+        root.style.backgroundColor = "#141c24";
       }
       if (theme === "pesquisai-light") {
         root.style.setProperty("--ink", "#1f262a");
@@ -2771,32 +3153,38 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         root.style.setProperty("--surface", "#f5f6f7");
         root.style.setProperty("--rail", "#ffffff");
         root.style.setProperty("--line", "rgba(0,0,0,.1)");
-        root.style.setProperty("--accent", "#157a73");
-        root.style.setProperty("--accent-dim", "rgba(21,122,115,.10)");
-        root.style.setProperty("--accent-glow", "rgba(21,122,115,.18)");
+        // v0.6.4: paleta UFVAI (dourado sobre papel quente; antes: teal #157a73)
+        root.style.setProperty("--accent", "#8a6d33");
+        root.style.setProperty("--accent-dim", "rgba(138,109,51,.10)");
+        root.style.setProperty("--accent-glow", "rgba(138,109,51,.18)");
         root.style.setProperty("--green", "#2e7d32");
         root.style.setProperty("--green-dim", "rgba(46,125,50,.1)");
-        root.style.setProperty("--amber", "#e65100");
-        root.style.setProperty("--amber-dim", "rgba(230,81,0,.1)");
+        root.style.setProperty("--amber", "#a67c00");
+        root.style.setProperty("--amber-dim", "rgba(166,124,0,.12)");
         root.style.setProperty("--red", "#c62828");
         root.style.setProperty("--red-dim", "rgba(198,40,40,.1)");
+        // v0.6.5: backdrop de modais acompanha o tema claro
+        root.style.setProperty("--ov-dim", "rgba(30,42,52,.38)");
         document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#f5f6f7");
       } else {
         root.style.setProperty("--ink", "#e8e6e0");
         root.style.setProperty("--ink-muted", "#9a9790");
-        root.style.setProperty("--surface", "#0d0f10");
-        root.style.setProperty("--rail", "#151819");
+        // v0.6.4: alinhado ao :root UFVAI (antes: surface #0d0f10/rail #151819/accent teal #46a39b)
+        root.style.setProperty("--surface", "#141c24");
+        root.style.setProperty("--rail", "#1f2831");
         root.style.setProperty("--line", "rgba(255,255,255,.07)");
-        root.style.setProperty("--accent", "#46a39b");
+        root.style.setProperty("--accent", "#b29149");
         root.style.setProperty("--accent-dim", "rgba(var(--accent-rgb),.12)");
         root.style.setProperty("--accent-glow", "rgba(var(--accent-rgb),.22)");
         root.style.setProperty("--green", "#5dba7e");
         root.style.setProperty("--green-dim", "rgba(93,186,126,.12)");
-        root.style.setProperty("--amber", "#e8b84b");
-        root.style.setProperty("--amber-dim", "rgba(232,184,75,.12)");
+        root.style.setProperty("--amber", "#D1A705");
+        root.style.setProperty("--amber-dim", "rgba(209,167,5,.14)");
         root.style.setProperty("--red", "#e07070");
         root.style.setProperty("--red-dim", "rgba(224,112,112,.12)");
-        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#0d0f10");
+        // v0.6.5: backdrop de modais acompanha o tema escuro
+        root.style.setProperty("--ov-dim", "rgba(4,7,11,.8)");
+        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#141c24");
       }
     }
 
@@ -2832,6 +3220,86 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       } catch(e) {}
     }
 
+    // ── v0.6.5: Splash de carregamento do terminal ─────────────
+    // Polling em /api/ttyd_ready ANTES de apontar o iframe: o usuário vê
+    // uma tela de espera com a marca em vez do ERR_CONNECTION_REFUSED do
+    // Chrome dentro do retângulo do terminal.
+    const TERMINAL_URL = (document.getElementById("terminal-frame") || {}).dataset
+      ? (document.getElementById("terminal-frame").dataset.terminalUrl || "")
+      : "";
+
+    function _bootEls() {
+      return {
+        splash: document.getElementById("boot-splash"),
+        status: document.getElementById("boot-status"),
+        err: document.getElementById("boot-error"),
+        retry: document.getElementById("boot-retry"),
+        frame: document.getElementById("terminal-frame"),
+      };
+    }
+
+    function _bootDict() { return I18N[_currentLang] || I18N["pt_BR"]; }
+
+    function showBootSplash(msg) {
+      const el = _bootEls();
+      if (!el.splash) return;
+      el.splash.style.display = "";
+      el.splash.classList.remove("hide");
+      const sp = el.splash.querySelector(".boot-spinner");
+      const bar = el.splash.querySelector(".boot-bar");
+      if (sp) sp.style.display = "";
+      if (bar) bar.style.display = "";
+      if (el.status) { el.status.style.display = ""; if (msg) el.status.textContent = msg; }
+      if (el.err) el.err.style.display = "none";
+      if (el.retry) el.retry.style.display = "none";
+    }
+
+    function hideBootSplash() {
+      const el = _bootEls();
+      if (!el.splash) return;
+      el.splash.classList.add("hide");
+      setTimeout(() => { el.splash.style.display = "none"; }, 500);
+    }
+
+    async function waitTerminalReady(maxMs) {
+      const t0 = Date.now();
+      maxMs = maxMs || 30000;
+      while (Date.now() - t0 < maxMs) {
+        try {
+          const r = await fetch(BASE + "/api/ttyd_ready", { cache: "no-store" });
+          if (r.ok) { const d = await r.json(); if (d.ready) return true; }
+        } catch (e) {}
+        await new Promise(z => setTimeout(z, 600));
+      }
+      return false;
+    }
+
+    async function bootTerminal(maxMs) {
+      const el = _bootEls();
+      if (!el.frame || !TERMINAL_URL) { hideBootSplash(); return; }
+      showBootSplash(_bootDict()["boot.starting"] || "Iniciando terminal…");
+      const ok = await waitTerminalReady(maxMs);
+      if (!ok) {
+        const dict = _bootDict();
+        const sp = el.splash.querySelector(".boot-spinner");
+        const bar = el.splash.querySelector(".boot-bar");
+        if (sp) sp.style.display = "none";
+        if (bar) bar.style.display = "none";
+        if (el.status) el.status.style.display = "none";
+        if (el.err) {
+          el.err.textContent = (dict["boot.timeout"] ||
+            "O terminal não respondeu. Verifique ~/PesquisAI/logs/ttyd.log.");
+          el.err.style.display = "block";
+        }
+        if (el.retry) el.retry.style.display = "inline-block";
+        return;
+      }
+      let loaded = false;
+      el.frame.onload = () => { loaded = true; hideBootSplash(); };
+      el.frame.src = TERMINAL_URL;
+      setTimeout(() => { if (!loaded) hideBootSplash(); }, 8000); // fallback visual
+    }
+
     // ── Listeners globais ─────────────────────────────────────
     document.addEventListener("keydown", (e) => {
       if (e.key === "?" && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) {
@@ -2862,61 +3330,48 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       // 1. Aplica idioma (síncrono, sem flash)
       applyLang(_currentLang);
       buildLangMenu();
+      // v0.6.15: sincroniza prompt inicial com idioma detectado do navegador
+      // Se backend ainda está em pt_BR (bug pré-0.6.15) e frontend detectou en/es/fr/zh, reinicia ttyd automaticamente
+      try {
+        fetch(BASE + "/api/lang").then(r=>r.json()).then(d=>{
+          const backendLang = d.lang;
+          if(backendLang && backendLang !== _currentLang && LANGS[_currentLang]) {
+            if(!sessionStorage.getItem("ufvai_lang_synced")) {
+              sessionStorage.setItem("ufvai_lang_synced", "1");
+              setLang(_currentLang);
+            }
+          }
+        }).catch(()=>{});
+      } catch(e){}
       // 2. Carrega tema
       loadInitialTheme();
       // 3. Aplica keys no ambiente
       fetch(BASE + "/api/apikey/apply", { method: "POST" }).catch(() => {});
-      // 4. First-run welcome hint
-      var _welcomeEl = document.getElementById("welcome-hint");
-      if (_welcomeEl && !localStorage.getItem("pesquisai_onboarded")) {
-        _welcomeEl.style.opacity = "1";
-        _welcomeEl.style.pointerEvents = "all";
-      }
+      // 4. v0.6.4: welcome-hint antigo REMOVIDO — a tela de Termos de Uso
+      //    (terms-overlay, com a logomarca oficial UFVAI) é a única abertura.
+      // 5. v0.6.5: conecta o terminal (com splash) só quando /api/ttyd_ready
+      bootTerminal();
+      // 6. v0.6.17: pré-aquece a memória (fire-and-forget) — o servidor constrói
+      //    o índice BM25 em background E popula o cache local; o 1º clique no
+      //    menu da memória abre instantâneo (sem esperar o Drive FUSE)
+      try {
+        fetch(BASE + "/api/obsidian?include=tree").then(r=>r.json()).then(d=>{
+          if (d && d.ok) {
+            _memoryCache = { tree: d.tree || [], status: d, ts: Date.now() };
+          }
+        }).catch(()=>{});
+      } catch(e){}
     });
     window.addEventListener("beforeunload", () => { _stopSessionsPoll(); });
   </script>
   <!-- marked.js: renderizador de markdown para o modal de Diretrizes do Agente e preview do editor -->
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
-  <!-- Welcome hint (first-run onboarding) -->
-<div id="welcome-hint" onclick="document.getElementById('welcome-hint').style.opacity='0';document.getElementById('welcome-hint').style.pointerEvents='none';try{localStorage.setItem('pesquisai_onboarded','1')}catch(e){}" style="position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:100000;opacity:0;pointer-events:none;transition:opacity .25s;">
-  <div style="background:#1c1f22;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:28px 32px;width:420px;max-width:90vw;box-shadow:0 28px 72px rgba(0,0,0,.7);text-align:center;">
-    
-    <!-- Logo SVG -->
-    <div style="margin-bottom:12px;display:flex;justify-content:center;">
-      <img src="https://raw.githubusercontent.com/gustavobraga-byte/PesquisAI/refs/heads/main/assets/logo.svg" alt="PesquisAI" style="width:260px;height:auto;max-width:80vw;border-radius:8px;" />
-    </div>
-
-    <!-- Descrição concisa -->
-    <div style="font-size:12.5px;line-height:1.65;color:var(--ink-muted);margin-bottom:8px;">
-      Agente de IA para pesquisa científica.
-    </div>
-    
-    <!-- Linha 1: Links principais -->
-    <div style="font-size:12px;line-height:1.6;color:var(--ink-muted);margin-bottom:4px;">
-      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/MANUAL.md" target="_blank" style="color:var(--accent);text-decoration:underline;">Manual</a>
-      &middot;
-      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/AGENTS.md" target="_blank" style="color:var(--accent);text-decoration:underline;">Arquitetura</a>
-      &middot;
-      <a href="https://github.com/gustavobraga-byte/PesquisAI" target="_blank" style="color:var(--accent);text-decoration:underline;">Repositório</a>
-    </div>
-    
-    <!-- Linha 2: Links legais/éticos -->
-    <div style="font-size:12px;line-height:1.6;color:var(--ink-muted);margin-bottom:20px;">
-      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/disclaimer_pesquisai.md" target="_blank" style="color:var(--accent);text-decoration:underline;">Disclaimer</a>
-      &middot;
-      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/MANUAL.md#citação-do-pesquisai" target="_blank" style="color:var(--accent);text-decoration:underline;">Como citar</a>
-      &middot;
-      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/declaracao_uso_ia.md" target="_blank" style="color:var(--accent);text-decoration:underline;">Uso de IA</a>
-    </div>
-    
-    <!-- Botão -->
-    <button onclick="document.getElementById('welcome-hint').style.opacity='0';document.getElementById('welcome-hint').style.pointerEvents='none';try{localStorage.setItem('pesquisai_onboarded','1')}catch(e){}" class="btn-ghost" style="background:var(--accent);color:#000;border-color:var(--accent);font-weight:600;padding:10px 28px;cursor:pointer;border-radius:6px;border:1px solid transparent;font-size:13px;">Começar</button>
-  </div>
-</div>
+  <!-- v0.6.4: welcome-hint (onboarding antigo PesquisAI) REMOVIDO.
+       A logomarca oficial UFVAI agora abre na tela de Termos de Uso (terms-overlay). -->
   </div>
   <!-- Confirm dialog overlay (replaces native confirm()) -->
-  <div id="confirm-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:100001;opacity:0;pointer-events:none;transition:opacity .18s;">
-    <div style="background:#181b1e;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:22px;width:400px;max-width:92vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
+  <div id="confirm-overlay" style="position:fixed;inset:0;background:var(--ov-dim);display:flex;align-items:center;justify-content:center;z-index:100001;opacity:0;pointer-events:none;transition:opacity .18s;">
+    <div style="background:var(--rail);border:1px solid var(--line);border-radius:10px;padding:22px;width:400px;max-width:92vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div id="confirm-msg" style="font-size:13px;line-height:1.55;color:var(--ink);margin-bottom:18px;"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;">
         <button id="confirm-no" class="btn-ghost" style="padding:9px 16px;" data-i18n="ui.cancel">Cancelar</button>
@@ -2924,6 +3379,478 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       </div>
     </div>
   </div>
+
+<!-- ═══ v0.6.0 — Termos de Uso (aceite obrigatório na 1ª entrada) ═══ -->
+<style>
+  #terms-overlay{position:fixed;inset:0;z-index:99999;display:none;align-items:center;
+    justify-content:center;background:rgba(10,13,17,.93);backdrop-filter:blur(6px);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;padding:16px;
+    overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  #terms-overlay .t-card{max-width:660px;width:100%;background:#141c24;border:1px solid #b29149;
+    border-radius:14px;padding:24px 26px;color:#e8e6e0;box-shadow:0 20px 60px rgba(0,0,0,.5);
+    max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;
+    -webkit-overflow-scrolling:touch;margin:auto;}
+  #terms-overlay .t-brand{font-family:"Montserrat","Syne",sans-serif;font-size:26px;
+    letter-spacing:-0.02em;margin-bottom:2px;}
+  #terms-overlay .t-brand b{font-weight:700}#terms-overlay .t-brand em{font-style:normal;font-weight:600;color:#b29149}
+  #terms-overlay .t-sub{font-size:11px;color:#9a9790;margin-bottom:14px;}
+  #terms-overlay .t-scroll{max-height:38vh;overflow:auto;border:1px solid rgba(178,145,73,.25);
+    border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.55;color:#cfcabf;margin-bottom:14px;}
+  #terms-overlay .t-scroll h4{margin:10px 0 4px;color:#b29149;font-size:12px;}
+  #terms-overlay .t-scroll p{margin:4px 0;}
+  #terms-overlay .t-links{font-size:11px;margin-bottom:14px;display:flex;gap:14px;flex-wrap:wrap;}
+  #terms-overlay .t-links a{color:#D1A705;text-decoration:none;border-bottom:1px dotted #D1A705;}
+  #terms-overlay label.t-check{display:flex;gap:9px;align-items:flex-start;font-size:12px;
+    margin-bottom:8px;cursor:pointer;line-height:1.45;}
+  #terms-overlay input[type=checkbox]{accent-color:#b29149;width:15px;height:15px;margin-top:1px;flex:0 0 auto;}
+  #terms-overlay .t-actions{display:flex;gap:10px;margin-top:14px;}
+  #terms-overlay button{flex:1;padding:11px 14px;border-radius:9px;font-size:13px;font-weight:600;
+    cursor:pointer;border:1px solid transparent;transition:.15s;}
+  #terms-overlay .t-ok{background:linear-gradient(135deg,#D1A705,#b29149);color:#141c24;border:none;}
+  #terms-overlay .t-ok:disabled{opacity:.35;cursor:not-allowed;}
+  #terms-overlay .t-no{background:transparent;color:#9a9790;border-color:rgba(154,151,144,.35);}
+  /* ── v0.6.9: RESPONSIVO (celulares/tablets — tudo visível e rolável) ── */
+  @media (max-width:640px){
+    #terms-overlay{padding:10px;padding-left:max(10px,env(safe-area-inset-left));
+      padding-right:max(10px,env(safe-area-inset-right));align-items:flex-start;
+      -webkit-text-size-adjust:100%;text-size-adjust:100%;}
+    #terms-overlay .t-card{padding:16px 14px;padding-bottom:calc(16px + env(safe-area-inset-bottom));
+      border-radius:12px;max-height:calc(100vh - 20px);max-height:calc(100dvh - 20px);}
+    #terms-overlay .t-card > div:first-child{margin-bottom:6px;}
+    #terms-overlay .t-card img[alt^="UFVAI"]{width:64px !important;height:64px !important;}
+    #terms-overlay .t-brand{font-size:21px;}
+    #terms-overlay .t-sub{font-size:10px;margin-bottom:10px;}
+    /* rolagem ÚNICA no card (sem scroll aninhado — mais natural no toque) */
+    #terms-overlay .t-scroll{max-height:none;padding:10px 11px;font-size:11.5px;}
+    #terms-overlay .t-scroll h4{font-size:11.5px;}
+    #terms-overlay .t-links{gap:9px;font-size:10.5px;margin-bottom:10px;}
+    #terms-overlay label.t-check{font-size:11.5px;gap:8px;}
+    #terms-overlay input[type=checkbox]{width:14px;height:14px;}
+    #terms-overlay input[type=email]{font-size:16px !important;padding:10px 11px !important;}
+    #terms-overlay .t-actions{flex-direction:column;gap:8px;margin-top:12px;}
+    /* v0.6.9: alvo de toque ≥44px (Apple HIG/Material) + sem highlight de tap */
+    #terms-overlay button{padding:12px 10px;font-size:13px;flex:none;width:100%;
+      min-height:46px;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+    #terms-overlay input[type=checkbox]{width:18px !important;height:18px !important;flex:0 0 auto;}
+  }
+  /* telas MUITO estreitas (ex.: iPhone SE, 320–400px) */
+  @media (max-width:400px){
+    #terms-overlay{padding:8px;}
+    #terms-overlay .t-card{padding:14px 12px;}
+    #terms-overlay .t-card img[alt^="UFVAI"]{width:54px !important;height:54px !important;}
+    #terms-overlay .t-brand{font-size:19px;}
+    #terms-overlay .t-scroll{font-size:11px;}
+    #terms-overlay .t-links{flex-direction:column;gap:7px;}
+    #terms-overlay label.t-check{font-size:11px;}
+  }
+  /* ALTURA baixa (landscape de celular OU tablet esticado) — prioriza o formulário */
+  @media (max-height:520px){
+    #terms-overlay{align-items:flex-start;}
+    #terms-overlay .t-card{padding:12px 16px;max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);}
+    #terms-overlay .t-card img[alt^="UFVAI"]{width:40px !important;height:40px !important;margin-bottom:4px !important;}
+    #terms-overlay .t-brand{font-size:17px;margin-bottom:0;}
+    #terms-overlay .t-sub{margin-bottom:6px;}
+    #terms-overlay .t-scroll{max-height:none;font-size:10.5px;padding:8px 10px;}
+    #terms-overlay .t-links{margin-bottom:8px;}
+    #terms-overlay .t-actions{gap:6px;margin-top:8px;}
+  }
+  @media (max-height:600px) and (orientation:landscape){
+    #terms-overlay{align-items:flex-start;}
+    #terms-overlay .t-scroll{max-height:none;}
+    #terms-overlay .t-card img[alt^="UFVAI"]{width:48px !important;height:48px !important;}
+  }
+</style>
+<div id="terms-overlay" role="dialog" aria-modal="true" aria-label="Termos de Uso">
+  <div class="t-card">
+    <!-- v0.6.4: logomarca oficial UFVAI (asset local, offline-safe; some graciosamente se ausente) -->
+    <div style="display:flex;justify-content:center;margin-bottom:10px;">
+      <img src="assets/logo-oficial-288.jpg" alt="UFVAI — Universidade Federal de Viçosa"
+           onerror="this.style.display='none'"
+           style="width:96px;height:96px;border-radius:50%;border:2px solid rgba(178,145,73,.55);box-shadow:0 4px 18px rgba(0,0,0,.45);background:#fff;object-fit:cover;" />
+    </div>
+    <div class="t-brand"><b>UFV</b><em>AI</em></div>
+    <div class="t-sub">Pesquisa científica com integridade · UFV/DER · v{__VERSION__}</div>
+    <div class="t-scroll">
+      <h4>🇧🇷 Português</h4>
+      <p>O UFVAI é fornecido sob a <b>licença MIT</b>, sem garantias, e apoia pesquisa científica
+      com <b>integridade</b>: valide as saídas da IA e declare o uso de IA conforme a Portaria CNPq
+      nº 2.664/2026. Você é responsável pelas suas chaves de API (armazenadas cifradas no seu Google
+      Drive), pelo conteúdo gerado e pelas políticas dos provedores de IA. Nenhum conteúdo do seu
+      vault é enviado a terceiros pela telemetria — ela é <b>anônima, sem cookies, ativa por padrão
+      após este aceite (legítimo interesse, LGPD art. 7º IX) e desligável a qualquer momento</b>
+      (desmarque a opção acima ou UFVAI_TELEMETRY=0 — art. 18 §2º). Termos completos v2.1 no link abaixo.</p>
+      <h4>🇺🇸 English</h4>
+      <p>UFVAI is provided under the <b>MIT license</b>, without warranty. Validate AI outputs and
+      disclose AI use per CNPq Ordinance 2.664/2026. You are responsible for your API keys,
+      generated content and provider policies. Telemetry is anonymous, cookie-free, <b>on by
+      default after accepting these terms</b> (legitimate interest, LGPD art. 7º IX) and can be
+      disabled anytime (uncheck above or UFVAI_TELEMETRY=0).</p>
+      <p style="opacity:.75">Español: licencia MIT, sin garantías; telemetría anónima activa por defecto, sin cookies, desactivable.
+      · Français : licence MIT, sans garantie ; télémétrie anonyme active par défaut, sans cookies, désactivable.
+      · 中文：MIT 许可证，不提供担保；遥测为匿名、默认开启（无 Cookie），可随时关闭。</p>
+    </div>
+    <div class="t-links">
+      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/LICENSE" target="_blank" rel="noopener">📜 Licença MIT + Notice / License</a>
+      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/docs/TERMS_OF_USE.md" target="_blank" rel="noopener">📄 Termos completos v2.1 / Full terms</a>
+      <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/PRIVACY.md" target="_blank" rel="noopener">🔒 Privacidade · LGPD / Privacy</a>
+    </div>
+    <!-- v0.6.9: telemetria ATIVA POR PADRÃO (opt-out) — base: legítimo interesse (LGPD art. 7º IX),
+         sem cookie _ga (analytics_storage:'denied'), direito de oposição art. 18 §2º + UFVAI_TELEMETRY=0.
+         Opcionais ANTES do obrigatório (ordem crescente de exigência, v0.6.8) -->
+    <label class="t-check"><input type="checkbox" id="t-analytics" checked>
+      <span>Estatísticas anônimas de uso — <b>ativas por padrão</b> &nbsp;<span style="opacity:.7">(Anonymous usage stats — on by default, no cookies, no content. Desmarque para não contribuir / uncheck to opt out — LGPD art. 18 §2º; kill-switch UFVAI_TELEMETRY=0)</span></span></label>
+    <!-- v0.6.10: Nome ao lado do e-mail (flex row: lado a lado no desktop, coluna no mobile) -->
+    <div class="t-row" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:2px;">
+      <label class="t-check" style="flex:1 1 160px;display:block;min-width:140px;margin:0;">
+        <span style="display:block;margin-bottom:4px;font-size:12px;font-weight:600">Nome — <b>obrigatório</b>
+          <span style="opacity:.7;font-weight:400">(Name — <b>required</b>)</span></span>
+        <input type="text" id="t-name" placeholder="Seu nome"
+               autocomplete="name" spellcheck="false"
+               style="width:100%;box-sizing:border-box;padding:9px 11px;border-radius:8px;font-size:13px;
+                      background:#0f151c;border:1px solid rgba(178,145,73,.35);color:#e8e6e0;outline:none;">
+      </label>
+      <label class="t-check" style="flex:1.2 1 180px;display:block;min-width:160px;margin:0;">
+        <span style="display:block;margin-bottom:4px;font-size:12px;font-weight:600">E-mail — <b>obrigatório</b>
+          <span style="opacity:.7;font-weight:400">(E-mail — <b>required</b>)</span></span>
+        <input type="email" id="t-email" placeholder="nome@dominio.br"
+               autocomplete="email" spellcheck="false"
+               style="width:100%;box-sizing:border-box;padding:9px 11px;border-radius:8px;font-size:13px;
+                      background:#0f151c;border:1px solid rgba(178,145,73,.35);color:#e8e6e0;outline:none;">
+      </label>
+    </div>
+    <span style="display:block;font-size:10.5px;opacity:.65;margin:2px 0 6px;line-height:1.45">
+      🔒 LGPD — nome e e-mail para ativação do UFVAI e contato sobre o produto (art. 7º V), guardados localmente
+      (chmod 600) e em backups/ufvai_consentimento.json no SEU Drive; cifrados em trânsito. IP armazenado para métrica de ativação.
+      O Google Analytics <b>nunca</b> recebe seu nome/e-mail/IP (apenas contador anônimo).
+      Você pode apagar a qualquer momento (art. 18).<br>
+      Name and e-mail to activate UFVAI and contact you; stored locally and in YOUR Drive; never sent to Google Analytics.</span>
+    <label class="t-check"><input type="checkbox" id="t-accept">
+      <span>Li e aceito os Termos de Uso e a Licença MIT &nbsp;<span style="opacity:.7">(I have read and accept the Terms of Use and the MIT License)</span></span></label>
+    <div class="t-actions">
+      <button class="t-no" id="t-decline-btn">Não aceitar / Decline</button>
+      <button class="t-ok" id="t-accept-btn" disabled>Aceitar e começar / Accept</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ v0.6.9 — Bem-vindo de volta (usuário já ativo na reabertura) ═══ -->
+<style>
+  #welcome-overlay{position:fixed;inset:0;z-index:99998;display:none;align-items:center;
+    justify-content:center;background:rgba(10,13,17,.93);backdrop-filter:blur(6px);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;padding:16px;
+    overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  #welcome-overlay .w-card{max-width:440px;width:100%;background:#141c24;border:1px solid #b29149;
+    border-radius:14px;padding:28px 30px;color:#e8e6e0;box-shadow:0 20px 60px rgba(0,0,0,.5);
+    text-align:center;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;
+    -webkit-overflow-scrolling:touch;margin:auto;}
+  #welcome-overlay .w-logo{width:96px;height:96px;border-radius:50%;border:2px solid rgba(178,145,73,.55);
+    box-shadow:0 4px 18px rgba(0,0,0,.45);background:#fff;object-fit:cover;margin:0 auto 12px;display:block;}
+  #welcome-overlay .w-brand{font-family:"Montserrat","Syne",sans-serif;font-size:26px;letter-spacing:-0.02em;}
+  #welcome-overlay .w-brand b{font-weight:700}#welcome-overlay .w-brand em{font-style:normal;font-weight:600;color:#b29149}
+  #welcome-overlay .w-title{font-size:18px;font-weight:600;margin:10px 0 4px;color:#e8e6e0;}
+  #welcome-overlay .w-sub{font-size:12px;color:#9a9790;line-height:1.5;margin-bottom:16px;}
+  #welcome-overlay .w-email{display:inline-block;background:rgba(178,145,73,.12);border:1px solid rgba(178,145,73,.4);
+    border-radius:8px;padding:10px 18px;font-size:15px;font-weight:600;color:#F0E4C3;margin:4px 0 6px;word-break:break-all;}
+  #welcome-overlay .w-note{font-size:10.5px;color:#7d7a72;line-height:1.45;margin:6px 0 18px;}
+  #welcome-overlay .w-actions{display:flex;flex-direction:column;gap:9px;}
+  #welcome-overlay button{padding:12px 14px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;
+    border:1px solid transparent;transition:.15s;width:100%;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+  #welcome-overlay .w-ok{background:linear-gradient(135deg,#D1A705,#b29149);color:#141c24;border:none;min-height:46px;}
+  #welcome-overlay .w-switch{background:transparent;color:#9a9790;border-color:rgba(154,151,144,.35);font-weight:500;min-height:44px;}
+  @media (max-width:640px){
+    #welcome-overlay{padding:10px;padding-left:max(10px,env(safe-area-inset-left));
+      padding-right:max(10px,env(safe-area-inset-right));align-items:flex-start;
+      -webkit-text-size-adjust:100%;text-size-adjust:100%;}
+    #welcome-overlay .w-card{padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom));
+      border-radius:12px;max-height:calc(100vh - 20px);max-height:calc(100dvh - 20px);}
+    #welcome-overlay .w-logo{width:72px !important;height:72px !important;}
+    #welcome-overlay .w-brand{font-size:21px;}
+    #welcome-overlay .w-title{font-size:16px;}
+    #welcome-overlay .w-email{font-size:14px;}
+  }
+  @media (max-width:400px){
+    #welcome-overlay{padding:8px;}
+    #welcome-overlay .w-card{padding:16px 12px;}
+    #welcome-overlay .w-logo{width:60px !important;height:60px !important;}
+    #welcome-overlay .w-brand{font-size:19px;}
+  }
+  @media (max-height:520px){
+    #welcome-overlay{align-items:flex-start;}
+    #welcome-overlay .w-card{padding:14px 16px;max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);}
+    #welcome-overlay .w-logo{width:44px !important;height:44px !important;margin-bottom:6px !important;}
+    #welcome-overlay .w-title{font-size:15px;margin-top:6px;}
+    #welcome-overlay .w-sub{margin-bottom:10px;}
+    #welcome-overlay .w-actions{gap:6px;}
+  }
+</style>
+<div id="welcome-overlay" role="dialog" aria-modal="true" aria-label="Bem-vindo de volta">
+  <div class="w-card">
+    <img src="assets/logo-oficial-288.jpg" alt="UFVAI — Universidade Federal de Viçosa"
+         onerror="this.style.display='none'" class="w-logo" />
+    <div class="w-brand"><b>UFV</b><em>AI</em></div>
+    <div class="w-sub" style="font-size:11px;color:#9a9790;margin-bottom:8px;">Pesquisa científica com integridade · UFV/DER · v{__VERSION__}</div>
+    <div class="w-title">👋 Bem-vindo de volta! / Welcome back!</div>
+    <div class="w-sub">Continue sua pesquisa de onde parou.<br>
+      <span style="opacity:.75">Pick up your research where you left off.</span></div>
+    <div class="w-email" id="w-email">—</div>
+    <div class="w-note">🔒 Seu e-mail de ativação — guardado no seu Drive (backups/ufvai_consentimento.json)
+      · Your activation e-mail — stored in your Drive (backups/ufvai_consentimento.json).</div>
+    <div class="w-actions">
+      <button class="w-ok" id="w-ok-btn">Continuar como este usuário / Continue as this user</button>
+      <button class="w-switch" id="w-switch-btn">Se não é você, alterar e-mail / Not you? Change e-mail</button>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  // v0.6.14: captura IP público via ipify (CORS) — corrige Colab localhost (proxy sem XFF)
+  var __UFVAI_CLIENT_IP__ = "";
+  try {
+    fetch("https://api.ipify.org?format=json", {cache:"no-store"}).then(function(r){return r.json();}).then(function(j){ if(j && j.ip) __UFVAI_CLIENT_IP__ = String(j.ip).trim(); }).catch(function(){});
+    setTimeout(function(){ if(!__UFVAI_CLIENT_IP__) fetch("https://ipinfo.io/json", {cache:"no-store"}).then(function(r){return r.json();}).then(function(j){ if(j && j.ip) __UFVAI_CLIENT_IP__ = String(j.ip).trim(); }).catch(function(){}); }, 1800);
+  } catch(e){}
+  try{
+    // v0.6.10: termos v6 → re-consentimento (nome+email obrigatórios, IP capturado)
+    // v0.6.14: __UFVAI_CLIENT_IP__ enviado junto a /api/consent e /api/access
+    var _TV="6";
+    var ov=document.getElementById("terms-overlay");
+    if(!ov) return;
+    var chk=document.getElementById("t-accept"),
+        btn=document.getElementById("t-accept-btn"),
+        an=document.getElementById("t-analytics"),
+        em=document.getElementById("t-email"),
+        nm=document.getElementById("t-name"),
+        profAnalytics=null,  // v0.6.10: prefs do perfil p/ o fluxo "Se não é você"
+        err=null, errName=null;
+    function _validMail(v){return !!v && /^[^@\\s]{1,64}@[^@\\s]+\\.[^@\\s]{2,}$/.test(v);}
+    function _validName(v){ v=(v||"").trim(); return v.length>=2 && v.length<=100 && /^[A-Za-zÀ-ÿÀ-ÿ\\s'\\-]{2,100}$/.test(v); }
+    function _updateBtn(){
+      // v0.6.10: NOME + E-MAIL obrigatórios — habilita só com Termos aceitos + ambos válidos
+      var okMail=_validMail((em&&em.value||"").trim());
+      var okName=_validName((nm&&nm.value||"").trim());
+      btn.disabled=!(chk.checked && okMail && okName);
+    }
+    function _post(accepted, analytics, contactEmail, contactName){
+      try{
+        var payload={accepted:accepted,analytics:analytics,terms_version:_TV};
+        if(contactEmail!==undefined) payload.contact_email=contactEmail;
+        if(contactName!==undefined) payload.contact_name=contactName;
+        if(__UFVAI_CLIENT_IP__) payload.ip=__UFVAI_CLIENT_IP__;
+        fetch("/api/consent",{method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(payload)}).catch(function(){});
+      }catch(e){}
+    }
+    var _heartbeatSent=false;
+    function _heartbeat(){
+      try{
+        if(_heartbeatSent) return;
+        _heartbeatSent=true;
+        var p={}; if(__UFVAI_CLIENT_IP__) p.ip=__UFVAI_CLIENT_IP__;
+        fetch("/api/access",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}).catch(function(){});
+      }catch(e){}
+    }
+    function _showErr(msg){
+      if(!err){
+        err=document.createElement("div");
+        err.style.cssText="font-size:11px;color:#e07b5f;margin-top:4px;";
+        var p=em?em.parentNode:null; if(p) p.appendChild(err); else ov.appendChild(err);
+      }
+      err.textContent=msg||"";
+    }
+    function _showErrName(msg){
+      if(!errName){
+        errName=document.createElement("div");
+        errName.style.cssText="font-size:11px;color:#e07b5f;margin-top:4px;";
+        var p=nm?nm.parentNode:null; if(p) p.appendChild(errName); else ov.appendChild(errName);
+      }
+      errName.textContent=msg||"";
+    }
+    chk.addEventListener("change",_updateBtn);
+    if(em) em.addEventListener("input",function(){ if(err) err.textContent=""; _updateBtn(); });
+    if(nm) nm.addEventListener("input",function(){ if(errName) errName.textContent=""; _updateBtn(); });
+    // v0.6.10: MOBILE — autofill do celular preenche nome/e-mail SEM disparar "input";
+    // sem isso o botão ficaria desabilitado e o usuário não conseguiria clicar.
+    // Cobrimos com change/blur + verificação periódica leve (só com overlay visível).
+    if(em){ em.addEventListener("change",_updateBtn); em.addEventListener("blur",_updateBtn); }
+    if(nm){ nm.addEventListener("change",_updateBtn); nm.addEventListener("blur",_updateBtn); }
+    var _autofillTimer=null;
+    function _ensureAutofillWatch(){
+      if(_autofillTimer) return;
+      _autofillTimer=setInterval(function(){
+        if(ov.style.display==="none"){ clearInterval(_autofillTimer); _autofillTimer=null; return; }
+        _updateBtn();
+      },400);
+    }
+    _ensureAutofillWatch();
+    // v0.6.10: MOBILE — teclado virtual não pode cobrir o campo/botão: rola até o
+    // elemento focado (visualViewport quando disponível; fallback scrollIntoView).
+    function _reveal(elm,delay){
+      try{ setTimeout(function(){
+        if(window.visualViewport && typeof window.visualViewport.height==="number"){
+          var r=elm.getBoundingClientRect(), vh=window.visualViewport.height;
+          if(r.bottom>vh || r.top<0) elm.scrollIntoView({block:"center",behavior:"smooth"});
+        } else {
+          elm.scrollIntoView({block:"nearest",behavior:"smooth"});
+        }
+      },delay||250); }catch(e){}
+    }
+    if(em) em.addEventListener("focus",function(){ _reveal(em,300); });
+    if(nm) nm.addEventListener("focus",function(){ _reveal(nm,300); });
+    if(btn) btn.addEventListener("focus",function(){ _reveal(btn,150); });
+    if(window.visualViewport){
+      try{
+        window.visualViewport.addEventListener("resize",function(){
+          var ae=document.activeElement;
+          if(ae===em || ae===nm) _reveal(ae,60);
+        });
+      }catch(e){}
+    }
+    btn.addEventListener("click",function(){
+      var v=(em&&em.value||"").trim();
+      var vn=(nm&&nm.value||"").trim();
+      if(!_validName(vn)){ _showErrName("Nome obrigatório — informe seu nome (2–100 letras). / Name required — enter your name (2–100 letters)."); try{nm.focus();}catch(e){} return; }
+      if(errName) errName.textContent="";
+      if(!_validMail(v)){ _showErr("E-mail obrigatório — informe um e-mail válido para continuar. / E-mail required — enter a valid e-mail to continue."); try{em.focus();}catch(e){} return; }
+      if(err) err.textContent="";
+      localStorage.setItem("ufvai_terms_version",_TV);
+      localStorage.setItem("ufvai_analytics", an.checked?"1":"0");
+      _post(true, an.checked, v, vn);
+      ov.style.display="none";
+      if(_autofillTimer){ clearInterval(_autofillTimer); _autofillTimer=null; }
+      // v0.6.9: telemetria ativa por padrão — liga o GA se NÃO desmarcada (opt-out)
+      if(an.checked && typeof window._ufvaiGaStart==="function"){ try{ window._ufvaiGaStart(); }catch(e){} }
+    });
+    document.getElementById("t-decline-btn").addEventListener("click",function(){
+      _post(false,false);
+      ov.innerHTML='<div class="t-card"><div class="t-brand"><b>UFV</b><em>AI</em></div>'+
+        '<p style="font-size:13px;line-height:1.6">Você optou por não aceitar os Termos de Uso.<br>'+
+        'A interface permanecerá bloqueada. Feche esta aba para encerrar.<br><br>'+
+        '<span style="opacity:.75">You declined the Terms of Use — the UI stays locked. Close this tab to exit.</span></p></div>';
+    });
+    // ── v0.6.10: PRÉ-PREENCHIMENTO — perfil persistente (backups/ufvai_consentimento.json) ──
+    try{
+      // v0.6.10: overlay "Bem-vindo de volta" — referências (nome + e-mail)
+      var wov=document.getElementById("welcome-overlay");
+      var wOk=document.getElementById("w-ok-btn");
+      var wSwitch=document.getElementById("w-switch-btn");
+      var wEmail=document.getElementById("w-email");
+      function _showWelcome(email, name){
+        if(!wov) return false;
+        try{
+          var txt="";
+          if(name && email) txt=name + " — " + email;
+          else if(email) txt=email;
+          else if(name) txt=name;
+          else txt="—";
+          if(wEmail) wEmail.textContent=txt;
+        }catch(e){}
+        wov.style.display="flex";
+        return true;
+      }
+      function _hideWelcome(){
+        try{ if(wov) wov.style.display="none"; }catch(e){}
+      }
+      // "Continuar" → heartbeat de acesso ativo (e-mail + hora + flag + IP) — v0.6.16: APENAS no clique
+      if(wOk){
+        wOk.addEventListener("click",function(){
+          try{ _heartbeat(); }catch(e){}
+          _hideWelcome();
+          if(_autofillTimer){ clearInterval(_autofillTimer); _autofillTimer=null; }
+        });
+      }
+      // "Se não é você" → abre os Termos com os campos nome/e-mail editáveis
+      if(wSwitch){
+        wSwitch.addEventListener("click",function(){
+          _hideWelcome();
+          var wTxt=(wEmail&&wEmail.textContent)||"";
+          // tenta separar nome — email quando exibido como "Nome — email"
+          var curEmail=wTxt, curName="";
+          if(wTxt.indexOf(" — ")!==-1){ var parts=wTxt.split(" — "); curName=parts[0]||""; curEmail=parts[1]||""; }
+          else if(wTxt.indexOf("@")!==-1){ curEmail=wTxt; }
+          else if(wTxt!=="—"){ curName=wTxt; }
+          if(nm && !nm.value && curName) nm.value=curName;
+          if(em && !em.value && curEmail && curEmail!=="—") em.value=curEmail;
+          // fallback: busca direto do profile carregado
+          try{
+            if(nm && profName && !nm.value) nm.value=profName;
+            if(em && (d&&d.profile&&d.profile.email) && !em.value) em.value=d.profile.email;
+          }catch(e){}
+          if(an && typeof profAnalytics!=="undefined"){ an.checked=!!profAnalytics; }
+          if(chk){ chk.checked=true; }
+          ov.style.display="flex";
+          _updateBtn();
+          try{ if(nm && !nm.value) setTimeout(function(){ nm.focus(); },260);
+               else if(em) setTimeout(function(){ em.focus(); em.select(); },260); }catch(e){}
+        });
+      }
+      var profName=""; // para uso no switch
+      fetch("/api/consent").then(function(r){return r.json();}).then(function(d){
+        var prof=(d&&d.profile)||{};
+        profAnalytics=prof.analytics;
+        profName=(prof.name||prof.nome||"");
+        // Já aceitou ESTA versão (perfil sobrevive à sessão)?
+        // v0.6.10: mostra "Bem-vindo de volta" com nome + e-mail
+        if(prof.accepted && prof.terms_version===_TV){
+          localStorage.setItem("ufvai_terms_version",_TV);
+          localStorage.setItem("ufvai_analytics", prof.analytics?"1":"0");
+          if(prof.analytics && typeof window._ufvaiGaStart==="function"){ try{ window._ufvaiGaStart(); }catch(e){} }
+          if(!_showWelcome(prof.email, profName)){
+            return; // sem overlay (fallback): segue sem exibir nada
+          }
+          // v0.6.16: heartbeat APENAS no clique "Continuar" (não automático ao exibir o welcome)
+          return;
+        }
+        // Sessão anterior (versão antiga dos Termos): pré-preenche nome+e-mail e só confirma
+        if(profName && nm && !nm.value){ nm.value=profName; }
+        if(prof.email && em && !em.value){ em.value=prof.email; }
+        if(an && typeof prof.analytics!=="undefined"){ an.checked=!!prof.analytics; }
+        if(chk){ chk.checked=true; }
+        ov.style.display="flex";
+        _updateBtn();
+      }).catch(function(){ ov.style.display="flex"; _updateBtn(); });
+    }catch(e){ ov.style.display="flex"; _updateBtn(); }
+  }catch(e){}
+})();
+</script>
+
+<!-- ═══ Google tag (gtag.js) — GA4 client-side · v0.6.4 ═══
+     ID: {__GA_MEASUREMENT_ID__} · Carregado APENAS após aceite dos Termos com
+     opt-in de estatísticas (LGPD art. 7º I). Sem consentimento: nada é carregado,
+     nenhum cookie _ga é criado, nenhuma requisição ao googletagmanager sai. -->
+<script>
+(function(){
+  var MID="{__GA_MEASUREMENT_ID__}", IS_COLAB={__IS_COLAB__};
+  if(!MID) return;
+  var loaded=false;
+  function _start(){
+    if(loaded) return; loaded=true;
+    try{
+      window.dataLayer=window.dataLayer||[];
+      window.gtag=function(){window.dataLayer.push(arguments);};
+      var s=document.createElement("script");s.async=true;
+      s.src="https://www.googletagmanager.com/gtag/js?id="+MID;
+      document.head.appendChild(s);
+      gtag('js',new Date());
+      // v0.6.9: telemetria ativa por padrão (opt-out) e SEM cookie —
+      // analytics_storage:'denied' impede o cookie _ga no dispositivo do
+      // usuário (base: legítimo interesse, LGPD art. 7º IX; oposição art. 18 §2º).
+      gtag('config',MID,{send_page_view:true,anonymize_ip:true,analytics_storage:'denied'});
+      // v0.6.9: coleta resumida aos DADOS PADRÃO do Analytics (page_view) —
+      // evento custom ufvai_session removido.
+    }catch(e){}
+  }
+  window._ufvaiGaStart=_start;
+  try{
+    // v0.6.10: opt-out — inicia se o aceite da versão atual existir E o usuário
+    // NÃO tiver desativado as estatísticas ("0"). undefined/"1" = ativo.
+    if(localStorage.getItem("ufvai_terms_version")==="6" &&
+       localStorage.getItem("ufvai_analytics")!=="0"){
+      setTimeout(_start,1200); // deixa a UI carregar primeiro
+    }
+  }catch(e){}
+})();
+</script>
 </body>
 </html>"""
 
@@ -2935,7 +3862,18 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     html = html.replace("{__TERMINAL_URL__}", terminal_url)
     html = html.replace("{__DRIVE_URL__}", drive_url)
     html = html.replace("{__VERSION__}", VERSION)
+    # v0.6.8: garantir que qualquer variante do placeholder seja substituída
+    # (screenshot mostrava v__UFVAI_VERSION__ literal por cache/branch antigo)
+    html = html.replace("__UFVAI_VERSION__", VERSION)
+    html = html.replace("__VERSION__", VERSION)
+    html = html.replace("v__UFVAI_VERSION__", f"v{VERSION}")
+    html = html.replace("__UFVAI_TOKEN__", session_token or "")
     html = html.replace("{RESPONSIVE_CSS}", RESPONSIVE_CSS)
+    # v0.6.4: GA4 client-side (gtag.js) — ID do admin (env > default embutido);
+    # vazio desliga o canal client-side (fica só o Measurement Protocol).
+    _ga_id = os.environ.get("UFVAI_GA_MEASUREMENT_ID", "G-CMVTFP2M6F").strip()
+    html = html.replace("{__GA_MEASUREMENT_ID__}", _ga_id)
+    html = html.replace("{__IS_COLAB__}", "true" if os.path.isdir("/content") else "false")
 
     i18n_inline: dict[str, dict[str, str]] = {
         "pt_BR": {
@@ -2973,12 +3911,20 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.toggle": "Alternar tema", "theme.light": "Tema claro (UI + terminal)",
             "theme.dark": "Tema escuro (UI + terminal)",
             "theme.terminal_reloaded": "Terminal recarregado com novo tema",
+            # v0.6.5 — Splash de carregamento do terminal
+            "boot.starting": "Iniciando terminal…",
+            "boot.restarting": "Reiniciando terminal…",
+            "boot.restoring": "Restaurando sessão…",
+            "boot.timeout": "O terminal não respondeu. Verifique ~/PesquisAI/logs/ttyd.log e recarregue.",
+            "boot.failed": "Falha ao reiniciar o terminal. Tente novamente.",
+            "boot.retry": "↻ Recarregar",
             "languages.label": "Idioma", "languages.switched_to": "Idioma alterado para",
             "success_messages.backup_saved": "Backup salvo",
-            # v0.5.1.2 — Memória PesquisAI
-            "memory.title": "Memória PesquisAI",
+            # v0.5.1.2 — Memória UFVAI
+            "memory.title": "Memória UFVAI",
+            "telemetry.title": "Telemetria (Admin)",
             "memory.subtitle": "Camada de memória persistente do agente",
-            "memory.tooltip": "Memória PesquisAI (segundo cérebro)",
+            "memory.tooltip": "Memória UFVAI (segundo cérebro)",
             "memory.status_ready": "🟢 Ativa",
             "memory.status_disabled": "⚪ Desativada",
             "memory.status_no_vault": "🟡 Sem vault",
@@ -3017,7 +3963,12 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "memory.no_results": "Nenhum resultado para a busca.",
             # v0.5.1.2 hotfix — Diretrizes do Agente
             "agents.title": "Diretrizes do Agente",
-            "agents.subtitle": "Regras e princípios do PesquisAI (AGENTS.md)",
+            "manual.title": "Manual do UFVAI",
+            "manual.subtitle": "Guia completo de uso (MANUAL.md)",
+            "manual.loading": "Carregando manual…",
+            "manual.error": "Manual não encontrado localmente.",
+            "manual.open_source": "Abrir no GitHub",
+            "agents.subtitle": "Regras e princípios do UFVAI (AGENTS.md)",
             "agents.loading": "Carregando diretrizes…",
             "agents.error": "Erro ao carregar diretrizes do agente.",
             "agents.copy_ok": "Diretrizes copiadas!",
@@ -3059,12 +4010,20 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.toggle": "Toggle theme", "theme.light": "Light theme (UI + terminal)",
             "theme.dark": "Dark theme (UI + terminal)",
             "theme.terminal_reloaded": "Terminal reloaded with new theme",
+            # v0.6.5 — Terminal boot splash
+            "boot.starting": "Starting the terminal…",
+            "boot.restarting": "Restarting the terminal…",
+            "boot.restoring": "Restoring session…",
+            "boot.timeout": "The terminal did not respond. Check ~/PesquisAI/logs/ttyd.log and reload.",
+            "boot.failed": "Failed to restart the terminal. Please try again.",
+            "boot.retry": "↻ Reload",
             "languages.label": "Language", "languages.switched_to": "Language switched to",
             "success_messages.backup_saved": "Backup saved",
             # v0.5.1.2 — PesquisAI Memory
-            "memory.title": "PesquisAI Memory",
+            "memory.title": "UFVAI Memory",
+            "telemetry.title": "Telemetry (Admin)",
             "memory.subtitle": "Agent's persistent memory layer",
-            "memory.tooltip": "PesquisAI Memory (second brain)",
+            "memory.tooltip": "UFVAI Memory (second brain)",
             "memory.status_ready": "🟢 Active",
             "memory.status_disabled": "⚪ Disabled",
             "memory.status_no_vault": "🟡 No vault",
@@ -3103,7 +4062,12 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "memory.no_results": "No results for the search.",
             # v0.5.1.2 hotfix — Agent Guidelines
             "agents.title": "Agent Guidelines",
-            "agents.subtitle": "PesquisAI rules and principles (AGENTS.md)",
+            "manual.title": "UFVAI Manual",
+            "manual.subtitle": "Complete user guide (MANUAL.md)",
+            "manual.loading": "Loading manual…",
+            "manual.error": "Manual not found locally.",
+            "manual.open_source": "Open on GitHub",
+            "agents.subtitle": "UFVAI rules and principles (AGENTS.md)",
             "agents.loading": "Loading guidelines…",
             "agents.error": "Error loading agent guidelines.",
             "agents.copy_ok": "Guidelines copied!",
@@ -3145,12 +4109,20 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.toggle": "Alternar tema", "theme.light": "Tema claro (UI + terminal)",
             "theme.dark": "Tema oscuro (UI + terminal)",
             "theme.terminal_reloaded": "Terminal recargado con nuevo tema",
+            # v0.6.5 — Splash de arranque del terminal
+            "boot.starting": "Iniciando el terminal…",
+            "boot.restarting": "Reiniciando el terminal…",
+            "boot.restoring": "Restaurando sesión…",
+            "boot.timeout": "El terminal no respondió. Revisa ~/PesquisAI/logs/ttyd.log y recarga.",
+            "boot.failed": "No se pudo reiniciar el terminal. Inténtalo de nuevo.",
+            "boot.retry": "↻ Recargar",
             "languages.label": "Idioma", "languages.switched_to": "Idioma cambiado a",
             "success_messages.backup_saved": "Copia guardada",
             # v0.5.1.2 — Memoria PesquisAI
-            "memory.title": "Memoria PesquisAI",
+            "memory.title": "Memoria UFVAI",
+            "telemetry.title": "Telemetría (Admin)",
             "memory.subtitle": "Capa de memoria persistente del agente",
-            "memory.tooltip": "Memoria PesquisAI (segundo cerebro)",
+            "memory.tooltip": "Memoria UFVAI (segundo cerebro)",
             "memory.status_ready": "🟢 Activa",
             "memory.status_disabled": "⚪ Desactivada",
             "memory.status_no_vault": "🟡 Sin vault",
@@ -3189,7 +4161,12 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "memory.no_results": "Sin resultados para la búsqueda.",
             # v0.5.1.2 hotfix — Directrices del Agente
             "agents.title": "Directrices del Agente",
-            "agents.subtitle": "Reglas y principios del PesquisAI (AGENTS.md)",
+            "manual.title": "Manual del UFVAI",
+            "manual.subtitle": "Guía completa de uso (MANUAL.md)",
+            "manual.loading": "Cargando manual…",
+            "manual.error": "Manual no encontrado localmente.",
+            "manual.open_source": "Abrir en GitHub",
+            "agents.subtitle": "Reglas y principios del UFVAI (AGENTS.md)",
             "agents.loading": "Cargando directrices…",
             "agents.error": "Error al cargar las directrices del agente.",
             "agents.copy_ok": "¡Directrices copiadas!",
@@ -3231,12 +4208,20 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "theme.toggle": "Basculer le thème", "theme.light": "Thème clair (UI + terminal)",
             "theme.dark": "Thème sombre (UI + terminal)",
             "theme.terminal_reloaded": "Terminal rechargé avec le nouveau thème",
+            # v0.6.5 — Écran de démarrage du terminal
+            "boot.starting": "Démarrage du terminal…",
+            "boot.restarting": "Redémarrage du terminal…",
+            "boot.restoring": "Restauration de la session…",
+            "boot.timeout": "Le terminal n'a pas répondu. Consultez ~/PesquisAI/logs/ttyd.log puis rechargez.",
+            "boot.failed": "Échec du redémarrage du terminal. Veuillez réessayer.",
+            "boot.retry": "↻ Recharger",
             "languages.label": "Langue", "languages.switched_to": "Langue changée en",
             "success_messages.backup_saved": "Sauvegarde enregistrée",
             # v0.5.1.2 — Mémoire PesquisAI
-            "memory.title": "Mémoire PesquisAI",
+            "memory.title": "Mémoire UFVAI",
+            "telemetry.title": "Télémétrie (Admin)",
             "memory.subtitle": "Couche de mémoire persistante de l'agent",
-            "memory.tooltip": "Mémoire PesquisAI (deuxième cerveau)",
+            "memory.tooltip": "Mémoire UFVAI (deuxième cerveau)",
             "memory.status_ready": "🟢 Active",
             "memory.status_disabled": "⚪ Désactivée",
             "memory.status_no_vault": "🟡 Pas de vault",
@@ -3275,13 +4260,112 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
             "memory.no_results": "Aucun résultat pour la recherche.",
             # v0.5.1.2 hotfix — Directives de l'Agent
             "agents.title": "Directives de l'Agent",
-            "agents.subtitle": "Règles et principes du PesquisAI (AGENTS.md)",
+            "manual.title": "Manuel du UFVAI",
+            "manual.subtitle": "Guide complet d'utilisation (MANUAL.md)",
+            "manual.loading": "Chargement du manuel…",
+            "manual.error": "Manuel introuvable localement.",
+            "manual.open_source": "Ouvrir sur GitHub",
+            "agents.subtitle": "Règles et principes du UFVAI (AGENTS.md)",
             "agents.loading": "Chargement des directives…",
             "agents.error": "Erreur lors du chargement des directives de l'agent.",
             "agents.copy_ok": "Directives copiées !",
             "agents.copy": "Copier",
             "agents.open_source": "Voir la source",
         },
+        "zh_CN": {
+            "ui.backup": "保存备份", "ui.restore": "恢复",
+            "ui.drive": "云端硬盘", "ui.close": "关闭", "ui.cancel": "取消",
+            "ui.loading": "加载中…", "ui.status_active": "智能体运行中",
+            "ui.exporting": "正在导出会话…",
+            "dashboard.title": "健康状态面板",
+            "providers.title": "连接 AI 提供商",
+            "providers.select": "选择要配置 API key 的提供商：",
+            "providers.saved_keys": "已保存到云端硬盘的密钥：",
+            "providers.add_new": "新建提供商",
+            "providers.search": "搜索提供商…",
+            "providers.api_key": "API KEY", "providers.back": "← 返回",
+            "providers.save_connect": "保存并连接",
+            "providers.var": "变量",
+            "providers.key_required": "请输入 API key。",
+            "providers.select_required": "请选择一个提供商。",
+            "providers.saving": "保存中…",
+            "providers.connected": "已连接",
+            "providers.updated": "已更新",
+            "providers.no_saved_keys": "暂无已保存的密钥。",
+            "providers.edit": "编辑",
+            "providers.delete": "删除",
+            "providers.confirm_delete": "删除以下提供商的密钥：",
+            "providers.deleted": "已删除",
+            "sessions.refresh": "↻ 刷新",
+            "sessions.title": "会话历史",
+            "sessions.search_placeholder": "🔍 按 ID 或内容搜索…",
+            "shortcuts.title": "键盘快捷键",
+            "shortcuts.copy": "复制所选内容", "shortcuts.copy_hint": "按住 Shift 并选择",
+            "shortcuts.interrupt": "中断命令", "shortcuts.paste": "粘贴（Chrome）",
+            "shortcuts.menu": "菜单与选项", "shortcuts.model": "更改模型",
+            "shortcuts.history_prev": "上一条历史", "shortcuts.history_next": "下一条历史",
+            "theme.toggle": "切换主题", "theme.light": "浅色主题（界面+终端）",
+            "theme.dark": "深色主题（界面+终端）",
+            "theme.terminal_reloaded": "终端已应用新主题并重新加载",
+            # v0.6.5 — 终端启动画面
+            "boot.starting": "正在启动终端…",
+            "boot.restarting": "正在重启终端…",
+            "boot.restoring": "正在恢复会话…",
+            "boot.timeout": "终端无响应。请查看 ~/PesquisAI/logs/ttyd.log 后重新加载。",
+            "boot.failed": "重启终端失败，请重试。",
+            "boot.retry": "↻ 重新加载",
+            "languages.label": "语言", "languages.switched_to": "语言已切换为",
+            "success_messages.backup_saved": "备份已保存",
+            "memory.title": "UFVAI 记忆库",
+            "telemetry.title": "遥测（管理员）",
+            "memory.subtitle": "智能体的持久记忆层（第二大脑）",
+            "memory.tooltip": "UFVAI 记忆库（第二大脑）",
+            "memory.status_ready": "🟢 运行中",
+            "memory.status_disabled": "⚪ 未启用",
+            "memory.status_no_vault": "🟡 缺少 vault",
+            "memory.status_read_only": "🟡 只读",
+            "memory.status_error": "🔴 错误",
+            "memory.notes_count": "笔记",
+            "memory.notes_unit": "篇",
+            "memory.tags_count": "标签",
+            "memory.avg_len": "平均长度",
+            "memory.links_count": "链接",
+            "memory.recent_notes": "最近笔记",
+            "memory.recent_daily": "最近日志",
+            "memory.templates": "模板",
+            "memory.refresh": "刷新",
+            "memory.save": "保存",
+            "memory.new_note": "新建笔记",
+            "memory.new_note_dialog_title": "新建笔记",
+            "memory.new_note_title": "笔记标题",
+            "memory.field_title": "标题",
+            "memory.field_tags": "标签（逗号分隔）",
+            "memory.field_template": "模板",
+            "memory.field_path": "路径",
+            "memory.empty_editor": "选择或创建一条笔记",
+            "memory.body_placeholder": "在此编写 Markdown…",
+            "memory.dirty": "有未保存的更改",
+            "memory.delete": "删除",
+            "memory.tab_edit": "编辑",
+            "memory.tab_preview": "预览",
+            "memory.tab_split": "分栏",
+            "memory.no_notes": "暂无笔记",
+            "memory.no_results": "无结果",
+            "memory.note_title": "笔记标题",
+            "memory.open_vault": "在 Obsidian 中打开",
+            "agents.title": "智能体规则（AGENTS.md）",
+            "manual.title": "UFVAI 使用手册",
+            "manual.subtitle": "完整使用指南（MANUAL.md）",
+            "manual.loading": "正在加载手册…",
+            "manual.error": "本地未找到手册。",
+            "manual.open_source": "在 GitHub 打开",
+            "agents.subtitle": "UFVAI 的规则与原则（AGENTS.md）",
+            "agents.copy": "复制 AGENTS.md",
+            "agents.copy_ok": "已复制到剪贴板",
+            "agents.error": "无法加载 AGENTS.md",
+            "agents.loading": "正在加载 AGENTS.md…",
+            "agents.open_source": "查看源码"
+        }
     }
 
     html = html.replace("{__LANGS_JSON__}", _json.dumps(langs_dict, ensure_ascii=False))
@@ -3315,7 +4399,7 @@ def main() -> None:
     print(f"🌐 Contém seletor de idioma: {'lang-btn' in html}")
     print(f"🎨 Contém toggleTheme com reload: {'terminal_reloaded' in html}")
     print(f"📐 Media queries: {html.count('@media')}")
-    print(f"🗣️ Idiomas suportados: {len(SUPPORTED_LANGUAGES)} (pt_BR, en_US, es_ES, fr_FR)")
+    print(f"🗣️ Idiomas suportados: {len(SUPPORTED_LANGUAGES)} (pt_BR, en_US, es_ES, fr_FR, zh_CN)")
 
 
 if __name__ == "__main__":

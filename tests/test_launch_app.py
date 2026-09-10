@@ -51,10 +51,11 @@ class TestCreateWrapperHtml:
 
     def test_html_contains_features(self, tmp_path, monkeypatch):
         """HTML deve conter 4 features e VERSION dinamico."""
-        monkeypatch.setattr("pesquisai.launch_app.WRAPPER_DIR", str(tmp_path))
+        monkeypatch.setattr("pesquisai.launch_app_responsive_v041.WRAPPER_DIR", str(tmp_path))
         launch_app.create_wrapper_html(
             "http://localhost:8000", "https://drive.google.com/test")
-        html = open(os.path.join(str(tmp_path), "index.html"), encoding="utf-8").read()
+        with open(os.path.join(str(tmp_path), "index.html"), encoding="utf-8") as _hf:
+            html = _hf.read()
         assert len(html) > 5000
         assert f"v{VERSION}" in html
         assert "openHealth()" in html
@@ -67,27 +68,30 @@ class TestCreateWrapperHtml:
 
     def test_html_contains_urls(self, tmp_path, monkeypatch):
         """HTML deve conter as URLs passadas."""
-        monkeypatch.setattr("pesquisai.launch_app.WRAPPER_DIR", str(tmp_path))
+        monkeypatch.setattr("pesquisai.launch_app_responsive_v041.WRAPPER_DIR", str(tmp_path))
         launch_app.create_wrapper_html(
             "http://localhost:9999", "https://drive.google.com/abc")
-        html = open(os.path.join(str(tmp_path), "index.html"), encoding="utf-8").read()
+        with open(os.path.join(str(tmp_path), "index.html"), encoding="utf-8") as _hf:
+            html = _hf.read()
         assert "http://localhost:9999" in html
         assert "https://drive.google.com/abc" in html
 
     def test_html_contains_providers(self, tmp_path, monkeypatch):
         """HTML deve conter a lista de provedores de IA."""
-        monkeypatch.setattr("pesquisai.launch_app.WRAPPER_DIR", str(tmp_path))
+        monkeypatch.setattr("pesquisai.launch_app_responsive_v041.WRAPPER_DIR", str(tmp_path))
         launch_app.create_wrapper_html("http://t", "http://d")
-        html = open(os.path.join(str(tmp_path), "index.html"), encoding="utf-8").read()
+        with open(os.path.join(str(tmp_path), "index.html"), encoding="utf-8") as _hf:
+            html = _hf.read()
         assert "anthropic" in html
         assert "openai" in html
         assert "PROVIDERS" in html
 
     def test_html_contains_backup_buttons(self, tmp_path, monkeypatch):
         """HTML deve conter botoes de backup e restaurar."""
-        monkeypatch.setattr("pesquisai.launch_app.WRAPPER_DIR", str(tmp_path))
+        monkeypatch.setattr("pesquisai.launch_app_responsive_v041.WRAPPER_DIR", str(tmp_path))
         launch_app.create_wrapper_html("http://t", "http://d")
-        html = open(os.path.join(str(tmp_path), "index.html"), encoding="utf-8").read()
+        with open(os.path.join(str(tmp_path), "index.html"), encoding="utf-8") as _hf:
+            html = _hf.read()
         assert "doBackup()" in html
         assert "openRestore()" in html
 

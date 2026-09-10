@@ -1,39 +1,59 @@
-# <img href="https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb" src="assets/logo.svg"> 
+<div align="center">
 
-[![Abrir no Colab](https://img.shields.io/badge/Clique_aqui-Comece_a_usar-brightgreen?style=for-the-badge)](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb)
+![UFVAI](assets/logo.svg#gh-light-mode-only)
+![UFVAI](assets/logo.svg#gh-dark-mode-only)
 
-[![Licença MIT](https://img.shields.io/badge/licença-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
-[![Status](https://img.shields.io/badge/status-em%20desenvolvimento-yellow.svg)]()
-[![SisPPG/UFV](https://img.shields.io/badge/SisPPG-10356285004-blue.svg)](http://sisppg.ufv.br)
-[![Versão](https://img.shields.io/badge/versão-0.5.1.8-orange.svg)]()
+# UFVAI — Inteligência que acelera a ciência
 
-> Ecossistema de agentes de IA para acelerar a pesquisa científica.
+**Agente de IA para pesquisa científica · Universidade Federal de Viçosa**
+
+[![Site oficial](https://img.shields.io/badge/🌐_Site-ufvaisite-2E3242?style=for-the-badge)](https://gustavobraga-byte.github.io/ufvaisite/)
+[![Abrir no Colab](https://img.shields.io/badge/▶️_Começar_agora-Google_Colab-brightgreen?style=for-the-badge)](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb)
+[![Apresentação](https://img.shields.io/badge/📊_Slides-ver_apresentação-C9A227?style=for-the-badge)](https://gustavobraga-byte.github.io/ufvaisite/#apresentacao)
+
+[![Versão](https://img.shields.io/badge/versão-0.6.17-orange.svg)]() [![Licença MIT](https://img.shields.io/badge/licença-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![SisPPG/UFV](https://img.shields.io/badge/SisPPG-10356285004-blue.svg)](http://sisppg.ufv.br) [![LGPD](https://img.shields.io/badge/LGPD-conforme-success.svg)](PRIVACY.md)
+
+> Consulta dados oficiais do Brasil e literatura validada, cita cada fonte e declara honestamente quando não há evidência suficiente.
+
+[🌐 Site](https://gustavobraga-byte.github.io/ufvaisite/) · [📓 Colab](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb) · [📘 Manual](MANUAL.md) · [📜 Termos v2.2](docs/TERMS_OF_USE.md) · [🔒 Privacidade v1.1](PRIVACY.md) · [📊 Telemetria](TELEMETRY.md) · [📝 Changelog](CHANGELOG.md)
+
+</div>
 
 ---
 
 ## 📑 Sumário
 
-- [Visão geral](#-visão-geral)
+- [Por que o UFVAI?](#-por-que-o-ufvai)
 - [Capacidades](#-capacidades)
 - [Início rápido](#-início-rápido)
-- [Skills disponíveis](#-skills-disponíveis)
-- [Roadmap](#-roadmap)
-- [Arquitetura](#-arquitetura)
-- [Limitações](#-limitações)
+- [Offline (.deb Linux)](#-offline-deb-linux)
+- [Skills](#️-skills)
+- [Novidades](#-novidades)
+- [Arquitetura](#️-arquitetura)
+- [Privacidade e Termos](#-privacidade-e-termos)
 - [Citação](#-citação)
-- [Declaração de uso de IA](#-declaração-de-uso-de-ia)
-- [Disclaimer](#-disclaimer)
-- [Como contribuir](#-como-contribuir)
+- [Idiomas](#-idiomas)
+- [Estrutura do repositório](#-estrutura-do-repositório)
+- [Contribuir](#-contribuir)
 - [Contato](#-contato)
 
 ---
 
-## 🧠 Visão geral
+## 🧠 Por que o UFVAI?
 
-O **PesquisAI** é um agente de Inteligência Artificial construído sobre a arquitetura **OpenCode**, projetado especificamente para pesquisadores, acadêmicos e cientistas. Ele automatiza etapas que vão do levantamento bibliográfico à estruturação de artigos, integrando fontes de dados públicos do Brasil.
+O **UFVAI** (marca) roda sobre o motor **PesquisAI** (este código, arquitetura OpenCode) e atua como um **pesquisador sênior remoto**: metódico, transparente sobre incertezas e comprometido com a integridade científica.
 
-> **🚨 Atenção:** O PesquisAI é uma ferramenta de apoio — **não substitui** a curadoria humana. Sempre revise os resultados gerados.
+| Princípio | Como funciona |
+|---|---|
+| 🚫 **Zero fabricação** | Nada de dados, DOIs ou autores inventados. Sem evidência → `[SEM DADOS SUFICIENTES]` |
+| 🏷️ **Evidência marcada** | Toda afirmação quantitativa porta `[DADO CONFIRMADO]` · `[ESTIMATIVA FUNDAMENTADA]` · `[SEM DADOS SUFICIENTES]` |
+| 📚 **Referência validada** | Toda referência exige DOI/ISBN/ISSN/URL oficial e passa por `citation-management` |
+| 🧾 **Trilha auditável** | Parâmetros, código e proveniência salvos na *Minha memória* (vault Obsidian no seu Drive) |
+| ⚖️ **ABNT por padrão** | Normalização UFV/ABNT NBR 14724 · 6023 · 10520 (APA/Vancouver sob pedido) |
+
+> 🚨 **Atenção:** ferramenta de apoio — **não substitui** revisão por pares nem o julgamento humano. Sempre revise. Sugira a [Declaração de Uso de IA](declaracao_uso_ia.md) nas entregas finais.
+
+📖 **Conheça em 2 minutos:** [site oficial](https://gustavobraga-byte.github.io/ufvaisite/) (demonstração animada do boot → Termos → tela principal) · [slides](https://gustavobraga-byte.github.io/ufvaisite/#apresentacao) · [vídeo tutorial](https://www.youtube.com/watch?v=8e8spp_7Gq4).
 
 ---
 
@@ -41,195 +61,153 @@ O **PesquisAI** é um agente de Inteligência Artificial construído sobre a arq
 
 | Área | O que faz |
 |------|-----------|
-| 📊 **Dados IBGE** | Consulta e extração de dados estatísticos, demográficos e socioeconômicos |
-| 🏥 **DataSUS** | Acesso e análise de dados públicos de saúde (mortalidade, internações, vacinação) |
-| 🌾 **Agro & Ambiente** | Dados do agronegócio brasileiro e cadastro ambiental rural (CAR) |
-| 🇧🇷 **Dados Brasil** | Conjunto amplo de indicadores e datasets oficiais brasileiros |
-| 📚 **Pesquisa científica** | Mineração de textos, revisão bibliográfica e suporte metodológico |
-| ✍️ **Redação acadêmica** | Auxílio na estruturação e revisão de artigos científicos |
-| 🔬 **Análise qualitativa** | Métodos clássicos e avançados (Reinert, similitude, codificação) |
-| 📐 **Normas ABNT/UFV** | Formatação e normalização de trabalhos acadêmicos |
+| 📊 **Dados IBGE/SIDRA** | Censo, PNAD, PIB, PAM/LSPA — demografia, território, economia |
+| 🏥 **DataSUS** | Mortalidade, internações, vacinação, SRAG, SINAN (139 datasets) |
+| 🌾 **Agro & Ambiente** | CONAB, preços Cepea, CAR/SICAR, PRODES/DETER, queimadas INPE, crédito rural |
+| 🇧🇷 **Dados Brasil** | BCB, TSE, Transparência, INEP, ANA, ANP e dezenas de APIs oficiais |
+| 🌦️ **Clima BR-DWGD** | Normais climatológicas e séries municipais gradeadas 0,1° |
+| 📚 **Literatura** | Meta-busca em 7 bases (PubMed, SciELO, LILACS, BDTD, OpenAlex, arXiv, bioRxiv/medRxiv) com deduplicação por DOI |
+| 🧪 **Métodos** | EDA, estatística com laudo APA, poder amostral, ML, qualitativa (Reinert/AFC/CHD) |
+| ✍️ **Escrita** | IMRAD, revisão sistemática, memorial RSC-PCCTAE UFV, documentos CEP/UFV |
+| 📐 **ABNT/UFV** | Capa, citações, referências, sumário no padrão UFV |
+| 🧠 **Memória** | Vault Obsidian no seu Drive — notas, hipóteses, referências, MOCs |
 
 ---
 
 ## 🚀 Início rápido
 
-### Opção 1 — Google Colab (recomendada)
+### Opção 1 — Google Colab (recomendada, ~2 min)
 
-Sem instalação, pronto em ~2 minutos:
+1. Clique em **Começar agora** (badge no topo) ou acesse o [notebook](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb);
+2. No Colab: **Ambiente de execução → Executar tudo** (`Ctrl+F9`);
+3. Aguarde a tela com a logomarca do UFVAI (~2 min) e clique em **ABRIR O UFVAI**;
+4. Na primeira vez: aceite os **Termos v2.2** informando **nome + e-mail** (LGPD art. 7º, V). Nas próximas: **"Bem-vindo de volta"** → *Continuar* (registra 1 linha `usuario_ativo` por clique).
 
-1. Clique no badge do Colab abaixo  
-   [![Abrir no Colab](https://img.shields.io/badge/Clique_aqui-Comece_a_usar-brightgreen?style=for-the-badge)](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb)
-
-2. No menu do Colab, vá em **Ambiente de execução → Executar tudo** (`Ctrl+F9`)
-
-3. Role até a última célula e clique em **🤖 Abrir o PesquisAI**
-
-### Opção 2 — Instalação local
+### Opção 2 — Local (`uv`, desenvolvedores)
 
 ```bash
 git clone https://github.com/gustavobraga-byte/PesquisAI.git
 cd PesquisAI
 uv sync
-# ... (consulte o MANUAL.md para detalhes)
+# consulte o MANUAL.md para detalhes
 ```
 
 ---
 
-### Opção 2 - Uso offline - SO Linux
+## 📴 Offline (.deb Linux)
 
-O PesquisAI pode ser executado **100% offline** em sistemas Debian/Ubuntu, ideal para
-ambientes sem internet, necessidade de sigilo dos dados processados ou com restrições de conectividade.
-
-### Instalação Rápida
+Funciona **100% offline** em Debian/Ubuntu com LLM local (Ollama). Ideal para sigilo ou sem internet.
 
 ```bash
-# Baixe e instale com um único comando
-wget https://github.com/gustavobraga-byte/PesquisAI/raw/main/debs/pesquisai_0.5.1.9.deb -O /tmp/pesquisai.deb && \
-sudo apt install /tmp/pesquisai.deb -y && \
-rm /tmp/pesquisai.deb
-
-# Execute
+wget https://github.com/gustavobraga-byte/PesquisAI/raw/main/debs/pesquisai_0.6.17-offline_amd64.deb -O /tmp/pesquisai.deb && \
+sudo apt install /tmp/pesquisai.deb -y && rm /tmp/pesquisai.deb
 pesquisai
 ```
 
-### Requisitos Mínimos
-
 | Requisito | Especificação |
 |-----------|---------------|
-| **SO** | Debian 10+ / Ubuntu 26.04+ (amd64) |
-| **RAM** | 4 GB (mín.) · 8 GB+ (recomendado) Usando LLM em núvem|
+| **SO** | Debian 10+ / Ubuntu 22.04+ (amd64) |
+| **RAM** | 4 GB mín. · 8 GB+ recomendado (16 GB+ p/ contexto 262k) |
 | **Disco** | 500 MB livres |
-| **Python** | 3.10+ (instalado como dependência) |
-| **Portas** | `8000` (Interface Web) · `8001` (Terminal TTYD) |
-
-### LLM Local (Ollama) — Para Offline Total
-
-Para funcionar **sem nenhuma conexão com a internet**, é necessário um LLM local via
-[Ollama](https://ollama.com):
+| **Portas** | `8000` (terminal) · `8001` (interface) · `11434` (Ollama) |
 
 ```bash
-# Instale o Ollama
+# LLM local (exemplo 262k)
 curl -fsSL https://ollama.com/install.sh | sh
-
-# Baixe um modelo compatível (256k de contexto)
-ollama pull mistral-small:24b    # Melhor custo-benefício (14 GB VRAM)
-ollama pull qwen2.5:7b           # Para hardware limitado (6 GB VRAM)
-ollama pull kimi/kimi2.6         # Melhor qualidade geral
+ollama pull qwen3:4b-instruct-2507-q4_K_M   # 262k nativo, ~2,5 GB
 ```
 
-Configure o PesquisAI para usar o modelo local editando (exemplo com o mistral-small:24b)
-`~/.config/opencode/opencode.json`:
-
-```json
-{
-  "$schema": "https://opencode.ai",
-  "provider": {
-    "ollama": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Ollama (local)",
-      "options": {
-        "baseURL": "http://localhost:11434/v1"
-      },
-      "models": {
-        "mistral-small:24b": {
-          "name": "mistral-small:24b",
-          "contextWindow": 256000
-        }
-      }
-    }
-  }
-}
-```
-
-### Liberar Portas no Firewall (em caso de falha)
-
-```bash
-sudo ufw allow 8000/tcp   # Interface Web
-sudo ufw allow 8001/tcp   # Terminal TTYD
-sudo ufw allow 11434/tcp  # Ollama API (se usar LLM local)
-```
-
-
-
-> 📖 **Documentação completa da versão offline:**
-> [`debs/README.md`](debs/README.md) — inclui solução de problemas, estrutura de
-> diretórios, modelos recomendados e configuração avançada.
+> 📖 Guia completo, solução de problemas e modelos recomendados: [`debs/README.md`](debs/README.md).
 
 ---
 
-## 🛠️ Skills disponíveis
+## 🛠️ Skills
 
-O PesquisAI opera por módulos especializados (*skills*). Cada skill conecta o agente a uma fonte de dados ou capacidade específica.
+O agente opera por *skills* — cada uma conecta a uma fonte ou capacidade.
 
-| Skill | Descrição | Autor |
-|-------|-----------|-------|
-| `skill-ibge` | Consulta automatizada à API do IBGE (Censo, PNAD, PIB, etc.) | [@gustavobraga-byte](https://github.com/gustavobraga-byte) |
-| `skill-datasus` | Integração com OpenDataSUS (mortalidade, internações, vacinação) | [@gustavobraga-byte](https://github.com/gustavobraga-byte) |
-| `skill-UFV-ABNT` | Formatação segundo normas UFV/ABNT | [@gustavobraga-byte](https://github.com/gustavobraga-byte) |
-| `skill-analise-qualitativa` | Análise de conteúdo com métodos clássicos e avançados (NVivo-like) | [@gustavobraga-byte](https://github.com/gustavobraga-byte) |
-| `scientific-skills` | Mineração de textos, revisão bibliográfica, suporte metodológico | [@K-Dense-AI](https://github.com/K-Dense-AI) |
-| `skill-dados-brasil` | Indicadores e datasets oficiais complementares | [@gustavobraga-byte](https://github.com/gustavobraga-byte) |
-| `skill-agrobr` | Dados do agronegócio (produção, pecuária, CAR) | [@gustavobraga-byte](https://github.com/gustavobraga-byte) |
-| `skill-obsidian-memory` | Memória persistente via Obsidian vault no Google Drive 🧠 | [@gustavobraga-byte](https://github.com/gustavobraga-byte) |
-| `skill-memorial-ufv` | Geração automática de Memorial RSC-PCCTAE conforme normas UFV/ABNT 📜 | [@gustavobraga-byte](https://github.com/gustavobraga-byte) |
+| Skill | Descrição |
+|-------|-----------|
+| `ibge-br` | IBGE/SIDRA, malhas, CNAE |
+| `opendatasus` | OpenDataSUS/SUS (139 datasets) |
+| `dados-brasil` | BCB, TSE, Transparência, INEP, ANA… |
+| `agrobr` | Agro brasileiro (38+ fontes) |
+| `BR-DWGD` | Clima gradeado BR |
+| `ufv-abnt` | Normalização ABNT/UFV |
+| `analise-qualitativa` | Conteúdo/Reinert/codificação |
+| `citation-management` | Validação DOI/ISBN (obrigatória) |
+| `meta-search-br` | Meta-busca 7 bases acadêmicas |
+| `memorial-ufv` / `pdf-to-memorial-rsc` | Memorial RSC-PCCTAE |
+| `cep-ufv` | Pacote documental CEP/UFV |
+| `grant-finder` | Editais BR + internacionais |
+| `obsidian-memory` | Minha memória (vault Obsidian) |
+| `scientific` | Pacote K-Dense (140+ subskills) |
 
 ---
 
-## 🗺️ Roadmap
+## 🆕 Novidades
 
-| Fase | Período | Foco |
-|------|---------|------|
-| **1 — Base sólida** | Meses 1–3 | CLI, testes, CI/CD, instalação local |
-| **2 — Expansão de dados** | Meses 4–7 | Novas skills: IPEA, INEP, Sucupira/CAPES, plugins |
-| **3 — Interface** | Meses 8–11 | Interface web aprimorada, editor de artigos, copilot |
-| **4 — Ecossistema** | Meses 12–18 | API pública, versão SaaS, integração institucional |
+**v0.6.17 — ⚡ Memória abre instantânea** (singleton + warm-up + prefetch; 2ª abertura em µs) · **v0.6.16 — 1 linha por retorno** (heartbeat só no clique *Continuar*) · **v0.6.15 — idioma detectado** (sistema/navegador) · **v0.6.14 — IP real via ipify + todo acesso logado** · **v0.6.13 — IP real + heartbeat `usuario_ativo`** · **v0.6.10 — Nome+IP, planilha 8 colunas, cache BM25, mobile** · **v0.6.9 — Termos v2.1, e-mail obrigatório, opt-out sem cookies, .deb offline**.
+
+<details>
+<summary>Histórico 0.6.x completo</summary>
+
+| Versão | Data | Destaques |
+|--------|------|-----------|
+| **0.6.17** | 01/09/2026 | Memória instantânea (singleton + warm-up + prefetch) |
+| **0.6.16** | 01/09/2026 | Retorno = 1 linha apenas no clique |
+| **0.6.15** | 01/09/2026 | Prompt inicial respeita idioma detectado |
+| **0.6.14** | 01/09/2026 | IP real (ipify) + todo acesso logado |
+| **0.6.13** | 01/09/2026 | IP real + heartbeat revisita |
+| **0.6.12** | 01/09/2026 | Preview da memória no mobile |
+| **0.6.11** | 01/09/2026 | Hotfix isoformat cache BM25 |
+| **0.6.10** | 01/09/2026 | Nome+IP, planilha 8 cols, cache BM25, mobile |
+| **0.6.9** | 25/08/2026 | Termos v2.1, e-mail obrigatório, opt-out, .deb |
+| **0.6.8** | 24/08/2026 | Contato via planilha + Apps Script |
+| **0.6.7** | 23/08/2026 | Painel de boot temático + contato configurável |
+| **0.6.6** | 22/08/2026 | Favicon, contato opt-in, Sheets |
+| **0.6.5** | — | ⛔ VETADA (launcher regressivo) |
+| **0.6.4** | 22/08/2026 | Marca UFVAI, temas, logo, Termos v2 |
+| **0.6.0** | 21/08/2026 | Rebrand, segurança, telemetria opt-in, zh_CN |
+
+</details>
+
+Histórico detalhado: [`CHANGELOG.md`](CHANGELOG.md) · Novidades do site: [ufvaisite/#novidades](https://gustavobraga-byte.github.io/ufvaisite/#novidades).
 
 ---
 
 ## ⚙️ Arquitetura
 
-O PesquisAI usa **ttyd** para renderizar um terminal Linux interativo no navegador via Google Colab, com o ecossistema OpenCode injetado:
-
 ```
-Google Colab
-└── ttyd (terminal web na porta 8000)
+Google Colab (ou .deb offline)
+└── ttyd :8000 (terminal web)
     └── opencode (runtime do agente)
-        ├── skill-ibge
-        ├── skill-datasus
-        ├── skill-dados-brasil
-        ├── skill-agrobr
-        ├── skill-UFV-ABNT
-        ├── skill-analise-qualitativa
-        ├── scientific-skills
-        ├── skill-obsidian-memory  ← memória persistente (v0.5.0+)
-        ├── skill-memorial-ufv    ← Memorial RSC-PCCTAE UFV/ABNT (v0.5.1.8+)
-        └── pesquisai (instruções do agente)
+        ├── ibge-br · opendatasus · dados-brasil · agrobr · BR-DWGD
+        ├── citation-management · meta-search-br · grant-finder
+        ├── ufv-abnt · analise-qualitativa · scientific
+        ├── memorial-ufv · cep-ufv · pyzotero · markitdown
+        └── obsidian-memory ← Minha memória (vault no seu Drive)
 ```
 
-Dependências gerenciadas pelo [uv (Astral)](https://github.com/astral-sh/uv) para instalação rápida e reproduzível.
+Interface web `:8001` (Colab) com tela de Termos v2.2 (nome+e-mail+IP, opt-out) e painel Admin/Telemetria. Offline: `~/PesquisAI/vault/` · `~/PesquisAI/backups/` · `~/PesquisAI/config/ufvai.env`.
 
 ---
 
-## ⚠️ Limitações
+## 🔒 Privacidade e Termos
 
-O PesquisAI **não substitui** o julgamento humano e apresenta as seguintes limitações:
-
-- ❌ **Não** realiza revisão por pares nem validação científica profunda.
-- ❌ **Não** acessa bases pagas sem integração específica.
-- ❌ **Não** coleta dados primários (entrevistas, experimentos, surveys).
-- ❌ **Não** garante atualização em tempo real — depende das APIs externas.
-- ❗ **Alucinações possíveis:** sempre verifique os resultados com fontes confiáveis.
+- **Ativação:** nome + e-mail obrigatórios (LGPD art. 7º, V) + IP de registro — elimináveis a qualquer tempo (art. 18, VI). Planilha 8 colunas; retorno = 1 linha `usuario_ativo` por clique.
+- **Telemetria:** ativa por padrão **sem cookies** (art. 7º, IX, opt-out) — só contadores anônimos GA4; nunca nome/e-mail/IP/conteúdo. Desligue com `UFVAI_TELEMETRY=0` ou desmarcando a caixa.
+- **Documentos vigentes:** [Termos v2.2](docs/TERMS_OF_USE.md) · [Privacidade v1.1](PRIVACY.md) · [Telemetria](TELEMETRY.md) · [Licença MIT + NOTICE marca](LICENSE).
+- O aceite é registrado localmente; nada da Minha memória sai do seu Drive/máquina (exceto prompts ao provedor de LLM escolhido, sob os termos dele).
 
 ---
 
 ## 📚 Citação
 
-**ABNT NBR 6023:2018:**
+**ABNT NBR 6023:**
 
 ```
-BRAGA, Gustavo Bastos. PesquisAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.5.1.9. Viçosa: Universidade Federal de Viçosa, 2026.
+BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para pesquisa
+científica. Versão 0.6.17. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -240,63 +218,84 @@ Verificar autenticidade em: http://sisppg.ufv.br
 **BibTeX:**
 
 ```bibtex
-@software{braga2026pesquisai,
+@software{braga2026ufvai,
   author       = {Gustavo Bastos Braga},
-  title        = {{PesquisAI}: Agente de Intelig{\^e}ncia Artificial
+  title        = {{UFVAI}: Agente de Intelig{\^e}ncia Artificial
                   para Pesquisa Cient{\'\i}fica},
   year         = {2026},
-  version      = {0.5.1.9},
+  version      = {0.6.17},
   institution  = {Universidade Federal de Vi{\c{c}}osa (UFV)},
   url          = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/}
 }
 ```
 
----
-
-## 🤖 Declaração de uso de IA
-
-O uso do PesquisAI em trabalhos acadêmicos **deve ser declarado** conforme diretrizes do COPE, CAPES e principais periódicos. Consulte o arquivo [`declaracao_uso_ia.md`](declaracao_uso_ia.md) para modelos prontos (ABNT, ICMJE, Nature, Science, Elsevier, Springer).
+Site para divulgar: `https://gustavobraga-byte.github.io/ufvaisite/`. Modelos de declaração de IA: [`declaracao_uso_ia.md`](declaracao_uso_ia.md). Como citar dados: [`citacao_pesquisai.md`](citacao_pesquisai.md).
 
 ---
 
-## ⚖️ Disclaimer
+## 🌐 Idiomas
 
-O PesquisAI é um **software experimental fornecido "como está"**, sem garantias. LLMs podem **alucinar** — é responsabilidade exclusiva do usuário validar todos os dados, análises e referências gerados. Consulte o [`disclaimer_pesquisai.md`](disclaimer_pesquisai.md) para os termos completos.
+🇧🇷 pt_BR · 🇺🇸 en_US · 🇪🇸 es_ES · 🇫🇷 fr_FR · 🇨🇳 zh_CN — interface, Termos e diretrizes (`AGENTS.md` + `agents/` em 5 idiomas).
 
 ---
 
-## 🤝 Como contribuir
+## 🗂️ Estrutura do repositório
 
-Contribuições são bem-vindas — especialmente novas skills para fontes de dados públicos brasileiros.
-
-```bash
-# 1. Fork e clone
-git clone https://github.com/SEU_USUARIO/PesquisAI.git
-
-# 2. Crie uma branch
-git checkout -b feature/nova-skill
-
-# 3. Desenvolva, teste e abra um Pull Request
+```
+├── PesquisAI.ipynb          # entrada Colab (boot + Termos v2.2 + citação)
+├── main.py / pesquisai/     # motor (launch_app, wrapper v041, telemetry, obsidian-memory)
+├── assets/                  # logo oficial, ícones, favicons
+├── docs/TERMS_OF_USE.md     # Termos v2.2 (nome+e-mail+IP, opt-out)
+├── PRIVACY.md               # Privacidade v1.1
+├── TELEMETRY.md             # Telemetria GA4 (2 canais, opt-out)
+├── MANUAL.md                # Manual completo
+├── CHANGELOG.md             # Histórico 0.6.x
+├── debs/                    # pacote offline + README
+├── i18n/ · agents/ · tests/ · scripts/
+└── LICENSE                  # MIT + NOTICE marca UFVAI
 ```
 
-Consulte o [`AGENTS.md`](AGENTS.md) para entender a arquitetura das skills.
+> 🧹 **Limpeza 10/09/2026:** removidos `__pycache__`/`*.pyc` e `debs/*.bak*` (11 backups); `debs/legado/` preservado como histórico; **não publicar** `IntructionsCEO_paperclip.md` (uso interno) — ver `docs/FILE_AUDIT_2026-08-22.md`.
 
-**Ideias de contribuição:**
-- Skills para IPEA, INEP, ANEEL, ANS, IBICT, etc.
-- Melhorias na skill científica (SciELO, BDTD)
-- Traduções da documentação
-- Casos de uso e exemplos práticos
+---
+
+## 🗺️ Roadmap
+
+| Fase | Período | Foco |
+|------|---------|------|
+| **1 — Base sólida** | Meses 1–3 | CLI, testes, CI/CD, instalação local |
+| **2 — Expansão de dados** | Meses 4–7 | IPEA, INEP, Sucupira/CAPES, plugins |
+| **3 — Interface** | Meses 8–11 | Editor de artigos, copilot web |
+| **4 — Ecossistema** | Meses 12–18 | API pública, SaaS, integração institucional |
+
+---
+
+## 🤝 Contribuir
+
+Contribuições são bem-vindas — especialmente novas skills de dados públicos brasileiros.
+
+```bash
+git clone https://github.com/SEU_USUARIO/PesquisAI.git
+git checkout -b feature/nova-skill
+# desenvolva, teste (pytest) e abra um Pull Request
+```
+
+Leia o [`AGENTS.md`](AGENTS.md). Ideias: IPEA, INEP, ANEEL, ANS, IBICT, SciELO/BDTD, traduções, casos de uso.
 
 ---
 
 ## 📬 Contato
 
-Desenvolvido por **Gustavo Bastos Braga** na Universidade Federal de Viçosa (UFV).
+Desenvolvido por **Gustavo Bastos Braga** — Universidade Federal de Viçosa (DER/UFV).
 
 - ✉️ gustavo.braga@ufv.br
 - 🐙 [@gustavobraga-byte](https://github.com/gustavobraga-byte)
+- 🌐 [Site oficial](https://gustavobraga-byte.github.io/ufvaisite/)
 
 ---
 
-Feito com 💙 para impulsionar a ciência brasileira.
-```
+<div align="center">
+
+Feito com 💙 para impulsionar a ciência brasileira · UFVAI v0.6.17 · SisPPG/UFV nº 10356285004
+
+</div>

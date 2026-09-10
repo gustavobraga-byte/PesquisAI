@@ -65,7 +65,8 @@
   "languages": {
     "pt_BR": "Português (Brasil)",
     "en_US": "English (United States)",
-    "es_ES": "Español (España)"
+    "es_ES": "Español (España)",
+    "zh_CN": "Português (Brasil)"
   },
   "agents": {
     "rules_title": "Regras Absolutas",
@@ -87,5 +88,18 @@
     "session_imported": "Sessão importada!",
     "session_opened": "Sessão aberta!",
     "config_applied": "Configuração aplicada"
+  },
+  "terms": {
+    "title": "Termos de Uso — UFVAI",
+    "accept_label": "Li e aceito os Termos de Uso e a Licença MIT",
+    "analytics_label": "Opcional: permitir estatísticas anônimas de uso",
+    "btn_accept": "Aceitar e começar",
+    "btn_decline": "Não aceitar",
+    "declined": "Você optou por não aceitar os Termos de Uso.",
+    "license_link": "Licença MIT (GitHub)"
+  },
+  "memory": {
+    "title": "Memória UFVAI",
+    "tooltip": "Memória UFVAI (segundo cérebro)"
   }
 }

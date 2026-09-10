@@ -53,3 +53,29 @@ Manter as dependências atualizadas é essencial. Use:
 ```bash
 pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 ```
+
+---
+
+## v0.6.0 — Hardening (21/08/2026)
+
+Auditoria integral aplicada (detalhes em `docs/SECURITY_AUDIT_2026-08-21.md`):
+
+- **CORS removido** + **token de sessão** obrigatório em `/api/*` (`X-UFVAI-Token`, injetado no HTML do wrapper).
+- Sanitização de comandos valida **cada segmento após `&&`**.
+- `opencode_auth.json` cifrado no Drive; chaves mascaradas nos GETs; sem nomes de env secrets nas respostas.
+- ThreadingHTTPServer · cap 10 MB · rate limit 120/min/IP · headers seguros · anti-traversal no restore/backup.
+- Bind local padrão `127.0.0.1` (Colab mantém `0.0.0.0`) — override `UFVAI_BIND_HOST`.
+- `--yolo`: mantido por padrão; desligue com `PESQUISAI_YOLO=0`.
+
+### Variáveis de ambiente de segurança/privacidade
+
+| Variável | Padrão | Efeito |
+|---|---|---|
+| `UFVAI_TELEMETRY` | `1` | `0` desliga telemetria globalmente |
+| `UFVAI_GA_MEASUREMENT_ID` / `UFVAI_GA_API_SECRET` | vazias | Sem elas, nada é enviado |
+| `PESQUISAI_YOLO` | `1` | `0` exige aprovação manual das ações do agente |
+| `UFVAI_BIND_HOST` | auto | Força host do wrapper |
+| `PESQUISAI_TTYD_CRED` | vazio | `user:senha` para credenciais básicas no ttyd |
+
+Reporte vulnerabilidades conforme a seção acima.
+
