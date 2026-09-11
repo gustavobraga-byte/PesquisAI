@@ -73,8 +73,8 @@ e usamos consentimento como base legal). Você tem, nos termos do **art. 18 da L
 9. Oposição ao tratamento.
 
 **Como exercer:** escreva para gustavo.braga@ufv.br (resposta imediata em formato simplificado; 
-completa em até 15 dias, art. 19) ou acione o Encarregado institucional da UFV:
-https://dgi.ufv.br/privacidade/. Dados que permanecem 100% no seu Drive estão sob seu controle
+completa em até 15 dias, art. 19) ou acione o Encarregado institucional da UFV por meio de canal
+institucional próprio. Dados que permanecem 100% no seu Drive estão sob seu controle
 direto (exclusão, exportação) a qualquer momento.
 
 **Registro das operações:** o mantenedor mantém registro simples das operações de telemetria
