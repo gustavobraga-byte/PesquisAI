@@ -1,5 +1,83 @@
 # Changelog — PesquisAI
 
+## [0.6.20] — 2026-10-01 — 🫀 Keep-alive + botão SAIR na interface · 🌐 Rodapé com o site oficial · 📄 Planilha de contatos em 1 linha
+### 🎯 Nova direção (mudança de planos)
+- **Descartada** a abordagem da 0.6.20 bugada de 30/09 (supervisor desacoplado `colab_host.py`/`spawn_detached` — travava em "Aguardando a interface ficar pronta…" porque `eval_js(proxyPort)` e `drive.mount` exigem o kernel do Colab e abortavam antes de gravar o `READY_FILE`). **Rollback** foi feito e a base desta release é a **v0.6.19 estável**, sem alteração funcional no pacote de boot — a 0.6.20 vive no `PesquisAI.ipynb` (boot/keep-alive/SAIR) e no pacote (rodapé do site + planilha de contatos, abaixo). Número de versão mantido: **0.6.20**.
+
+### 📦 Novo `PesquisAI.ipynb` (única mudança de código)
+- **Célula de boot simplificada:** painel da logomarca (5% → 12% → 20%) → clone/pull do repositório (`git pull --ff-only --depth 1` em `/tmp/pesquisai`) → `from main import run; run()` **direto no kernel do Colab** (fluxo comprovado da v0.6.17/0.6.19, sem supervisor) → painel 100%.
+- **🫀 Keep-alive em background (subprocesso):** `subprocess.Popen(sys.executable, start_new_session=True)` imprime 1 linha a cada 60s em `/tmp/pesquisai/ufvai_keepalive.log` (saída em arquivo — mantém a política "painel único", zero texto solto no notebook). Limite honesto documentado na célula: nada impede o Colab de destruir o runtime (~12 h de teto, cota, decisão do backend).
+- **🔴 Botão SAIR (novo, card abaixo da barra de carregamento):**
+  - Exibido após o boot bem-sucedido **somente no Colab** (registro real de callback via `google.colab.output.register_callback("ufvai.exit", …)`);
+  - **Confirmação obrigatória:** clique em SAIR abre painel de confirmação (SIM, SAIR / CANCELAR) com aviso claro — tudo em memória é perdido, arquivos no Drive continuam salvos, não há como desfazer;
+  - Ao confirmar: encerra o keep-alive (`terminate` → `wait` → fallback `kill`), atualiza o painel de boot ("Encerrando o ambiente…") e chama **`google.colab.runtime.unassign()`** — desconecta e exclui o runtime (equivalente a *Runtime ▸ Desconectar e excluir ambiente*; colabtools #2568);
+  - Fallback honesto: se `invokeFunction` falhar, o card orienta usar o menu **Runtime** manualmente (nenhuma chamada inventada);
+  - Fora do Colab o card não é exibido (sem `google.colab` disponível).
+- **Documentação:** células markdown do ipynb atualizadas (instruções de uso, keep-alive e SAIR; citação ABNT v0.6.20).
+
+### 🌐 Rodapé com o link do site oficial
+- O rodapé da interface ganha o link **"🌐 Site"** (ícone globo em SVG, abre em nova aba) para `https://gustavobraga-byte.github.io/ufvaisite/`, entre o GitHub e o texto "UFV · Viçosa, MG - Brasil".
+- **Responsivo:** em telas <480px o texto "UFV · Viçosa, MG - Brasil" sai de cena para o link caber sem quebrar a linha; desktop e tablet mantêm tudo visível.
+- Arquivos: `pesquisai/launch_app_responsive_v041.py` + `pesquisai/launch_app_responsive.py` (pacote) e cópias vivas da raiz (4 no total); typo de tag `<span>` corrigido no responsivo do pacote.
+
+### 📄 Planilha de contatos: uma linha por ativação/retorno
+- **Contrato novo:** a planilha do desenvolvedor recebe EXATAMENTE UMA linha — a **`usuario_ativo`** (e-mail · nome · IP), gravada **quando o usuário clica no botão** (Continuar/ABRIR da tela de Termos ou "Bem-vindo de volta").
+- O primeiro aceite **não grava mais** a linha `novo_contato`: grava somente o perfil do usuário localmente + backup no Drive (e o contador anônimo no GA4).
+- Backend (`telemetry.py`): `notify_active_user()` agora é a única fonte de linhas; a flag legada `novo_contato` ainda é aceita no Apps Script (compatibilidade) e o fix "Versão" como texto (evita `0.6.20` virar data no Sheets) está propagado nas cópias.
+
+### 🧪 Testes
+- Suítes revalidadas: deduplicação/telemetria atualizada ao contrato da linha única (32/32) · cascata CSS dos 4 arquivos vivos (144/144) · versão/boot (24/24) · SAIR em modo estático.
+- **Igual a Zero:** o ambiente Colab em uso nunca foi desligado nos testes (casos que invocariam shutdown/keepalive real foram executados apenas como verificação estática de código).
+
+### 🔢 Versionamento e docs em paridade
+- Bump `0.6.19 → 0.6.20` em `pesquisai/__version__.py` (`__version__`, `__release_date__="2026-10-01"`, `__codename__="Boot simplificado + keep-alive em subprocesso + botão SAIR no Colab"`), `pyproject.toml` (versão + descrição), `Dockerfile` (comentário + LABEL), `README.md` (badge, novidades, tabela de versões, citação, BibTeX, rodapé), `MANUAL.md` (cabeçalho, citações, tabela, rodapé), `AGENTS.md` + `agents/AGENTS.{en,es,fr,pt,zh}.md` (frontmatter + rodapé), `citacao_pesquisai.md`, `PesquisAI.ipynb`.
+- **Pendente (humano):** publish no GitHub (o ipynb clona de `gustavobraga-byte/PesquisAI`); rebuild do `.deb` não é exigido (o código do pacote é idêntico à v0.6.19 — a mudança vive só no notebook).
+
+---
+
+## [0.6.19] — 2026-09-29 — 📱 Menu mobile sem SVG + hamburger à direita + docs em paridade
+
+### 📐 O menu hamburger aparecia colado no logo, à esquerda
+- **Sintoma:** em ≤767px o botão de idioma + hamburguer apareciam logo ao lado da marca "UFVAI", no lado **esquerdo** da topbar — o usuário não os achava.
+- **Causa raiz:** o CSS base tem `.sep { flex: 1; }` dentro do `#topbar`. Na resolução do flexbox o `flex-grow` é distribuído **antes** das margens automáticas (§4.5 do spec: "auto margins absorb the remaining free space *after* the flexible lengths have been resolved"). Com o `.sep` absorvendo todo o espaço livre, o `margin-left: auto` do `.tb-icons` recebia 0 e o grupo encostava no logo.
+- **Fix CSS:** em `@media (max-width: 767px)` → `#topbar .sep { display: none; }` (especificidade de ID, vence o `.sep` do CSS base). Os `.tb-btn` que o `.sep` separava já estão `display:none` nesse breakpoint, então nada se perde: o espaço livre volta e o `margin-left: auto` do `.tb-icons` empurra idioma + hamburguer para a borda direita.
+- **Desktop intacto:** o `.sep` continua `flex:1` como spacer acima de 768px e o `.tb-icons` volta a `margin-left: 6px` (encostado no logo, como sempre).
+- **Arquivos:** `pesquisai/launch_app_responsive_v041.py` (produção) + `pesquisai/launch_app_responsive.py` (legado) nos dois projetos (`UFVAI-v0.6.9/`, `ufvai-github/`) **e** as cópias de produção da raiz (`launch_app_responsive_v041.py`, `launch_app_responsive.py`, `launch_app_responsive_versaoteste_CORRIGIDO.py`) — 7 arquivos vivos no total.
+
+### 🧪 Teste de regressão de cascata (não é grep no fonte)
+- **Novo:** `tests/test_responsive_hamburger.py` nos dois projetos.
+- **Como funciona:** importa o módulo real, chama `create_wrapper_html()`, extrai os `<style>`, parseia o CSS com `tinycss2` e **resolve a cascata de verdade** — especificidade + `!important` + ordem de origem + style inline — para uma largura simulada. Escolhido porque o bug anterior (`display:none` presente mas inefetivo por cascata) **passaria** num grep: a regra antiga tinha especificidade (0,1,0), igual à da regra base.
+- **Cobertura:** 7 arquivos vivos × 10 larguras (320/375/414/479/600/767 mobile · 768/900/1024/1440 desktop) — 252 verificações por projeto. Contratos: (a) ≤767px nenhum SVG da topbar fica visível (exceto o do próprio hamburger); (b) ≤767px `.sep` = `none` e `.tb-icons` com `margin-left:auto`; (c) ≥768px o `.sep` volta a ser spacer e `.tb-icons` volta a `6px`; (d) o hamburger e o botão de idioma continuam visíveis no mobile; (e) nenhum SVG dentro do drawer.
+- **Resultado:** 252/252 nos dois projetos.
+- Versão do release: `0.6.19` em `pesquisai/__version__.py` (`__version__="0.6.19"`, `__release_date__="2026-09-29"`, `__codename__="Menu mobile sem SVG + docs em paridade (skills personalizadas)"`), `pyproject.toml`, `Dockerfile` e `CHANGELOG.md`; docs em paridade: `README.md` (badge, novidades, tabela de versões, citação, BibTeX, rodapé), `MANUAL.md` (cabeçalho, citação, tabela, rodapé), `AGENTS.md` + `agents/AGENTS.{pt,en,es,fr,zh}.md`, `citacao_pesquisai.md`, `PesquisAI.ipynb`.
+
+
+### 📱 Responsivo: esconder botões SVG quando o hamburger aparece
+- **Motivação:** em telas pequenas (≤767px) o menu hamburger aparecia mas os botões-ícone SVG continuavam na topbar, poluindo e duplicando ações.
+- **Fix CSS (`launch_app_responsive*.py`):** `@media (max-width:767px)` agora faz `.tb-icon{display:none}`; drawer reexibe botões textuais (`.mobile-menu .tb-btn{display:inline-flex}`) sem SVG (`.mobile-menu .tb-btn svg, .mobile-menu .btn-provider svg{display:none}`). NENHUM SVG aparece com menu reduzido — funções seguem no drawer (Dashboard, Sessões, Atalhos, Diretrizes, Memória, Tema, Idioma, backup/restore/drive).
+- **Arquivos:** `pesquisai/launch_app_responsive_v041.py` (produção) + `pesquisai/launch_app_responsive.py` (legado) nos dois projetos (`UFVAI-v0.6.9/` e `ufvai-github/`).
+
+### 📚 Docs em paridade (skills personalizadas)
+- **Sincronizados `UFVAI-v0.6.9/` → `ufvai-github/`:** `AGENTS.md` + `agents/AGENTS.{pt,en,es,fr,zh}.md` + `agents/README.md` — todos agora com §2.1.0, linha `cep-ufv`, ética atualizada, cabeçalhos multilíngues com recall 4b.
+- **Fix versões incorretas:** frontmatter/rodapés `0.6.17` → `0.6.19` (código já era `0.6.18` no staging); `Dockerfile` estável `0.6.9` → `0.6.19`; `README.md` (badge, novidades, tabela, citação, BibTeX, rodapé), `MANUAL.md` (cabeçalho, tabela, citação, rodapé), `citacao_pesquisai.md`, `PesquisAI.ipynb`, `pyproject.toml` sincronizados.
+- Bump `0.6.18 → 0.6.19` em `pesquisai/__version__.py` (`__version__`, `__release_date__="2026-09-29"`, `__codename__="Menu mobile sem SVG + docs em paridade (skills personalizadas)"`), `pyproject.toml`, `Dockerfile`, `CHANGELOG.md`.
+
+### 📦 Rebuild `.deb` 0.6.19-offline (29/09)
+- **Base:** `pesquisai_0.6.17-offline10` extraído; `/opt/pesquisai` atualizado com fonte v0.6.19 (docs, `__version__`, `constants.py` com `cep-ufv` + `custom_skills`, responsivo sem SVG, `index.html`, i18n); `run_fast.py` com merge `setup_custom_skills` (v0.6.18) sobre patches offline (tela loading, portas automáticas); `telemetry.py`/`launch_app.py` offline preservados (versão via `__version__`).
+- **Pacote:** `pesquisai_0.6.19-offline_amd64.deb` · 1019K · md5 `df7be1672b18395f652ef558696bc946` · sha256 `695a03f3ba130d8e63d55f761945ccc6d47bbedbac7b18168671668a813da05a` · `Version: 0.6.19-offline` · `Installed-Size: 3240` · 0 `__pycache__`/`.pyc` · perms 755/644.
+- **Validação:** `py_compile` merged OK; `test_version_sync` 5/5; `dpkg-deb` conteúdo OK (`__version__ 0.6.19`, `custom_skills` 6 refs, responsive `display:none` 2 refs, AGENTS `0.6.19`, offline patches 25+3 refs).
+- **Destino:** `UFVAI-v0.6.9/debs/` + `ufvai-github/debs/` (anteriores preservados); `debs/README.md` atualizado (pacote + SHA + tabela + citação).
+
+## [0.6.18] — 2026-09-19 — 🧩 Skills personalizadas do usuário
+
+### 🧩 Nova pasta persistente de skills personalizadas
+- **Motivação:** permitir que o usuário estenda o UFVAI com skills próprias, sem precisar editar o código ou os repositórios oficiais, e que o agente saiba onde criar skills novas solicitadas em conversa.
+- **Pasta:** `backups/skills-personalizadas/` (Colab: `/content/drive/My Drive/PesquisAI/backups/skills-personalizadas/` · Offline: `~/PesquisAI/backups/skills-personalizadas/`). Criada automaticamente no boot, com `README.md` explicativo.
+- **Carga a cada boot:** nova `setup_custom_skills()` em `pesquisai/run_fast.py`, chamada logo após `setup_skills()` — varre a pasta e copia cada subpasta válida (contendo `SKILL.md`) para `SKILLS_DIR` (`~/.agents/skills`), onde o OpenCode a injeta no contexto junto com as oficiais. Subpastas sem `SKILL.md` são ignoradas com log informativo (validação fail-closed); falhas nunca interrompem o boot.
+- **Instrução ao agente:** nova seção "🧩 Skills Personalizadas do Usuário" injetada no prompt do `pesquisai.md` (via `_inject` dentro de `setup_launch`) com o caminho real da pasta — ao criar uma nova skill a pedido do usuário, o agente grava-a obrigatoriamente nessa pasta e informa que ela entra em vigor no próximo boot.
+- **Documentação:** `AGENTS.md` ganhou seção §2.1.0 com as regras da pasta de skills personalizadas.
+- Bump `0.6.17 → 0.6.18` em `pesquisai/__version__.py` (`__version__`, `__codename__="Skills personalizadas do usuário (backups/skills-personalizadas carregadas a cada boot)"`), `pyproject.toml`, `CHANGELOG.md`.
+
 ## [0.6.17] — 2026-09-01 — ⚡ Memória abre instantânea via menu (singleton + warm-up + prefetch)
 
 ### ⚡ O carregamento da memória demorava muito a cada abertura do menu

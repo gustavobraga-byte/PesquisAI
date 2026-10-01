@@ -1,6 +1,6 @@
 # 📘 Manual do UFVAI
 
-> **Agente de Pesquisa Científica de Alta Performance · v0.6.17 · Setembro 2026**
+> **Agente de Pesquisa Científica de Alta Performance · v0.6.20 · Setembro 2026**
 > Registro SisPPG/UFV nº 10356285004 · Universidade Federal de Viçosa
 
 ---
@@ -484,6 +484,14 @@ Quando terminar, o próprio painel finaliza em 100% exibindo a **logomarca ofici
 ![Splash de inicialização do terminal](manual-figuras/splash-terminal-real.jpeg)
 *Figura 3 — Splash real de conexão: logomarca UFVAI, spinner dourado e status "Iniciando terminal…".*
 
+### 1.4.1 Keep-alive e botão SAIR (v0.6.20)
+
+Desde a **v0.6.20**, o notebook mantém o runtime do Colab ativo com um **keep-alive em background** (subprocesso que grava 1 linha a cada 60s em `/tmp/pesquisai/ufvai_keepalive.log`) — o combate à ociosidade funciona mesmo com a aba minimizada.
+
+> **Limite honesto:** nada impede o Colab de destruir o runtime (~12 h de teto, cota, decisão do backend). Memória, skills e configurações vivem no seu Drive — se cair: **Runtime → Reiniciar sessão → Executar tudo**.
+
+**Para encerrar por completo (economiza cota):** no card **ENCERRAR SESSÃO** exibido abaixo da barra de carregamento, clique em **SAIR**. O UFVAI **pede confirmação** (SIM, SAIR / CANCELAR) e, ao confirmar, desconecta e **exclui o ambiente de execução** (equivalente a *Runtime ▸ Desconectar e excluir ambiente*, via `google.colab.runtime.unassign()`). Tudo em memória é perdido — **os arquivos no seu Drive continuam salvos**. Não há como desfazer após confirmar.
+
 ### 1.5 O aceite obrigatório (Termos de Uso) — a primeira tela
 
 > **Sem o aceite, o UFVAI não abre.** A tela de Termos de Uso é a **única tela de abertura** do aplicativo — não existe modal intermediário nem forma de pular.
@@ -527,7 +535,7 @@ Após o aceite, você acessa a interface com **terminal interativo do agente**, 
 Para usar **sem internet e sem Colab** (requisito de privacidade máxima — nada sai da sua máquina):
 
 ```bash
-sudo dpkg -i pesquisai_0.6.17-offline_amd64.deb   # ou versão mais recente
+sudo dpkg -i pesquisai_0.6.19-offline_amd64.deb   # ou versão mais recente
 ufvai                                       # abre a interface (UI 8001 · terminal 8000)
 ```
 
@@ -845,7 +853,7 @@ Todos os arquivos gerados são salvos **exclusivamente** nesses locais — nunca
 **Solução:**
 ```bash
 sudo apt install python3-pip        # resolve o Depends
-sudo dpkg -i pesquisai_0.6.17-offline_amd64.deb
+sudo dpkg -i pesquisai_0.6.19-offline_amd64.deb
 ```
 Ou, em último caso: `sudo dpkg -i --force-depends pesquisai_*.deb` (o pip já estar presente é suficiente).
 
@@ -861,7 +869,7 @@ Ou, em último caso: `sudo dpkg -i --force-depends pesquisai_*.deb` (o pip já e
 
 ```
 BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.6.17. Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão 0.6.20. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -872,7 +880,7 @@ Verificar autenticidade em: http://sisppg.ufv.br
 **Formato simplificado (nota de rodapé):**
 
 ```
-UFVAI, versão 0.6.17, desenvolvido por Gustavo Bastos Braga (UFV, 2026). Disponível em:
+UFVAI, versão 0.6.20, desenvolvido por Gustavo Bastos Braga (UFV, 2026). Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 ```
 
@@ -901,7 +909,7 @@ https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 | **Tipo** | Software / Computer Program |
 | **Autor** | Braga, Gustavo Bastos |
 | **Título** | UFVAI: agente de inteligência artificial para pesquisa científica |
-| **Versão** | 0.6.17 |
+| **Versão** | 0.6.20 |
 | **Ano** | 2026 |
 | **Instituição** | Universidade Federal de Viçosa (UFV) |
 | **URL** | https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/ |
@@ -917,7 +925,7 @@ https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 author = {Gustavo Bastos Braga},
 title = {{UFVAI}: Agente de Intelig{\^e}ncia Artificial para Pesquisa Cient{\'\i}fica},
 year = {2026},
-version = {0.6.17},
+version = {0.6.20},
 institution = {Universidade Federal de Vi{\c{c}}osa (UFV)},
 url = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/},
 note = {Acessado em: DD m{\^e}s AAAA}
@@ -974,7 +982,7 @@ Ethics (COPE).
 
 Referência da ferramenta:
 BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para
-pesquisa científica. Versão 0.6.17. Viçosa: UFV, 2026. Disponível em:
+pesquisa científica. Versão 0.6.20. Viçosa: UFV, 2026. Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Registro SisPPG/UFV nº 10356285004 — http://sisppg.ufv.br
 ```
@@ -1246,7 +1254,7 @@ O UFVAI suporta **5 idiomas** (chinês adicionado na v0.6.0):
 
 | Idioma | Arquivo |
 |--------|---------|
-| Português (Brasil) — padrão | `agents/AGENTS.pt.md` |
+| Português (Brasil) — padrão, canônico | `AGENTS.md` (raiz; sem duplicata em `agents/`) |
 | English (US) | `agents/AGENTS.en.md` |
 | Español | `agents/AGENTS.es.md` |
 | Français | `agents/AGENTS.fr.md` |
@@ -1260,6 +1268,9 @@ Resumo das versões da série 0.6.x (detalhes completos no `CHANGELOG.md` do rep
 
 | Versão | Data | Destaques |
 |--------|------|-----------|
+| **0.6.20** | 01/10/2026 | 🫀 Boot simplificado do Colab (ipynb: clone + `run()` no kernel + keep-alive em subprocesso, log `ufvai_keepalive.log`) + botão **SAIR** com confirmação (encerra o keep-alive e chama `runtime.unassign()` — desconecta e exclui o ambiente) |
+| **0.6.19** | 29/09/2026 | 📱 Menu mobile sem SVG (`.tb-icon{display:none}` ≤767px, drawer sem SVG) + hamburger alinhado à direita (`#topbar .sep{display:none}` ≤767px, evita `flex:1` × `margin-left:auto`) + teste de regressão de cascata + docs em paridade (§2.1.0 skills personalizadas) |
+| **0.6.18** | 19/09/2026 | 🧩 Skills personalizadas (`backups/skills-personalizadas/` a cada boot) |
 | **0.6.17** | 01-02/09/2026 | ⚡ **Memória abre instantânea via menu**: singleton `_get_memory()` em RAM (índice BM25 construído 1×), rebuild em background (stale-while-revalidate), warm-up no boot, árvore em RAM, cache frontend 120 s + prefetch |
 | **0.6.16** | 01/09/2026 | 🐛 Retorno registra **1 linha apenas no clique** na planilha (removidos heartbeats automáticos duplicados; guard `_heartbeatSent`) |
 | **0.6.15** | 01/09/2026 | 🐛 Prompt inicial respeita o idioma detectado do sistema/navegador (`_ensure_lang_initialized()` + auto-sync frontend) |
@@ -1306,4 +1317,4 @@ O UFVAI usa estes marcadores para indicar o nível de confiança:
 ---
 
 *Documentação atualizada: Setembro 2026*  
-*UFVAI v0.6.17 · Registro SisPPG/UFV nº 10356285004*
+*UFVAI v0.6.20 · Registro SisPPG/UFV nº 10356285004*

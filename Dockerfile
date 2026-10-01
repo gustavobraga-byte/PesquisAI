@@ -1,4 +1,4 @@
-# Dockerfile — UFVAI v0.6.9
+# Dockerfile — UFVAI v0.6.20
 #
 # Imagem para execução offline (fora do Google Colab).
 # Requer binário opencode instalado separadamente ou montado como volume.
@@ -17,7 +17,7 @@ FROM python:3.12-slim AS base
 
 LABEL org.opencontainers.image.title="UFVAI"
 LABEL org.opencontainers.image.description="Agente de IA para Pesquisa Científica com foco em dados brasileiros"
-LABEL org.opencontainers.image.version="0.6.9"
+LABEL org.opencontainers.image.version="0.6.20"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.source="https://github.com/gustavobraga-byte/PesquisAI"
 LABEL org.opencontainers.image.vendor="Universidade Federal de Viçosa (UFV)"
