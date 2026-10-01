@@ -207,7 +207,7 @@ Interface web `:8001` (Colab) com tela de Termos v2.2 (nome+e-mail+IP, opt-out) 
 
 ```
 BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.6.17. Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão 0.6.20. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -223,7 +223,7 @@ Verificar autenticidade em: http://sisppg.ufv.br
   title        = {{UFVAI}: Agente de Intelig{\^e}ncia Artificial
                   para Pesquisa Cient{\'\i}fica},
   year         = {2026},
-  version      = {0.6.17},
+  version      = {0.6.20},
   institution  = {Universidade Federal de Vi{\c{c}}osa (UFV)},
   url          = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/}
 }
@@ -296,6 +296,6 @@ Desenvolvido por **Gustavo Bastos Braga** — Universidade Federal de Viçosa (D
 
 <div align="center">
 
-Feito com 💙 para impulsionar a ciência brasileira · UFVAI v0.6.17 · SisPPG/UFV nº 10356285004
+Feito com 💙 para impulsionar a ciência brasileira · UFVAI v0.6.20 · SisPPG/UFV nº 10356285004
 
 </div>
