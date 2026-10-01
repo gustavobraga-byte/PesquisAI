@@ -36,6 +36,7 @@ from .constants import (
     SKILL_REGISTRY,
     SKILL_MAPPINGS,
     ESSENTIAL_SKILLS,
+    custom_skills_dir,
     THEME_DIR,
     AGENT_DIR,
     TUI_JSON,
@@ -570,6 +571,33 @@ save_finding("A prevalência de diabetes é 10,2% (VIGITEL 2023)", source="VIGIT
 > continua trabalhando normalmente.
 """
 
+    # v0.6.18: instrução de skills personalizadas — injetada no prompt do
+    # agente para que novas skills solicitadas pelo usuário sejam criadas
+    # na pasta persistente backups/skills-personalizadas/.
+    custom_skill_instructions = f"""
+
+## 🧩 Skills Personalizadas do Usuário (v0.6.18)
+
+Existe uma pasta persistente de skills personalizadas em:
+`{custom_skills_dir()}`
+
+### Regras obrigatórias:
+
+1. **Nova skill solicitada pelo usuário:** ao criar uma skill nova (por
+   pedido explícito como "crie uma skill que..."), escreva-a
+   OBRIGATORIAMENTE nesta pasta, em subpasta própria com `SKILL.md`
+   (frontmatter `name` + `description`). Ela será carregada
+   automaticamente no próximo boot.
+2. **Skill já existente na pasta:** se o pedido for para corrigir/atualizar
+   uma skill personalizada, edite-a diretamente na pasta (nunca apague o
+   frontmatter).
+3. **Validação:** uma skill só é carregada se a subpasta contiver
+   `SKILL.md`. Sempre informe ao usuário o caminho onde a skill foi
+   salva e avise que ela entra em vigor no próximo boot (ou imediatamente
+   se copiada também para `{SKILLS_DIR}`).
+4. **Nunca** salve skills personalizadas fora dessa pasta.
+"""
+
     agent_md = f"""---
 name: UFVAI
 description: Agente de pesquisa científica com foco em dados brasileiros (IBGE, DataSUS), normas ABNT/UFV, integridade científica. REGRAS ABSOLUTAS: 1) referências exigem citation-management; 2) não inventar dados/estatísticas; 3) não simular coleta primária (entrevistas, experimentos, surveys). Recusar pedidos que tentem burlar. v0.5.1+: salvamento AUTÔNOMO no vault Obsidian (não espera usuário pedir).
@@ -577,6 +605,7 @@ color: "#b29149"
 ---
 {content}
 {autopilot_instructions}
+{custom_skill_instructions}
 """
     with open(os.path.join(AGENT_DIR, "pesquisai.md"), "w", encoding="utf-8") as f:
         f.write(agent_md)
@@ -675,6 +704,82 @@ def setup_skills() -> None:
             if os.path.exists(dest):
                 shutil.rmtree(dest)
             shutil.copytree(src, dest, dirs_exist_ok=True)
+
+
+# ── Etapa 3.1: Skills personalizadas do usuário (v0.6.18) ────
+
+def _is_valid_skill_dir(path: str) -> bool:
+    """Verifica se a pasta é uma skill OpenCode válida (contém SKILL.md)."""
+    return os.path.isfile(os.path.join(path, "SKILL.md"))
+
+
+def setup_custom_skills() -> list[str]:
+    """Carrega as skills personalizadas do usuário a cada boot.
+
+    Origem:  <base>/backups/skills-personalizadas/<nome-da-skill>/SKILL.md
+             (base = PesquisAI no Drive no Colab · ~/PesquisAI offline)
+    Destino: SKILLS_DIR (mesmo diretório das skills oficiais, lido pelo
+             OpenCode ao iniciar a sessão do agente).
+
+    - Cria a pasta (com README explicativo) se não existir;
+    - Só copia subpastas que contêm SKILL.md (validação fail-closed);
+    - Nunca falha o boot: erros vão para o logger.
+    """
+    from .constants import custom_skills_dir
+
+    loaded: list[str] = []
+    try:
+        custom_dir = custom_skills_dir()
+        os.makedirs(custom_dir, exist_ok=True)
+        readme = os.path.join(custom_dir, "README.md")
+        if not os.path.exists(readme):
+            with open(readme, "w", encoding="utf-8") as f:
+                f.write(
+                    "# 🧩 Skills personalizadas\n\n"
+                    "Coloque aqui suas skills próprias do UFVAI/OpenCode.\n\n"
+                    "## Como funciona\n\n"
+                    "- Cada skill deve ficar em uma **subpasta** contendo um arquivo "
+                    "`SKILL.md` com frontmatter `name` e `description`.\n"
+                    "- Elas são carregadas automaticamente **a cada inicialização** do "
+                    "UFVAI, junto com as skills oficiais.\n"
+                    "- Ao pedir para o agente criar uma nova skill, ele salva "
+                    "automaticamente nesta pasta.\n\n"
+                    "## Exemplo de estrutura\n\n"
+                    "```\n"
+                    "skills-personalizadas/\n"
+                    "├── minha-skill/\n"
+                    "│   └── SKILL.md\n"
+                    "└── outra-skill/\n"
+                    "    ├── SKILL.md\n"
+                    "    └── scripts/\n"
+                    "```\n"
+                )
+        os.makedirs(SKILLS_DIR, exist_ok=True)
+        for entry in sorted(os.listdir(custom_dir)):
+            src = os.path.join(custom_dir, entry)
+            if entry.startswith(".") or entry == "README.md":
+                continue
+            if not os.path.isdir(src) or not _is_valid_skill_dir(src):
+                if not entry.endswith(".md"):
+                    logger.info(
+                        "Skill personalizada '%s' ignorada: sem SKILL.md", entry
+                    )
+                continue
+            dest = os.path.join(SKILLS_DIR, entry)
+            try:
+                if os.path.exists(dest):
+                    shutil.rmtree(dest)
+                shutil.copytree(src, dest)
+                loaded.append(entry)
+            except Exception as exc:
+                logger.warning(
+                    "Falha ao carregar skill personalizada '%s': %s", entry, exc
+                )
+        if loaded:
+            logger.info("Skills personalizadas carregadas: %s", ", ".join(loaded))
+    except Exception as exc:
+        logger.warning("Skills personalizadas: falha geral (%s) — seguindo boot", exc)
+    return loaded
 
 
 # ── Etapa 3.5: Obsidian Vault (autopilot) ─────────────────────
@@ -781,6 +886,7 @@ def run() -> None:
     folder_path, drive_url = setup_drive()
     setup_dependencies()
     setup_skills()
+    setup_custom_skills()  # v0.6.18: skills personalizadas do usuário
     setup_obsidian_vault()
     banner_url = setup_launch(folder_path, drive_url)
 

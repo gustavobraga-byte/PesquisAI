@@ -46,7 +46,8 @@ _FORM_VIEW_URL = ("https://docs.google.com/forms/d/e/"
     "1FAIpQLSd773cm2qDkwpXzbz50IVhGSG7rpC527taTYGsdUes0Lh1s2A/viewform")
 # Webhook do desenvolvedor (Apps Script → Planilha). Ver scripts/webhook-contatos.gs
 # v0.6.10 (01/09): endpoint atualizado (solicitação usuário)
-_DEFAULT_CONTACT_ENDPOINT = "https://script.google.com/macros/s/AKfycbxel3-_75htD3b5bd0HEPLSCWHSj79CR_Tf4IH6sEWscBlhF3jOjcNBaKbCuffcWskH/exec"
+# v0.6.20 (01/10): nova implantação do Apps Script (nova URL /exec)
+_DEFAULT_CONTACT_ENDPOINT = "https://script.google.com/macros/s/AKfycby1zrMKMbySw-eZ6v-9W8G-6GRXcyyO77YYMKSG7vZfGF34mqWF-02XgBVs4FHPtmQ6/exec"
 
 _FALSEY = ("0", "false", "off", "no")
 
@@ -369,6 +370,25 @@ def save_contact(email: str, name: str | None = None, ip: str | None = None) -> 
         if not _valid_name(cname):
             return False, "Nome inválido — use 2 a 100 letras."
     sha = hashlib.sha256(addr.encode("utf-8")).hexdigest()
+    # v0.6.20-fix: dedupe ANTES de gravar — lê o perfil PERSISTENTE (local +
+    # backup do Drive). Se o e-mail já está registrado, é RE-CONSENTIMENTO
+    # (re-aceite dos Termos, re-execução da célula, overlay esporádico) e NÃO
+    # um contato novo: a planilha não recebe linha "novo_contato" — apenas o
+    # heartbeat "usuario_ativo" do clique "Continuar" registra o acesso.
+    # E-mail diferente (ou ausente) = contato novo de verdade → registra.
+    _already_registered = False
+    try:
+        _prev = _read_profile()
+        _already_registered = (bool(_prev.get("email"))
+                               and str(_prev.get("email", "")).strip().lower() == addr)
+    except Exception:
+        _already_registered = False
+    # v0.6.20-fix (segunda rodada): a planilha do desenvolvedor recebe
+    # EXATAMENTE UMA linha por ativação/retorno — o heartbeat "usuario_ativo"
+    # (com IP) disparado pelo clique do botão Continuar/ABRIR via /api/access
+    # → notify_active_user(). Aqui NÃO há mais forward "novo_contato": o
+    # primeiro aceite grava apenas o perfil local/Drive; a linha única só é
+    # escrita quando o usuário clica no botão.
     try:
         os.makedirs(os.path.dirname(_PROFILE_FILE), exist_ok=True)
         # preserva campos antigos se já existirem (ex.: ip não persiste)
@@ -400,11 +420,22 @@ def save_contact(email: str, name: str | None = None, ip: str | None = None) -> 
                     "sim" if configured() else "nao",
                     "sim" if _contact_endpoint() else "NAO CONFIGURADO",
                     ip or "—"))
+    if _already_registered:
+        # v0.6.20-fix: re-consentimento — sem linha "novo_contato" na planilha
+        # e sem contador GA4 repetido; o perfil local/Drive é atualizado acima
+        # (mantendo aceite/versão dos Termos em dia) e o acesso será registrado
+        # pelo clique "Continuar" (flag "usuario_ativo").
+        _contato_log("re-consentimento SKIP: e-mail já registrado — sem linha "
+                     "'novo_contato' (só o 'usuario_ativo' do botão)")
+        return True, "Contato atualizado com sucesso."
     # Contador ANÔNIMO para o GA4 (sem nenhum dado derivado do e-mail/nome/ip)
     event("contact_optin")
-    # Canal direto do desenvolvedor (opcional): envia o endereço real por HTTPS
-    # v0.6.10: encaminha nome e ip juntos
-    threading.Thread(target=_forward_contact, args=(addr, sha, "novo_contato", cname, ip or ""), daemon=True).start()
+    # v0.6.20-fix: NÃO há forward "novo_contato" ao endpoint — a planilha do
+    # desenvolvedor recebe a linha ÚNICA "usuario_ativo" (e-mail · nome · IP)
+    # somente no clique do botão Continuar/ABRIR (/api/access →
+    # notify_active_user()). Isso elimina a duplicação na planilha.
+    _contato_log("primeiro aceite: perfil gravado localmente — planilha aguarda "
+                 "'usuario_ativo' do clique do botão (linha única)")
     return True, "Contato registrado com sucesso."
 
 
@@ -412,6 +443,16 @@ def clear_contact() -> None:
     """Elimina o e-mail local (direito de eliminação, LGPD art. 18 VI)."""
     try:
         os.remove(_PROFILE_FILE)
+    except Exception:
+        pass
+    # v0.6.20-fix: elimina TAMBÉM o perfil persistente (Drive/offline) — sem
+    # isso, após a eliminação, o re-aceite dos Termos seria tratado como
+    # re-consentimento (sem linha "novo_contato") e o e-mail eliminado voltaria
+    # a pré-preencher a tela. Eliminação = eliminar em todos os cantos.
+    try:
+        bpath = _persisted_profile_path()
+        if bpath and os.path.isfile(bpath):
+            os.remove(bpath)
     except Exception:
         pass
 
@@ -449,9 +490,12 @@ def _forward_contact(addr: str, sha: str, kind: str = "novo_contato", name: str 
     O webhook (UFVAI_CONTACT_ENDPOINT) é o único canal confiável.
 
     ``kind`` distingue o tipo de registro gravado na planilha:
-      • "novo_contato" — primeiro aceite da tela de Termos (opt-in);
-      • "usuario_ativo" — reabertura: usuário já ativo, cada novo acesso
-        (heartbeat da tela "Bem-vindo de volta" → flag na planilha).
+      • "usuario_ativo" — ÚNICO tipo enviado (v0.6.20): cada ativação/retorno
+        grava 1 linha com e-mail + nome + IP, disparada pelo clique do botão
+        (Continuar/ABRIR → /api/access → notify_active_user()).
+      • "novo_contato" — legado (primeiro aceite da tela de Termos); SEM uso
+        desde a v0.6.20: o aceite grava apenas o perfil local/Drive, sem
+        linha na planilha, eliminando a duplicação de registro.
 
     v0.6.10: ``name`` e ``ip`` são enviados juntos (nome ao lado do e-mail;
     IP capturado do X-Forwarded-For/remote_addr). O IP é coletado com
@@ -654,7 +698,9 @@ def notify_active_user(ip: str | None = None) -> None:
     Na reabertura (perfil persistente existente + mesma versão dos Termos),
     a UI mostra a tela "Bem-vindo de volta" e, ao confirmar, chama este
     heartbeat: o webhook recebe o e-mail + horário do acesso + flag
-    "usuario_ativo", distinguindo-o do "novo_contato" (primeiro aceite).
+    "usuario_ativo". v0.6.20: este é o ÚNICO registro que a planilha recebe
+    — o primeiro aceite também chega aqui (perfil já gravado por
+    save_contact), garantindo exatamente 1 linha por ativação.
 
     v0.6.10: ``ip`` capturado da requisição (X-Forwarded-For) é encaminhado
     junto ao webhook para métrica de ativação geográfica/segurança.
@@ -680,3 +726,71 @@ def notify_active_user(ip: str | None = None) -> None:
         ).start()
     except Exception as e:
         _contato_log("heartbeat FALHOU: %s" % type(e).__name__)
+
+
+def publish_backend_url(url: str) -> None:
+    """v0.6.11: anuncia a URL pública do backend no webhook (descoberta do app).
+
+    Chamado pelo launch() do Colab após obter o proxyPort: o Apps Script
+    (v0.6.11+) guarda como "último backend" deste usuário (chave = sha do
+    e-mail) e o app Android (variante cloud) busca via
+    ``GET ?action=backend&email_sha256=...`` — zero colagem de URL.
+    Também grava linha de auditoria na planilha (flag "backend_online").
+
+    LGPD: mesma finalidade consentida do contato (art. 7º V); só vai ao
+    endpoint do desenvolvedor, nunca ao GA4. Fire-and-forget; sem perfil
+    ou sem endpoint → no-op (apenas auditoria local).
+    """
+    try:
+        u = str(url or "").strip().rstrip("/") + "/"
+        if not (u.startswith("https://") or u.startswith("http://")):
+            return
+        prof = _read_profile()
+        addr = str(prof.get("email", "")).strip().lower()
+        if not addr:
+            _contato_log("backend_online SKIP: sem e-mail salvo")
+            return
+        sha = str(prof.get("email_sha256", "")
+                  or hashlib.sha256(addr.encode("utf-8")).hexdigest())
+        name = str(prof.get("name", "") or prof.get("nome", ""))
+        endpoint = _contact_endpoint()
+        if not endpoint:
+            _contato_log("backend_online PENDENTE: endpoint não configurado")
+            return
+        payload = {
+            "product": "ufvai",
+            "email": addr,
+            "email_sha256": sha,
+            "name": name,
+            "ip": "",
+            "environment": "colab" if os.path.isdir("/content") else "local",
+            "app_version": _APP_VERSION,
+            "sent_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "flag": "backend_online",
+            "backend_url": u,
+        }
+
+        def _post() -> None:
+            try:
+                req = urllib.request.Request(
+                    endpoint,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                resp = urllib.request.urlopen(req, timeout=8)
+                try:
+                    resp.read(64)
+                except Exception:
+                    pass
+                _contato_log("backend_online OK * %s" % (u[:60],))
+            except Exception as e:
+                _contato_log("backend_online FALHOU * %s: %s"
+                             % (type(e).__name__, str(e)[:100]))
+
+        threading.Thread(target=_post, daemon=True).start()
+    except Exception as e:
+        try:
+            _contato_log("backend_online FALHOU: %s" % type(e).__name__)
+        except Exception:
+            pass

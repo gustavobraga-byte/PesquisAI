@@ -93,6 +93,24 @@ ESSENTIAL_SKILLS: set[str] = {
     name for _, name, required in SKILL_REGISTRY if required
 }
 
+# ── Skills personalizadas do usuário (v0.6.18) ───────────────
+# Pasta persistente (Drive no Colab · ~/PesquisAI no offline) onde o
+# usuário coloca skills próprias. Cada subpasta deve conter um SKILL.md
+# no formato OpenCode. São carregadas a cada boot pelo setup_custom_skills().
+CUSTOM_SKILLS_DIRNAME: str = "skills-personalizadas"
+
+def custom_skills_dir() -> str:
+    """Retorna o caminho da pasta de skills personalizadas do usuário.
+
+    Colab: /content/drive/My Drive/PesquisAI/backups/skills-personalizadas/
+    Offline: ~/PesquisAI/backups/skills-personalizadas/
+    """
+    if os.path.isdir(MOUNT_PATH):
+        base = DRIVE_PATH
+    else:
+        base = os.path.expanduser("~/PesquisAI")
+    return os.path.join(base, "backups", CUSTOM_SKILLS_DIRNAME)
+
 # ── Obsidian Second-Brain (v0.5.0+) ───────────────────────────
 # REGRA: o vault DEVE ficar no Google Drive do usuário.
 # Caminho padrão: /content/drive/My Drive/PesquisAI/vault/

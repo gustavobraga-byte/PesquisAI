@@ -44,6 +44,7 @@ if IN_COLAB:
         except Exception:
             pass
     _builtins.print = _silent_print
+
 from .opencode_utils import find_opencode, build_env
 from .security import load_encrypted_keys, save_encrypted_keys, sanitize_command
 
@@ -62,6 +63,7 @@ try:
     from .telemetry import masked_state as _tel_masked_state, save_admin_config as _tel_save_admin
     from .telemetry import save_contact as _tel_save_contact, clear_contact as _tel_clear_contact, contact_status as _tel_contact_status
     from .telemetry import notify_active_user as _tel_notify_active_user
+    from .telemetry import publish_backend_url as _tel_publish_backend_url
 except Exception:  # pragma: no cover
     def _tel_event(*a, **k): pass
     def _tel_set_consent(*a, **k): pass
@@ -77,6 +79,7 @@ except Exception:  # pragma: no cover
     def _tel_contact_status(*a, **k):
         return {"has_email": False, "email_masked": "", "contact_endpoint_set": False}
     def _tel_notify_active_user(*a, **k): pass
+    def _tel_publish_backend_url(*a, **k): pass
 # v0.4.2.2: __version__ foi MOVIDO para pesquisai/__version__.py
 # (estava em /__version__.py). Mantemos fallback para robustez.
 try:
@@ -1764,10 +1767,15 @@ def start_wrapper_server():
                 cand_files: list[str] = []
                 for _lg in _lang_order:
                     _sh = _lg.split("_")[0]
+                    # NOTA: o pt-BR canônico vive na RAIZ (AGENTS.md) e é
+                    # espelhado em agents/AGENTS.pt.md (cópia idêntica).
+                    # Se o espelho existir, é ele que é servido primeiro;
+                    # senão, o fallback canônico abaixo cobre o pt.
                     cand_files.append(f"AGENTS.{_sh}.md")
                     cand_files.append(f"AGENTS.{_lg}.md")
                 content = None
                 served_file = None
+                served_lang = None
                 tried_files = []
                 if agents_dir:
                     for fname in cand_files:
@@ -1778,10 +1786,25 @@ def start_wrapper_server():
                                 with open(fpath, "r", encoding="utf-8") as fh:
                                     content = fh.read()
                                 served_file = fname
+                                served_lang = fname[7:-3] if fname.startswith("AGENTS.") else ""
                                 break
                             except Exception as e:
                                 content = f"⚠️ Erro ao ler {fname}: {e}"
                                 break
+                if content is None:
+                    # Fallback canônico: <raiz>/AGENTS.md (pt-BR, fonte única).
+                    # Cobre o pt_BR (sem AGENTS.pt.md desde a remoção da
+                    # duplicata) e serve de última instância p/ qualquer idioma.
+                    _root_agents = os.path.join(parent, "AGENTS.md")
+                    tried_files.append(_root_agents)
+                    if os.path.isfile(_root_agents):
+                        try:
+                            with open(_root_agents, "r", encoding="utf-8") as fh:
+                                content = fh.read()
+                            served_file = "AGENTS.md"
+                            served_lang = "pt"
+                        except Exception as e:
+                            content = f"⚠️ Erro ao ler AGENTS.md: {e}"
                 if content is None:
                     self._json(200, {
                         "ok": False,
@@ -1795,7 +1818,8 @@ def start_wrapper_server():
                     "ok": True,
                     "lang": full,
                     "served_file": served_file or "",
-                    "fallback_used": bool(served_file and short not in str(served_file)),
+                    "served_lang": served_lang or short,
+                    "fallback_used": bool(served_lang and served_lang not in (short, full)),
                     "filename": served_file or f"AGENTS.{short}.md",
                     "content": content,
                 })
@@ -3020,6 +3044,29 @@ def start_wrapper_server():
                 self._json(200, {"ok": True, "deleted": True})
                 return
 
+            # ══════════════════════════════════════════════════════════
+            # v0.6.20 — Botão SAIR da interface (após confirmação no modal)
+            # ══════════════════════════════════════════════════════════
+            if p == "/api/shutdown":
+                # Exigência de segurança: a UI só envia {"confirm": true}
+                # após o usuário confirmar no modal. Sem isso, 400.
+                if not bool(body.get("confirm", False)):
+                    return self._json(400, {
+                        "ok": False,
+                        "error": "Confirmação ausente — o encerramento exige "
+                                 "confirmação explícita do usuário.",
+                    })
+                # v0.6.20-fix: resposta IMEDIATA. O trabalho lento (nota de
+                # fim de sessão no Drive/FUSE, kill do keep-alive e unassign)
+                # roda em thread daemon. Antes era tudo síncrono e a rota só
+                # respondia depois do write no Drive → o modal travava vários
+                # segundos antes de desconectar.
+                _shutdown_start()
+                return self._json(200, {
+                    "ok": True,
+                    "message": "Encerrando o ambiente de execução…",
+                })
+
             self.send_error(404)
     
     # v0.6.9-6: offline completo — bind 0.0.0.0 resolve "porta não funciona" quando localhost
@@ -3566,6 +3613,176 @@ def show_launch_button(banner_url):
 """))
 
 
+# ══════════════════════════════════════════════════════════════════
+# v0.6.20 — Botão SAIR da interface: encerramento seguro do runtime
+# ══════════════════════════════════════════════════════════════════
+# Fluxo acionado pela UI (modal com confirmação → POST /api/shutdown):
+#   0. A rota responde IMEDIATAMENTE (v0.6.20-fix) — todo o trabalho vai para
+#      uma thread daemon via _shutdown_start(), para a UI não travar no Drive;
+#   1. Salvar nota de fim de sessão na memória (best-effort, teto de 1 s);
+#   2. Encerrar o keep-alive do notebook (PID em /tmp/pesquisai/ufvai_keepalive.pid,
+#      escrito pela célula de boot; fallback pkill pelo marcador de cmdline);
+#   3. Desconectar e excluir o runtime do Colab (runtime.unassign) — executado
+#      em thread daemon APÓS a resposta HTTP chegar ao frontend, para que a
+#      UI possa mostrar o estado "encerrando/encerrado" antes da queda.
+_KEEPALIVE_PID_FILE = "/tmp/pesquisai/ufvai_keepalive.pid"
+_KEEPALIVE_CMD_MARKER = "ufvai-keepalive-v0620"
+
+
+def _shutdown_save_memory_note() -> bool:
+    """Grava nota de fim de sessão na memória (best-effort, fail-open)."""
+    try:
+        from pesquisai.obsidian import ObsidianMemoryStatus
+        from pesquisai.obsidian.models import Note, NoteMetadata
+        from pesquisai.obsidian.models import extract_wikilinks, extract_tags
+        import datetime as _dt
+
+        mem = _get_memory()
+        if mem.status != ObsidianMemoryStatus.READY or mem._vault is None:
+            return False
+        today = _dt.date.today()
+        rel_path = f"sessions/ses_{today.isoformat()}-encerrado-via-interface.md"
+        body = (
+            f"# Sessão encerrada via interface — {today.isoformat()}\n\n"
+            "- **Evento:** usuário acionou o botão **SAIR** da interface do app "
+            "(confirmação explícita no modal) e o ambiente de execução foi "
+            "desconectado/excluído (`runtime.unassign`).\n"
+            f"- **Registrado automaticamente** pela rota `/api/shutdown` (v0.6.20) "
+            "para preservar o rastro da sessão na memória.\n"
+            "- Próxima sessão: recall em [[moc/last-state]].\n"
+        )
+        existing = mem.get(rel_path)
+        if existing is not None:
+            body = existing.body + "\n" + body
+        note = Note(
+            path=rel_path,
+            metadata=NoteMetadata(
+                title=f"Sessão encerrada via interface — {today.isoformat()}",
+                created=existing.metadata.created if existing else today,
+                updated=today,
+                tags=("pesquisai/session", "pesquisai/archived"),
+                created_by="pesquisai",
+                status="archived",
+            ),
+            body=body,
+            wikilinks=extract_wikilinks(body),
+            tags=extract_tags(body),
+        )
+        if existing is not None:
+            note.tags = tuple(sorted(set(note.tags) | set(existing.metadata.tags) | set(note.wikilinks and [])))
+        mem._vault.write(note, force=False)
+        return True
+    except Exception:
+        return False
+
+
+def _shutdown_kill_keepalive() -> bool:
+    """Encerra o subprocesso keep-alive do notebook (best-effort)."""
+    import signal  # import local: módulo não depende de signal no topo
+
+    pid: int | None = None
+    try:
+        with open(_KEEPALIVE_PID_FILE, "r", encoding="utf-8") as fh:
+            pid = int(fh.read().strip())
+    except Exception:
+        pid = None
+
+    if pid is not None and pid > 0 and pid != os.getpid():
+        try:
+            os.kill(pid, signal.SIGTERM)
+            # v0.6.20-fix: espera curta (≤0,3 s) pelo TERM antes do KILL —
+            # o botão SAIR não pode ficar preso num processo teimoso.
+            for _ in range(15):
+                time.sleep(0.02)
+                try:
+                    os.kill(pid, 0)
+                except OSError:
+                    return True
+            os.kill(pid, signal.SIGKILL)
+            return True
+        except OSError:
+            pass
+
+    # Fallback: marcador na cmdline (PID file ausente/inválido)
+    try:
+        subprocess.run(
+            ["pkill", "-f", _KEEPALIVE_CMD_MARKER],
+            capture_output=True, timeout=5,
+        )
+        return True
+    except Exception:
+        return False
+
+
+def _shutdown_schedule_unassign(delay_s: float = 0.4) -> None:
+    """Desconecta/exclui o runtime do Colab após a resposta HTTP ser entregue.
+
+    O servidor wrapper roda em thread DENTRO do processo do kernel do Colab;
+    `google.colab.runtime.unassign()` age pelo canal do kernel e é o mesmo
+    mecanismo de *Runtime ▸ Desconectar e excluir ambiente* (colabtools).
+    Fora do Colab (offline/.deb), nada é feito.
+    """
+    def _worker():
+        try:
+            time.sleep(delay_s)
+            if not IN_COLAB:
+                return
+            from google.colab import runtime as _colab_runtime  # noqa: PLC0415
+            _colab_runtime.unassign()
+        except Exception:
+            # Fallback honesto: o usuário pode usar o menu Runtime.
+            pass
+
+    threading.Thread(target=_worker, daemon=True, name="ufvai-sair-unassign").start()
+
+
+def _shutdown_start(
+    *,
+    memory_timeout_s: float = 1.0,
+    flush_s: float = 0.4,
+) -> None:
+    """Dispara o encerramento SEM bloquear a resposta HTTP (v0.6.20-fix).
+
+    Todo o trabalho lento — gravar a nota de fim de sessão na memória
+    (Drive/FUSE), encerrar o keep-alive e desligar o runtime — roda em
+    thread daemon. A rota ``/api/shutdown`` responde na hora e a UI fecha o
+    modal imediatamente, sem os segundos de espera do write no Drive.
+
+    A gravação da nota tem um **teto** (``memory_timeout_s``): desconectar
+    não pode depender de uma escrita lenta no Drive. A nota é *best-effort*
+    e o progresso real já é salvo continuamente pelo agente.
+    """
+    def _worker() -> None:
+        # 1. Nota de fim de sessão em paralelo (não bloqueia o kill).
+        note_done = threading.Event()
+
+        def _save() -> None:
+            try:
+                _shutdown_save_memory_note()
+            except Exception:  # noqa: BLE001
+                pass
+            finally:
+                note_done.set()
+
+        threading.Thread(
+            target=_save, daemon=True, name="ufvai-sair-memoria",
+        ).start()
+
+        # 2. Encerra o keep-alive (rápido) enquanto a nota é gravada.
+        try:
+            _shutdown_kill_keepalive()
+        except Exception:  # noqa: BLE001
+            pass
+
+        # 3. Espera a nota apenas até o teto — nunca além disso.
+        note_done.wait(timeout=memory_timeout_s)
+
+        # 4. Só então derruba o kernel, garantindo o flush da resposta HTTP.
+        _shutdown_schedule_unassign(delay_s=flush_s)
+
+    threading.Thread(target=_worker, daemon=True, name="ufvai-sair").start()
+
+
 def launch():
     global _drive_url
     
@@ -3668,6 +3885,13 @@ def launch():
     if not IN_COLAB:
         _auto_open_browser(banner_url)
         print(f"\n🌐 Interface: {banner_url}  (terminal: http://localhost:{TERMINAL_PORT})")
+
+    # v0.6.11: anuncia a URL pública p/ o app Android descobrir sozinho (sem colar URL)
+    if IN_COLAB and banner_url and str(banner_url).startswith("http"):
+        try:
+            _tel_publish_backend_url(str(banner_url))
+        except Exception:
+            pass
 
     return banner_url
 

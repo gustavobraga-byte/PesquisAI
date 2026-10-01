@@ -141,15 +141,45 @@ RESPONSIVE_CSS: str = """
     .status { display: none; }  /* esconde status, foco no essencial */
     .tb-btn { display: none; }  /* migram para hamburger */
     .tb-icons { margin-left: auto; gap: 3px; }
+    /* === FIX (29/09/2026): hamburguer alinhado a DIREITA no mobile. ===
+       Causa: o CSS base tem .sep { flex:1 }, que absorve TODO o espaco livre
+       do #topbar. Na resolucao do flexbox o flex-grow e resolvido ANTES das
+       margens auto, entao o margin-left:auto do .tb-icons recebia 0 e o
+       grupo ficava colado no logo, a ESQUERDA. Os .tb-btn que o .sep
+       separava ja estao display:none neste breakpoint, entao nao se perde
+       nada ao escondê-lo: o espaco volta e o hamburguer encosta na borda
+       direita. Especificidade #topbar para vencer o .sep do CSS base. */
+    #topbar .sep { display: none; }
     .tb-icon { width: 32px; height: 32px; }
     .tb-icon svg { width: 14px; height: 14px; }
+    /* === REGRA v2 (29/09/2026) — com o hamburger visivel, ZERO icone SVG na topbar.
+       .hamburger e .lang-btn NAO sao .tb-icon: ficam de fora de proposito e
+       continuam visiveis. Especificidade #topbar + !important para nao perder a
+       cascata contra qualquer regra .tb-icon declarada depois. === */
+    #topbar .tb-icon { display: none !important; }
+    /* dentro do drawer: somente texto, nenhum SVG */
+    .mobile-menu .tb-btn { display: inline-flex; }
+    .mobile-menu .tb-btn svg,
+    .mobile-menu .btn-provider svg { display: none !important; }
     .hamburger { display: inline-flex; }
-    #footer { padding: 0 8px; height: 36px; }
+    #footer { padding: 0 8px; height: 36px; gap: 12px; }
+    /* v0.6.20-fix: rodapé mobile = SOMENTE ÍCONES (todo texto escondido).
+       - .footer-link font-size:0 colapsa o texto do link; o SVG mantém tamanho fixo em px.
+       - .footer-loc ("UFV · Viçosa, MG") sai TAMBÉM no mobile intermediário (480–767px),
+         e não apenas abaixo de 480px.
+       - Separadores (.footer-sep) desativados: sem texto, o separador fica órfão
+         (ex.: o que precedia o texto oculto / o que antecedia o "Powered by").
+         O gap do #footer passa a dar o espaçamento entre os ícones. */
     .footer-brand { display: none; }
-    .footer-sep { margin: 0 6px; }
-    .footer-link { font-size: 9.5px; }
-    .btn-provider { padding: 0 6px; font-size: 9px; height: 20px; }
+    .footer-loc { display: none; }
     .footer-oc { display: none; }
+    #footer .footer-sep { display: none; }
+    .footer-link { font-size: 0; }
+    .footer-link svg { margin-right: 0; }
+    .btn-provider { padding: 0 6px; font-size: 9px; height: 20px; }
+    .footer-right { gap: 10px; }
+    .footer-right .btn-provider { gap: 0; }
+    .footer-right .btn-provider span { display: none; }  /* "+ provedor" vira só o ícone */
     /* terminal: ocupa mais espaço em mobile */
     #terminal-frame { height: calc(100vh - 50px - 36px) !important; }
     /* modais: largura quase total */
@@ -748,7 +778,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       <span data-i18n="providers.title">+ provedor</span>
     </button>
     <div style="height:1px;background:var(--line);margin:8px 0;"></div>
-    <button class="modal-close" onclick="openHealth(); toggleMobileMenu();">🩺 <pan data-i18n="dashboard.title">Dashboard de Saúde</span></button>
+    <button class="modal-close" onclick="openHealth(); toggleMobileMenu();">🩺 <span data-i18n="dashboard.title">Dashboard de Saúde</span></button>
     <button class="modal-close" onclick="openSessions(); toggleMobileMenu();">📜 <span data-i18n="sessions.title">Histórico de Sessões</span></button>
     <button class="modal-close" onclick="openShortcuts(); toggleMobileMenu();">⌨️ <span data-i18n="shortcuts.title">Atalhos de Teclado</span></button>
     <button class="modal-close" onclick="openAgents(); toggleMobileMenu();">📋 <span data-i18n="agents.title">Diretrizes do Agente</span></button>
@@ -774,17 +804,23 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
   <div id="footer">
     <span class="footer-brand">PesquisAI</span>
     <span class="footer-sep"></span>
-    <a href="mailto:gustavo.braga@ufv.br" class="footer-link">
+    <a href="mailto:gustavo.braga@ufv.br" class="footer-link" title="gustavo.braga@ufv.br" aria-label="E-mail">
       <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
       gustavo.braga@ufv.br
     </a>
     <span class="footer-sep"></span>
-    <a href="https://github.com/gustavobraga-byte/PesquisAI" target="_blank" class="footer-link">
+    <a href="https://github.com/gustavobraga-byte/PesquisAI" target="_blank" class="footer-link" title="GitHub" aria-label="GitHub">
       <svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
       GitHub
     </a>
     <span class="footer-sep"></span>
-    <span style="color:var(--ink-muted)">UFV · Viçosa, MG - Brasil</span>
+    <!-- v0.6.20-fix: link do SITE OFICIAL no rodapé (falta reportada pelo usuário) -->
+    <a href="https://gustavobraga-byte.github.io/ufvaisite/" target="_blank" rel="noopener" class="footer-link footer-site" title="Site oficial do UFVAI">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      Site
+    </a>
+    <span class="footer-sep"></span>
+    <span style="color:var(--ink-muted)" class="footer-loc">UFV · Viçosa, MG - Brasil</span>
 
     <div class="footer-right">
       <button class="btn-provider" onclick="connectProvider()" title="Conectar novo provedor de IA">
@@ -886,7 +922,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
         <button onclick="copyAgents()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="agents.copy">Copiar</button>
         <button onclick="reloadAgents()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;">↻ <span data-i18n="ui.loading">Recarregar</span></button>
         <div style="flex:1;"></div>
-        <a id="agents-source-link" href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/agents/AGENTS.pt.md" target="_blank" class="footer-link" style="font-size:10.5px;" data-i18n="agents.open_source">Ver fonte</a>
+        <a id="agents-source-link" href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/AGENTS.md" target="_blank" class="footer-link" style="font-size:10.5px;" data-i18n="agents.open_source">Ver fonte</a>
       </div>
     </div>
   </div>
@@ -1625,7 +1661,10 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
       if (badgeEl) badgeEl.textContent = langShort;
       if (sourceEl) {
         const code = (_currentLang || "pt_BR").split("_")[0];
-        sourceEl.href = "https://github.com/gustavobraga-byte/PesquisAI/blob/main/agents/AGENTS." + code + ".md";
+        // pt-BR canônico vive na RAIZ (AGENTS.pt.md removido — sem duplicata)
+        sourceEl.href = code === "pt"
+          ? "https://github.com/gustavobraga-byte/PesquisAI/blob/main/AGENTS.md"
+          : "https://github.com/gustavobraga-byte/PesquisAI/blob/main/agents/AGENTS." + code + ".md";
       }
 
       if (!forceReload && _agentsCacheLang === _currentLang && _agentsCache) {

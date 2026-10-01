@@ -141,15 +141,45 @@ RESPONSIVE_CSS: str = """
     .status { display: none; }  /* esconde status, foco no essencial */
     .tb-btn { display: none; }  /* migram para hamburger */
     .tb-icons { margin-left: auto; gap: 3px; }
+    /* === FIX (29/09/2026): hamburguer alinhado a DIREITA no mobile. ===
+       Causa: o CSS base tem .sep { flex:1 }, que absorve TODO o espaco livre
+       do #topbar. Na resolucao do flexbox o flex-grow e resolvido ANTES das
+       margens auto, entao o margin-left:auto do .tb-icons recebia 0 e o
+       grupo ficava colado no logo, a ESQUERDA. Os .tb-btn que o .sep
+       separava ja estao display:none neste breakpoint, entao nao se perde
+       nada ao escondê-lo: o espaco volta e o hamburguer encosta na borda
+       direita. Especificidade #topbar para vencer o .sep do CSS base. */
+    #topbar .sep { display: none; }
     .tb-icon { width: 32px; height: 32px; }
     .tb-icon svg { width: 14px; height: 14px; }
+    /* === REGRA v2 (29/09/2026) — com o hamburger visivel, ZERO icone SVG na topbar.
+       .hamburger e .lang-btn NAO sao .tb-icon: ficam de fora de proposito e
+       continuam visiveis. Especificidade #topbar + !important para nao perder a
+       cascata contra qualquer regra .tb-icon declarada depois. === */
+    #topbar .tb-icon { display: none !important; }
+    /* dentro do drawer: somente texto, nenhum SVG */
+    .mobile-menu .tb-btn { display: inline-flex; }
+    .mobile-menu .tb-btn svg,
+    .mobile-menu .btn-provider svg { display: none !important; }
     .hamburger { display: inline-flex; }
-    #footer { padding: 0 8px; height: 36px; }
+    #footer { padding: 0 8px; height: 36px; gap: 12px; }
+    /* v0.6.20-fix: rodapé mobile = SOMENTE ÍCONES (todo texto escondido).
+       - .footer-link font-size:0 colapsa o texto do link; o SVG mantém tamanho fixo em px.
+       - .footer-loc ("UFV · Viçosa, MG") sai TAMBÉM no mobile intermediário (480–767px),
+         e não apenas abaixo de 480px.
+       - Separadores (.footer-sep) desativados: sem texto, o separador fica órfão
+         (ex.: o que precedia o texto oculto / o que antecedia o "Powered by").
+         O gap do #footer passa a dar o espaçamento entre os ícones. */
     .footer-brand { display: none; }
-    .footer-sep { margin: 0 6px; }
-    .footer-link { font-size: 11px; }
-    .btn-provider { padding: 0 6px; font-size: 9px; height: 20px; }
+    .footer-loc { display: none; }
     .footer-oc { display: none; }
+    #footer .footer-sep { display: none; }
+    .footer-link { font-size: 0; }
+    .footer-link svg { margin-right: 0; }
+    .btn-provider { padding: 0 6px; font-size: 9px; height: 20px; }
+    .footer-right { gap: 10px; }
+    .footer-right .btn-provider { gap: 0; }
+    .footer-right .btn-provider span { display: none; }  /* "+ provedor" vira só o ícone */
     /* terminal: ocupa mais espaço em mobile */
     #terminal-frame { height: calc(100vh - 50px - 36px) !important; }
     /* modais: largura quase total */
@@ -193,6 +223,9 @@ RESPONSIVE_CSS: str = """
     .tb-btn { padding: 0 8px; }
     .footer-sep:nth-of-type(3) { display: none; }
   }
+
+  /* v0.6.20-fix: coberto pelo bloco ≤767px — rodapé mobile = somente ícones
+     (nada a fazer aqui para o rodapé). */
 
   /* === Acessibilidade: foco visível em todos os botões === */
   .tb-btn:focus-visible, .tb-icon:focus-visible, .hamburger:focus-visible,
@@ -298,7 +331,7 @@ RESPONSIVE_CSS: str = """
     color:        #1f262a;
     --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
     --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  }}
+  }
 
   /* === Indicador de tema ativo (NOVO em v0.4.1) === */
   #theme-toggle[data-theme="pesquisai-light"] {
@@ -588,6 +621,40 @@ def create_wrapper_html(
     .btn-restore { color:var(--amber); background:var(--amber-dim); border-color:rgba(232,184,75,.25); }
     .btn-restore:hover { background:rgba(232,184,75,.2); border-color:rgba(232,184,75,.5); }
 
+    /* v0.6.20 — botão SAIR (encerrar ambiente de execução) */
+    .btn-sair { color:var(--red); background:var(--red-dim); border-color:rgba(224,112,112,.25); }
+    .btn-sair:hover { background:rgba(224,112,112,.2); border-color:rgba(224,112,112,.5); }
+
+    /* v0.6.20 — modal de confirmação do SAIR */
+    #sair-overlay {
+      position: fixed; inset: 0;
+      background: var(--ov-dim);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 99999; opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+    #sair-overlay.open { opacity: 1; pointer-events: all; }
+    #sair-modal {
+      background: var(--rail); border: 1px solid var(--line);
+      border-radius: 8px; padding: 24px; width: 400px; max-width: 90vw;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6);
+    }
+    #sair-modal .sair-warn {
+      font-size: 11.5px; color: var(--ink-muted);
+      line-height: 1.6; margin-bottom: 16px;
+    }
+    #sair-modal .sair-status {
+      font-size: 11px; color: var(--accent);
+      margin-top: 12px; min-height: 15px; text-align: center;
+    }
+    #sair-modal .sair-done {
+      display: none; margin-top: 14px; padding: 12px;
+      font-size: 12px; color: var(--ink); line-height: 1.6;
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--line); border-radius: var(--radius);
+      text-align: center;
+    }
+
     #toast {
       position: fixed; bottom: 58px; right: 18px;
       padding: 9px 16px; border-radius: var(--radius);
@@ -859,6 +926,12 @@ def create_wrapper_html(
       <span data-i18n="ui.drive">Drive</span>
     </a>
 
+    <!-- v0.6.20: SAIR — oculto por padrão; exibido via JS somente no Colab -->
+    <button class="tb-btn btn-sair" id="sair-btn" onclick="ufvaiExit()" style="display:none;">
+      <svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+      <span data-i18n="ui.sair">SAIR</span>
+    </button>
+
   </div>
 
   <!-- Mobile menu (drawer) — espelha o topbar em mobile -->
@@ -876,6 +949,11 @@ def create_wrapper_html(
       <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
       <span data-i18n="ui.drive">Drive</span>
     </a>
+    <!-- v0.6.20: SAIR no drawer mobile (idem topbar: exibido só no Colab) -->
+    <button class="tb-btn btn-sair" id="sair-btn-mobile" onclick="ufvaiExit(); toggleMobileMenu();" style="display:none;width:100%;justify-content:flex-start;">
+      <svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+      <span data-i18n="ui.sair">SAIR</span>
+    </button>
     <button class="btn-provider" onclick="connectProvider(); toggleMobileMenu();" style="width:100%;justify-content:flex-start;">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
       <span data-i18n="providers.title">+ provedor</span>
@@ -922,17 +1000,23 @@ def create_wrapper_html(
   <div id="footer">
     <span class="footer-brand">UFVAI</span>
     <span class="footer-sep"></span>
-    <a href="mailto:gustavo.braga@ufv.br" class="footer-link">
+    <a href="mailto:gustavo.braga@ufv.br" class="footer-link" title="gustavo.braga@ufv.br" aria-label="E-mail">
       <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
       gustavo.braga@ufv.br
     </a>
     <span class="footer-sep"></span>
-    <a href="https://github.com/gustavobraga-byte/PesquisAI" target="_blank" class="footer-link">
+    <a href="https://github.com/gustavobraga-byte/PesquisAI" target="_blank" class="footer-link" title="GitHub" aria-label="GitHub">
       <svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
       GitHub
     </a>
     <span class="footer-sep"></span>
-    <span style="color:var(--ink-muted)">UFV · Viçosa, MG - Brasil</span>
+    <!-- v0.6.20-fix: link do SITE OFICIAL no rodapé (falta reportada pelo usuário) -->
+    <a href="https://gustavobraga-byte.github.io/ufvaisite/" target="_blank" rel="noopener" class="footer-link footer-site" title="Site oficial do UFVAI">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      Site
+    </a>
+    <span class="footer-sep"></span>
+    <span style="color:var(--ink-muted)" class="footer-loc">UFV · Viçosa, MG - Brasil</span>
     <span class="footer-sep"></span>
 
     <div class="footer-right">
@@ -948,6 +1032,33 @@ def create_wrapper_html(
   </div>
 
   <div id="toast"></div>
+
+  <!-- v0.6.20 — Modal de confirmação do SAIR (confirmação OBRIGATÓRIA antes
+       de desconectar e excluir o ambiente de execução do Colab) -->
+  <div id="sair-overlay" onclick="if(event.target===this)ufvaiExitCancel()">
+    <div id="sair-modal" role="dialog" aria-modal="true" aria-labelledby="sair-title">
+      <div class="modal-title" id="sair-title">⏻ <span data-i18n="sair.title">Encerrar sessão</span></div>
+      <p class="sair-q" style="font-size:12.5px;color:var(--ink);margin-bottom:10px;" data-i18n="sair.confirm_q">Desconectar e excluir o ambiente de execução?</p>
+      <p class="sair-warn" data-i18n="sair.warn">Tudo em memória será perdido — os arquivos no seu Google Drive continuam salvos. Não há como desfazer após confirmar.</p>
+      <div style="display:flex;gap:8px;">
+        <button id="sair-yes" onclick="ufvaiExitConfirm()" style="flex:1;padding:9px;background:rgba(224,112,112,.15);border:1px solid rgba(224,112,112,.4);border-radius:var(--radius);color:var(--red);font-family:var(--font-sans);font-size:12px;font-weight:700;cursor:pointer;" data-i18n="sair.yes">SIM, SAIR</button>
+        <button onclick="ufvaiExitCancel()" style="padding:9px 14px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink-muted);font-family:var(--font-sans);font-size:12px;cursor:pointer;" data-i18n="ui.cancel">Cancelar</button>
+      </div>
+      <div class="sair-status" id="sair-status"></div>
+    </div>
+  </div>
+
+  <!-- v0.6.20 — tela "Ambiente desconectado" (após SIM, SAIR) — visual igual à
+       tela de Termos recusados; fica visível quando o runtime é desconectado -->
+  <div id="exit-overlay">
+    <div class="t-card">
+      <div class="t-brand"><b>UFV</b><em>AI</em></div>
+      <p class="e-msg">✅ Ambiente desconectado e excluído.<br>
+        Para usar o UFVAI de novo: reexecute a célula de boot no Colab.<br>
+        Os arquivos no seu Google Drive continuam salvos.<br><br>
+        <span style="opacity:.75">Environment disconnected and deleted. To use UFVAI again, re-run the boot cell in Colab. Files on your Google Drive remain saved.</span></p>
+    </div>
+  </div>
 
   <div id="modal-overlay" onclick="if(event.target===this)closeModal()">
     <div id="modal">
@@ -1053,7 +1164,7 @@ def create_wrapper_html(
         <button onclick="copyAgents()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;" data-i18n="agents.copy">Copiar</button>
         <button onclick="reloadAgents()" class="modal-close" style="width:auto;padding:5px 12px;font-size:11px;">↻ <span data-i18n="ui.loading">Recarregar</span></button>
         <div style="flex:1;"></div>
-        <a id="agents-source-link" href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/agents/AGENTS.pt.md" target="_blank" class="footer-link" style="font-size:10.5px;" data-i18n="agents.open_source">Ver fonte</a>
+        <a id="agents-source-link" href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/AGENTS.md" target="_blank" class="footer-link" style="font-size:10.5px;" data-i18n="agents.open_source">Ver fonte</a>
       </div>
     </div>
   </div>
@@ -1278,6 +1389,13 @@ def create_wrapper_html(
     // ════════════════════════════════════════════════════════════
 
     const BASE = location.origin;
+    // v0.6.20-fix: IS_COLAB precisa existir no escopo DESTE script.
+    // Antes, o único `IS_COLAB` era declarado dentro da IIFE do GA4 (script
+    // posterior, escopo local); o uso top-level no bloco do botão SAIR
+    // lançava `ReferenceError: IS_COLAB is not defined`, abortando todo este
+    // script ANTES de registrar o listener de `load` — o splash nunca era
+    // escondido e a UI travava em "Iniciando terminal…".
+    const IS_COLAB = {__IS_COLAB__};
     const LANGS = {__LANGS_JSON__};
     const I18N = {__I18N_JSON__};
     const LANG_COOKIE = "pesquisai_lang";
@@ -1508,6 +1626,74 @@ def create_wrapper_html(
 
     function closeModal() {
       document.getElementById("modal-overlay").classList.remove("open");
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // v0.6.20 — SAIR: desconectar e excluir o ambiente de execução
+    // Botão vive na interface do app (topbar/drawer). Exibido somente
+    // no Colab. Confirmação OBRIGATÓRIA; após confirmar:
+    //   POST /api/shutdown {confirm:true} → backend salva a nota de fim
+    //   de sessão na memória, encerra o keep-alive e desconecta o runtime.
+    // ═══════════════════════════════════════════════════════════
+    function _sairDict() {
+      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      return {
+        status: dict["sair.status"] || "Encerrando o ambiente… aguarde",
+        fail: dict["sair.fail"] || "Falha ao encerrar — use Runtime ▸ Desconectar e excluir ambiente.",
+      };
+    }
+    function ufvaiExit() {
+      const ov = document.getElementById("sair-overlay");
+      document.getElementById("sair-status").textContent = "";
+      const yes = document.getElementById("sair-yes");
+      yes.disabled = false; yes.style.opacity = "1";
+      ov.classList.add("open");
+    }
+    function ufvaiExitCancel() {
+      document.getElementById("sair-overlay").classList.remove("open");
+    }
+    // v0.6.20 — tela "Ambiente desconectado": mostra o overlay full-screen
+    // (mesmo visual da tela de Termos recusados) e fecha o modal; a tela
+    // permanece visível quando o runtime do Colab é desconectado/excluído.
+    function ufvaiExitDone() {
+      ufvaiExitCancel();
+      const eo = document.getElementById("exit-overlay");
+      if (eo) eo.style.display = "flex";
+    }
+    async function ufvaiExitConfirm() {
+      const d = _sairDict();
+      const st = document.getElementById("sair-status");
+      const yes = document.getElementById("sair-yes");
+      yes.disabled = true; yes.style.opacity = ".6";
+      st.textContent = d.status;
+      try {
+        const r = await fetch(BASE + "/api/shutdown", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true })
+        });
+        const resp = await r.json().catch(() => ({}));
+        if (r.ok && resp.ok) {
+          // v0.6.20-fix: a rota responde na hora (o unassign é agendado em
+          // thread daemon no backend). Mostramos imediatamente a tela
+          // "Ambiente desconectado" — ela permanece visível quando a conexão
+          // cai (sem a antiga espera fixa de 2,5 s).
+          ufvaiExitDone();
+        } else {
+          yes.disabled = false; yes.style.opacity = "1";
+          st.textContent = resp.error || d.fail;
+        }
+      } catch (e) {
+        yes.disabled = false; yes.style.opacity = "1";
+        st.textContent = d.fail;
+      }
+    }
+    // Exibe os botões SAIR somente no Colab (no .deb/offline não há runtime a encerrar)
+    if (IS_COLAB) {
+      try {
+        document.getElementById("sair-btn").style.display = "";
+        document.getElementById("sair-btn-mobile").style.display = "";
+      } catch (e) {}
     }
 
     async function doRestore(file) {
@@ -2156,7 +2342,11 @@ def create_wrapper_html(
       if (badgeEl) badgeEl.textContent = langShort;
       if (sourceEl) {
         const code = (_currentLang || "pt_BR").split("_")[0];
-        sourceEl.href = "https://github.com/gustavobraga-byte/PesquisAI/blob/main/agents/AGENTS." + code + ".md";
+        // pt-BR canônico vive na RAIZ (AGENTS.md), espelhado em
+        // agents/AGENTS.pt.md — "Ver fonte" aponta para a raiz.
+        sourceEl.href = code === "pt"
+          ? "https://github.com/gustavobraga-byte/PesquisAI/blob/main/AGENTS.md"
+          : "https://github.com/gustavobraga-byte/PesquisAI/blob/main/agents/AGENTS." + code + ".md";
       }
 
       if (!forceReload && _agentsCacheLang === _currentLang && _agentsCache) {
@@ -3409,6 +3599,19 @@ def create_wrapper_html(
   #terms-overlay .t-ok{background:linear-gradient(135deg,#D1A705,#b29149);color:#141c24;border:none;}
   #terms-overlay .t-ok:disabled{opacity:.35;cursor:not-allowed;}
   #terms-overlay .t-no{background:transparent;color:#9a9790;border-color:rgba(154,151,144,.35);}
+  /* ── v0.6.20 — tela "Ambiente desconectado" (após SIM, SAIR) — mesmo visual
+     da tela de Termos recusados (card escuro com borda dourada). Permanece
+     visível quando o runtime do Colab é desconectado/excluído. ── */
+  #exit-overlay{position:fixed;inset:0;z-index:100000;display:none;align-items:center;
+    justify-content:center;background:rgba(10,13,17,.96);backdrop-filter:blur(6px);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;padding:16px;}
+  #exit-overlay .t-card{max-width:520px;width:100%;background:#141c24;border:1px solid #b29149;
+    border-radius:14px;padding:28px 26px;color:#e8e6e0;box-shadow:0 20px 60px rgba(0,0,0,.5);
+    text-align:center;}
+  #exit-overlay .t-brand{font-family:"Montserrat","Syne",sans-serif;font-size:26px;
+    letter-spacing:-0.02em;margin-bottom:12px;}
+  #exit-overlay .t-brand b{font-weight:700}#exit-overlay .t-brand em{font-style:normal;font-weight:600;color:#b29149}
+  #exit-overlay .e-msg{font-size:13px;line-height:1.6;}
   /* ── v0.6.9: RESPONSIVO (celulares/tablets — tudo visível e rolável) ── */
   @media (max-width:640px){
     #terms-overlay{padding:10px;padding-left:max(10px,env(safe-area-inset-left));
@@ -3630,16 +3833,20 @@ def create_wrapper_html(
       var okName=_validName((nm&&nm.value||"").trim());
       btn.disabled=!(chk.checked && okMail && okName);
     }
-    function _post(accepted, analytics, contactEmail, contactName){
+    function _post(accepted, analytics, contactEmail, contactName, onDone){
       try{
         var payload={accepted:accepted,analytics:analytics,terms_version:_TV};
         if(contactEmail!==undefined) payload.contact_email=contactEmail;
         if(contactName!==undefined) payload.contact_name=contactName;
         if(__UFVAI_CLIENT_IP__) payload.ip=__UFVAI_CLIENT_IP__;
+        // v0.6.20-fix: quando onDone vem preenchido (fluxo do aceite), o
+        // heartbeat "usuario_ativo" é disparado DEPOIS da resposta do
+        // /api/consent — o perfil já está gravado no servidor e a planilha
+        // recebe exatamente 1 linha (e-mail · nome · IP) por clique do botão.
         fetch("/api/consent",{method:"POST",
           headers:{"Content-Type":"application/json"},
-          body:JSON.stringify(payload)}).catch(function(){});
-      }catch(e){}
+          body:JSON.stringify(payload)}).then(function(){ if(onDone) try{onDone();}catch(e){} })["catch"](function(){ if(onDone) try{onDone();}catch(e){} });
+      }catch(e){ if(onDone) try{onDone();}catch(e2){} }
     }
     var _heartbeatSent=false;
     function _heartbeat(){
@@ -3715,7 +3922,10 @@ def create_wrapper_html(
       if(err) err.textContent="";
       localStorage.setItem("ufvai_terms_version",_TV);
       localStorage.setItem("ufvai_analytics", an.checked?"1":"0");
-      _post(true, an.checked, v, vn);
+      // v0.6.20-fix: o aceite NÃO grava mais linha "novo_contato" na
+      // planilha. A ÚNICA linha vem do heartbeat "usuario_ativo" (com IP),
+      // disparado pelo clique deste botão APÓS o consent ser processado.
+      _post(true, an.checked, v, vn, _heartbeat);
       ov.style.display="none";
       if(_autofillTimer){ clearInterval(_autofillTimer); _autofillTimer=null; }
       // v0.6.9: telemetria ativa por padrão — liga o GA se NÃO desmarcada (opt-out)
@@ -3878,6 +4088,8 @@ def create_wrapper_html(
     i18n_inline: dict[str, dict[str, str]] = {
         "pt_BR": {
             "ui.backup": "Salvar backup", "ui.restore": "Restaurar",
+            "ui.sair": "SAIR",
+            "sair.title": "Encerrar sessão", "sair.confirm_q": "Desconectar e excluir o ambiente de execução?", "sair.warn": "Tudo em memória será perdido — os arquivos no seu Google Drive continuam salvos. Não há como desfazer após confirmar.", "sair.yes": "SIM, SAIR", "sair.status": "Encerrando o ambiente… aguarde", "sair.fail": "Falha ao encerrar — use Runtime ▸ Desconectar e excluir ambiente.", "sair.done": "✅ Ambiente encerrado. Para usar o UFVAI de novo: reexecute a célula de boot.",
             "ui.drive": "Drive", "ui.close": "Fechar", "ui.cancel": "Cancelar",
             "ui.loading": "Carregando…", "ui.status_active": "agente ativo",
             "ui.exporting": "Exportando sessão…",
@@ -3977,6 +4189,8 @@ def create_wrapper_html(
         },
         "en_US": {
             "ui.backup": "Save backup", "ui.restore": "Restore",
+            "ui.sair": "EXIT",
+            "sair.title": "End session", "sair.confirm_q": "Disconnect and delete the execution environment?", "sair.warn": "Everything in memory will be lost — files on your Google Drive remain saved. Cannot be undone once confirmed.", "sair.yes": "YES, EXIT", "sair.status": "Shutting down the environment… please wait", "sair.fail": "Failed to shut down — use Runtime ▸ Disconnect and delete runtime.", "sair.done": "✅ Environment terminated. To use UFVAI again: re-run the boot cell.",
             "ui.drive": "Drive", "ui.close": "Close", "ui.cancel": "Cancel",
             "ui.loading": "Loading…", "ui.status_active": "agent active",
             "ui.exporting": "Exporting session…",
@@ -4076,6 +4290,8 @@ def create_wrapper_html(
         },
         "es_ES": {
             "ui.backup": "Guardar copia", "ui.restore": "Restaurar",
+            "ui.sair": "SALIR",
+            "sair.title": "Cerrar sesión", "sair.confirm_q": "¿Desconectar y eliminar el entorno de ejecución?", "sair.warn": "Todo en memoria se perderá — los archivos de tu Google Drive siguen guardados. No se puede deshacer tras confirmar.", "sair.yes": "SÍ, SALIR", "sair.status": "Cerrando el entorno… espere", "sair.fail": "Error al cerrar — usa Runtime ▸ Desconectar y eliminar el entorno.", "sair.done": "✅ Entorno cerrado. Para usar UFVAI de nuevo: reejecuta la celda de arranque.",
             "ui.drive": "Drive", "ui.close": "Cerrar", "ui.cancel": "Cancelar",
             "ui.loading": "Cargando…", "ui.status_active": "agente activo",
             "ui.exporting": "Exportando sesión…",
@@ -4175,6 +4391,8 @@ def create_wrapper_html(
         },
         "fr_FR": {
             "ui.backup": "Sauvegarder", "ui.restore": "Restaurer",
+            "ui.sair": "QUITTER",
+            "sair.title": "Terminer la session", "sair.confirm_q": "Déconnecter et supprimer l'environnement d'exécution ?", "sair.warn": "Tout en mémoire sera perdu — les fichiers de votre Google Drive restent sauvegardés. Irréversible après confirmation.", "sair.yes": "OUI, QUITTER", "sair.status": "Arrêt de l'environnement… veuillez patienter", "sair.fail": "Échec de l'arrêt — utilisez Runtime ▸ Déconnecter et supprimer l'environnement.", "sair.done": "✅ Environnement terminé. Pour réutiliser UFVAI : relancez la cellule de démarrage.",
             "ui.drive": "Drive", "ui.close": "Fermer", "ui.cancel": "Annuler",
             "ui.loading": "Chargement…", "ui.status_active": "agent actif",
             "ui.exporting": "Exportation de la session…",
@@ -4274,6 +4492,8 @@ def create_wrapper_html(
         },
         "zh_CN": {
             "ui.backup": "保存备份", "ui.restore": "恢复",
+            "ui.sair": "退出",
+            "sair.title": "结束会话", "sair.confirm_q": "断开连接并删除执行环境？", "sair.warn": "内存中的所有内容都将丢失 — Google 云端硬盘中的文件仍会保存。确认后无法撤销。", "sair.yes": "确定，退出", "sair.status": "正在关闭环境…请稍候", "sair.fail": "关闭失败 — 请使用 Runtime ▸ 断开连接并删除环境。", "sair.done": "✅ 环境已终止。如需再次使用 UFVAI：重新运行引导单元。",
             "ui.drive": "云端硬盘", "ui.close": "关闭", "ui.cancel": "取消",
             "ui.loading": "加载中…", "ui.status_active": "智能体运行中",
             "ui.exporting": "正在导出会话…",

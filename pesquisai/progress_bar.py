@@ -60,6 +60,19 @@ def show(step: int = 0, total: int = 4, message: str = "Iniciando...") -> None:
     if IN_COLAB:
         return
     bar = "█" * (pct // 4) + "░" * (25 - pct // 4)
+    # v0.6.20 — restaura o print original: o import do launch_app pode ter
+    # silenciado builtins.print (política painel único do Colab). Se chegou
+    # aqui, o painel NÃO está disponível e o stdout é a única saída — os
+    # prints legados precisam funcionar (Colab mockado por teste, offline etc.).
+    try:
+        import builtins as _b
+        import sys as _sys
+        _atual = _b.__dict__.get("print")
+        _original = getattr(getattr(_atual, "__globals__", None), "get", lambda k: None)("_orig_print")
+        if _original is not None and callable(_original):
+            _b.print = _original
+    except Exception:
+        pass
     print(f"\r  {message:<42} {bar} {pct:>3}%", end="", flush=True)
 
 
