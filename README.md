@@ -15,7 +15,7 @@
 
 > Consulta dados oficiais do Brasil e literatura validada, cita cada fonte e declara honestamente quando não há evidência suficiente.
 
-[🌐 Site](https://gustavobraga-byte.github.io/ufvaisite/) · [📓 Colab](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb) · [📘 Manual](MANUAL.md) · [📜 Termos v2.2](docs/TERMS_OF_USE.md) · [🔒 Privacidade v1.1](PRIVACY.md) · [📊 Telemetria](TELEMETRY.md) · [📝 Changelog](CHANGELOG.md)
+[🌐 Site](https://gustavobraga-byte.github.io/ufvaisite/) · [📓 Colab](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb) · [📘 Manual](MANUAL.md) · [📜 Termos v3](docs/TERMS_OF_USE.md) · [🔒 Privacidade v1.1](PRIVACY.md) · [📊 Telemetria](TELEMETRY.md) · [📝 Changelog](CHANGELOG.md)
 
 </div>
 
@@ -146,13 +146,17 @@ O agente opera por *skills* — cada uma conecta a uma fonte ou capacidade.
 
 ## 🆕 Novidades
 
-**v0.6.17 — ⚡ Memória abre instantânea** (singleton + warm-up + prefetch; 2ª abertura em µs) · **v0.6.16 — 1 linha por retorno** (heartbeat só no clique *Continuar*) · **v0.6.15 — idioma detectado** (sistema/navegador) · **v0.6.14 — IP real via ipify + todo acesso logado** · **v0.6.13 — IP real + heartbeat `usuario_ativo`** · **v0.6.10 — Nome+IP, planilha 8 colunas, cache BM25, mobile** · **v0.6.9 — Termos v2.1, e-mail obrigatório, opt-out sem cookies, .deb offline**.
+**v0.6.21 — 🔧 Motor OpenCode V2 + 🍪 Aviso de cookies só quando bloqueados + 🫀 Keep-alive em célula** .
 
 <details>
 <summary>Histórico 0.6.x completo</summary>
 
 | Versão | Data | Destaques |
 |--------|------|-----------|
+| **0.6.21** | 13/10/2026 | 🔧 Motor **OpenCode V2**  · 🍪 aviso de cookies de terceiros **só quando o bloqueio é detectado**  |
+| **0.6.20** | 01/10/2026 | Boot simplificado (ipynb: clone + run + keep-alive subprocesso) + botão SAIR com confirmação (runtime.unassign) |
+| **0.6.19** | 29/09/2026 | Menu mobile sem SVG + hamburger à direita no mobile (fix `.sep` `flex:1`) + teste de cascata + docs em paridade (§2.1.0) |
+| **0.6.18** | 19/09/2026 | Skills personalizadas (`backups/skills-personalizadas/`) |
 | **0.6.17** | 01/09/2026 | Memória instantânea (singleton + warm-up + prefetch) |
 | **0.6.16** | 01/09/2026 | Retorno = 1 linha apenas no clique |
 | **0.6.15** | 01/09/2026 | Prompt inicial respeita idioma detectado |
@@ -207,7 +211,7 @@ Interface web `:8001` (Colab) com tela de Termos v2.2 (nome+e-mail+IP, opt-out) 
 
 ```
 BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.6.20. Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão 0.6.21. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -223,7 +227,7 @@ Verificar autenticidade em: http://sisppg.ufv.br
   title        = {{UFVAI}: Agente de Intelig{\^e}ncia Artificial
                   para Pesquisa Cient{\'\i}fica},
   year         = {2026},
-  version      = {0.6.20},
+  version      = {0.6.21},
   institution  = {Universidade Federal de Vi{\c{c}}osa (UFV)},
   url          = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/}
 }
