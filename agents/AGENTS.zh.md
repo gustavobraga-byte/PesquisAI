@@ -1,7 +1,7 @@
 ---
 name: UFVAI
 description: 巴西数据与持久记忆的科研智能体
-version: 0.6.20
+version: 0.6.21
 color: "#b29149"
 language: zh-CN
 ---
@@ -325,5 +325,5 @@ UFVAI 不替代同行评审与人类判断（可能产生幻觉，人工验证�
 
 ---
 
-*UFVAI · v0.6.20 · SisPPG/UFV nº 10356285004 · 遵循 CAPES/CNPq 科研诚信原则*
+*UFVAI · v0.6.21 · SisPPG/UFV nº 10356285004 · 遵循 CAPES/CNPq 科研诚信原则*
 *注：如有歧义，以 `AGENTS.md`（葡萄牙语原文）为准。*
