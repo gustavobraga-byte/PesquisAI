@@ -23,8 +23,18 @@ except ImportError:
     HTML = None
     update_display = None
 
-from .constants import TERMINAL_PORT, WRAPPER_PORT, WRAPPER_DIR, VERSION, logger
+from .constants import (
+    TERMINAL_PORT, WRAPPER_PORT, WRAPPER_DIR, VERSION, TUI_JSON, CLI_JSON,
+    OPENCODE_DB_PATH, logger,
+)
 from .jokes import next_joke
+from .opencode_config import (
+    load_json_config,
+    merge_cli_theme,
+    mode_from_ui_theme,
+    ui_theme_from_cli,
+    write_json_atomic,
+)
 
 # v0.6.8 — POLÍTICA PAINEL ÚNICO (Colab): nenhum print verboso vai para stdout —
 # todo feedback visual vem do painel de boot (_BootPanel). Em Colab o stdout é
@@ -45,8 +55,40 @@ if IN_COLAB:
             pass
     _builtins.print = _silent_print
 
-from .opencode_utils import find_opencode, build_env
+from .opencode_utils import (
+    find_opencode,
+    build_env,
+    opencode_version_string,
+    is_opencode_v2,
+)
 from .security import load_encrypted_keys, save_encrypted_keys, sanitize_command
+from .run_fast import ensure_ufvai_agent
+
+
+def _ensure_ufvai_agent_before_spawn(where: str = "terminal") -> None:
+    """Ajuste na v0.6.21 (14/10/2026 — SEM bump): terminal sempre inicia com UFVAI.
+
+    Chamada ANTES de todo (re)spawn do terminal. A OpenCode V2 só usa o
+    `default_agent` de opencode.json quando o agente existe, é visível e aceita
+    `primary` — caso contrário inicia com `build` (doc oficial
+    opencode.ai/v2/docs/agents, seção "Selection"). Reproduzido pelo autor:
+    ao adicionar uma nova chave de API o motor iniciava em `build`, porque
+    `agents/UFVAI.md`/`default_agent` só eram regrados no boot.
+
+    Best-effort: JAMAIS impede o terminal de abrir — um terminal atrasado é
+    pior que um aviso no log; a garantia roda de novo no próximo reinício.
+    """
+    try:
+        ok = ensure_ufvai_agent()
+    except Exception as exc:  # noqa: BLE001 — spawn do terminal não pode falhar por isso
+        logger.warning("ensure_ufvai_agent falhou (%s): %s", where, exc)
+        return
+    if not ok:
+        logger.warning(
+            "ensure_ufvai_agent NÃO gravou opencode.json (%s) — o motor pode "
+            "iniciar com o agente `build` até o próximo reinício.", where,
+        )
+
 
 def _safe_isoformat(v):
     """Converte date/datetime/str para ISO string de forma segura (fix v0.6.10 cache BM25)."""
@@ -179,7 +221,35 @@ def resolve_opencode() -> tuple[str, dict]:
         _opencode_bin = "opencode"
     _env = build_env()
     print(f"🔍 OpenCode binário: {_opencode_bin}")
+    _ver = opencode_version_string()
+    if _ver:
+        print(f"🔧 OpenCode versão: {_ver}")
     return _opencode_bin, _env
+
+
+# ── OpenCode V2 · tema do terminal (cli.json) ─────────────────
+# Um só tema (pesquisai) cobre claro e escuro: o modo fica em theme.mode.
+# A interface web continua usando os nomes 'pesquisai' / 'pesquisai-light'.
+
+def _read_theme() -> str:
+    """Tema da interface web conforme o modo do cli.json (dark → pesquisai)."""
+    ok, cli = load_json_config(CLI_JSON)
+    if ok and cli:
+        return ui_theme_from_cli(cli)
+    return "pesquisai"
+
+
+def _write_theme(theme_name: str) -> None:
+    """Grava o modo do tema UFVAI em cli.json (OpenCode V2).
+
+    'pesquisai-light' → theme.mode 'light'; 'pesquisai' → 'dark'. O nome do
+    tema do terminal passa a ser sempre 'pesquisai' porque o usuário escolheu
+    explicitamente o tema UFVAI na interface.
+    """
+    ok, cli = load_json_config(CLI_JSON)
+    if not ok:
+        raise OSError("cli.json existe mas não pode ser interpretado; tema não alterado")
+    write_json_atomic(CLI_JSON, merge_cli_theme(cli, "pesquisai", mode_from_ui_theme(theme_name)))
 
 
 def install_ttyd() -> None:
@@ -256,6 +326,7 @@ def kill_previous():
         capture_output=True,
         timeout=5,
     )
+    _tmux_kill_session()  # boot começa de sessão limpa (a sessão tmux não morre com o ttyd)
     subprocess.run(
         ["pkill", "-f", f"python3.*{WRAPPER_PORT}"],
         capture_output=True,
@@ -972,6 +1043,7 @@ def _stop_terminal(wait_s: float = 0.8) -> None:
     global _TTYD_PROC
     import signal as _signal
 
+    _tmux_kill_session()  # reinício explícito começa de sessão limpa
     proc, _TTYD_PROC = _TTYD_PROC, None
     if proc is not None and proc.poll() is None:
         try:
@@ -1020,6 +1092,59 @@ def _ensure_terminal_ready(spawn_fn, timeout_s: float = 20.0,
     return False
 
 
+# ── v0.6.22: sessão que sobrevive à queda do WebSocket ─────────────
+# O ttyd cria UM processo por conexão WebSocket e envia SIGHUP a esse processo
+# quando a conexão cai. Sem tmux, qualquer queda (ociosidade do proxy, aba em
+# segundo plano) matava o opencode, e a reconexão recomeçava a sessão do zero.
+# Com tmux, a queda derruba só o cliente: a sessão segue viva e a reconexão
+# reanexa a ela (o comando e o --prompt não rodam de novo).
+_TMUX_SOCKET = "ufvai"          # servidor tmux próprio: não mexe no tmux do usuário
+_TMUX_SESSION = "ufvai"
+_TMUX_CONF_PATH = "/tmp/ufvai-tmux.conf"
+_TMUX_CONF_TEXT = (
+    "set -g status off\n"                 # sem barra de status do tmux
+    "set -g escape-time 10\n"             # ESC responde rápido no TUI do opencode
+    "set -g default-terminal xterm-256color\n"
+    "set -g mouse on\n"                   # roda do mouse vira copy-mode (rolagem)
+)
+
+
+def _tmux_conf_path() -> "str | None":
+    """Grava o tmux.conf do UFVAI e devolve o caminho (None se não der)."""
+    try:
+        with open(_TMUX_CONF_PATH, "w", encoding="utf-8") as fh:
+            fh.write(_TMUX_CONF_TEXT)
+        return _TMUX_CONF_PATH
+    except OSError:
+        return None
+
+
+def _ttyd_shell_argv(bash_cmd: str) -> list:
+    """Argumentos do comando que o ttyd executa (depois das flags do ttyd).
+
+    Com tmux, o ttyd só anexa à sessão do UFVAI. Sem tmux, mantém o
+    comportamento anterior (bash -i -c), sem sessão persistente.
+    """
+    shell = ["bash", "-i", "-c", bash_cmd]
+    conf = _tmux_conf_path()
+    if conf is None or not shutil.which("tmux"):
+        return shell
+    return ["tmux", "-L", _TMUX_SOCKET, "-f", conf,
+            "new", "-A", "-s", _TMUX_SESSION, *shell]
+
+
+def _tmux_kill_session() -> None:
+    """Encerra a sessão tmux do UFVAI. Usado só em reinício explícito e no boot,
+    para que trocar idioma/chave/sessão comece de um estado limpo."""
+    if not shutil.which("tmux"):
+        return
+    try:
+        subprocess.run(["tmux", "-L", _TMUX_SOCKET, "kill-session", "-t", _TMUX_SESSION],
+                       capture_output=True, timeout=3)
+    except Exception:  # noqa: BLE001 — sessão inexistente é o caso normal
+        pass
+
+
 def _build_ttyd_cmd(lang: str | None = None):
     """v0.6.5: constrói (args, env) do ttyd com saudação no idioma pedido.
 
@@ -1038,14 +1163,14 @@ def _build_ttyd_cmd(lang: str | None = None):
     greeting = get_greeting(full_lang)
     # Escapar aspas para o bash -c "..."
     safe_prompt = greeting.replace('"', '\\"').replace("'", "\\'")
-    # v0.6.0: --yolo MANTIDO por padrão (decisão do usuário).
-    # Para desligar: export PESQUISAI_YOLO=0
-    _yolo = "" if os.environ.get("PESQUISAI_YOLO", "1").strip().lower() in ("0", "false", "off", "no") else " --yolo"
+    # Auto-aprovação de permissões (flag do OpenCode V2 é --auto; antes --yolo).
+    # Mantido ligado por padrão (decisão do usuário). Para desligar: PESQUISAI_YOLO=0
+    _yolo = "" if os.environ.get("PESQUISAI_YOLO", "1").strip().lower() in ("0", "false", "off", "no") else " --auto"
     bash_cmd = f'{opencode_bin} --prompt "{safe_prompt}" {_yolo} ; exec bash'
 
     # v0.4.2.5: construir args com --index (touch handlers)
     # v0.6.2: --writable restaurado (regressão v0.6.0 deixava o terminal read-only)
-    base_args = ["ttyd", "-p", str(TERMINAL_PORT), "--writable", "bash", "-i", "-c", bash_cmd]
+    base_args = ["ttyd", "-p", str(TERMINAL_PORT), "--writable", *_ttyd_shell_argv(bash_cmd)]
     return _build_ttyd_args(base_args, env), env, full_lang
 
 
@@ -1056,6 +1181,9 @@ def start_ttyd(lang: str | None = None):
         lang: Código do idioma (pt_BR, en_US, es_ES, fr_FR). Se None, usa
               o _current_lang global ou o env PESQUISAI_LANG.
 
+    v0.6.21 (14/10/2026): garantia `ensure_ufvai_agent` antes do spawn — o agente
+    carregado é sempre o UFVAI, nunca `build` (nem outro).
+
     v0.4.2.2: ao invés de `--prompt 'oi'` genérico, usa saudação no idioma
               + instrução "(a partir de agora responda em X)".
     v0.4.2.5: injeta touch handlers (scroll + pinch-zoom) no HTML do ttyd
@@ -1063,6 +1191,7 @@ def start_ttyd(lang: str | None = None):
     v0.6.5: spawn rastreado (_spawn_ttyd) + logs em arquivo; espera curta.
     """
     print(f"\n{next_joke('economia')}")
+    _ensure_ufvai_agent_before_spawn("start_ttyd")
     ttyd_args, env, full_lang = _build_ttyd_cmd(lang)
     _spawn_ttyd(ttyd_args, env)
     print(f"🚀 Terminal iniciado (idioma: {full_lang}, touch: {'ON' if '--index' in ttyd_args else 'OFF'}).")
@@ -1090,6 +1219,11 @@ def restart_ttyd_with_lang(lang: str) -> bool:
         # Persiste o idioma
         _current_lang = lang
         _persist_lang(lang)
+
+        # Ajuste 14/10/2026 (v0.6.21): troca de idioma E de chave de API passam
+        # por aqui (via _apply_opencode_env_change_async) — é EXATAMENTE o fluxo
+        # em que o autor viu o motor iniciar com `build` ao adicionar chave.
+        _ensure_ufvai_agent_before_spawn("restart_ttyd_with_lang")
 
         def _spawn():
             ttyd_args, env, _full = _build_ttyd_cmd(lang)
@@ -1258,6 +1392,160 @@ def _iter_memory_notes(mem, *, subdir=None):
         yield from vault.iter_notes(subdir=subdir)
 
 
+# ══════════════════════════════════════════════════════════════════
+# OpenCode V2 (mudança não lançada) · credenciais e serviço em background
+# ══════════════════════════════════════════════════════════════════
+# O V2 guarda credenciais no SQLite (~/.local/share/opencode/opencode.db); o
+# auth.json da V1 deixou de ser atualizado. O backup usa `opencode auth export`
+# (JSON com segredos) e `opencode auth import`. O arquivo no Drive é CIFRADO
+# (Fernet), como as demais chaves do UFVAI. Nunca copiamos o banco.
+_DRIVE_PESQUISAI: str = "/content/drive/My Drive/PesquisAI"
+_OC_AUTH_BACKUP_FILE: str = "opencode_auth.json"
+_OC_AUTH_BACKUP_FORMAT: str = "opencode-auth-export-v2"
+
+
+def _backup_dir() -> str:
+    """Pasta de backups: Drive no Colab; ~/PesquisAI/backups fora dele."""
+    base = _DRIVE_PESQUISAI if os.path.isdir(_DRIVE_PESQUISAI) else os.path.join(
+        os.path.expanduser("~"), "PesquisAI")
+    path = os.path.join(base, "backups")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _opencode_bin_or_find() -> str:
+    """Binário do OpenCode V2 (cache do boot ou busca)."""
+    try:
+        return _opencode_bin or find_opencode()
+    except FileNotFoundError:
+        return "opencode"
+
+
+def _opencode_auth_export_text() -> "str | None":
+    """Saída JSON de `opencode auth export` (None se o comando falhar)."""
+    try:
+        r = subprocess.run(
+            [_opencode_bin_or_find(), "auth", "export"],
+            capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("opencode auth export: %s", exc)
+        return None
+    if r.returncode != 0:
+        logger.warning("opencode auth export falhou (rc=%s): %s",
+                       r.returncode, (r.stderr or "")[:200])
+        return None
+    return r.stdout
+
+
+def _json_has_items(text: "str | None") -> bool:
+    """True se o texto é um JSON não vazio (lista ou objeto)."""
+    if not text:
+        return False
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return False
+    return isinstance(data, (list, dict)) and len(data) > 0
+
+
+def save_opencode_auth_to_drive(backup_dir: "str | None" = None) -> bool:
+    """Grava as credenciais do OpenCode V2 CIFRADAS no backup.
+
+    Nunca troca um backup existente por um vazio: só grava se a exportação
+    trouxer ao menos uma credencial.
+    """
+    backup_dir = backup_dir or _backup_dir()
+    text = _opencode_auth_export_text()
+    if not _json_has_items(text):
+        return False
+    try:
+        from .security import encrypt_data, _load_or_create_encryption_key
+        key = _load_or_create_encryption_key(backup_dir)
+        enc = encrypt_data(key, _b64.b64encode(text.encode("utf-8")).decode("ascii"))
+        dest = os.path.join(backup_dir, _OC_AUTH_BACKUP_FILE)
+        tmp = dest + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump({"_ufvai_enc": True, "format": _OC_AUTH_BACKUP_FORMAT, "data": enc}, fh)
+        os.replace(tmp, dest)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Falha ao salvar credenciais do OpenCode: %s", exc)
+        return False
+
+
+def restore_opencode_auth_from_drive(backup_dir: "str | None" = None) -> bool:
+    """Restaura as credenciais salvas no OpenCode V2 (antes do terminal iniciar)."""
+    import tempfile
+    backup_dir = backup_dir or _backup_dir()
+    src = os.path.join(backup_dir, _OC_AUTH_BACKUP_FILE)
+    if not os.path.exists(src):
+        return False
+    try:
+        with open(src, "r", encoding="utf-8") as fh:
+            wrapper = json.load(fh)
+        if not (isinstance(wrapper, dict) and wrapper.get("_ufvai_enc")):
+            return False
+        from .security import decrypt_data, _load_or_create_encryption_key
+        key = _load_or_create_encryption_key(backup_dir)
+        raw = _b64.b64decode(decrypt_data(key, wrapper["data"]).encode("ascii")).decode("utf-8")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Backup de credenciais do OpenCode ilegível: %s", exc)
+        return False
+
+    if wrapper.get("format") != _OC_AUTH_BACKUP_FORMAT:
+        # Backup legado (auth.json da V1): a V2 importa o auth.json legado na
+        # migração do banco. Só se aplica enquanto o banco ainda não existe.
+        if os.path.exists(OPENCODE_DB_PATH):
+            return False
+        legacy = os.path.expanduser("~/.local/share/opencode/auth.json")
+        os.makedirs(os.path.dirname(legacy), exist_ok=True)
+        with open(legacy, "w", encoding="utf-8") as fh:
+            fh.write(raw)
+        os.chmod(legacy, 0o600)
+        return True
+
+    if _json_has_items(_opencode_auth_export_text()):
+        return False  # o motor já tem credenciais; não duplicar
+    fd, tmp_path = tempfile.mkstemp(prefix="ufvai_oc_auth_", suffix=".json", dir="/tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(raw)
+        r = subprocess.run(
+            [_opencode_bin_or_find(), "auth", "import", tmp_path],
+            capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL,
+        )
+        if r.returncode != 0:
+            logger.warning("opencode auth import falhou (rc=%s): %s",
+                           r.returncode, (r.stderr or "")[:200])
+            return False
+        return True
+    finally:
+        try:
+            os.remove(tmp_path)  # segredos não ficam em /tmp
+        except OSError:
+            pass
+
+
+def _apply_opencode_env_change_async() -> None:
+    """Após salvar/remover chave: o serviço do V2 guarda o ambiente de quando subiu.
+
+    Paramos o serviço em background e reiniciamos o terminal para que o motor
+    leia as chaves novas. Roda em thread para não atrasar a resposta HTTP.
+    """
+    def _worker() -> None:
+        try:
+            _shutdown_stop_opencode_service()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            restart_ttyd_with_lang(_current_lang or "pt_BR")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Reinício do terminal após troca de chave falhou: %s", exc)
+
+    threading.Thread(target=_worker, daemon=True, name="ufvai-apply-keys").start()
+
+
 def start_wrapper_server():
     # Determine correct backup dir — v0.6.9-6: offline usa local se Drive sem escrita
     _pesquisai_drive = "/content/drive/My Drive/PesquisAI"
@@ -1283,94 +1571,6 @@ def start_wrapper_server():
     DRIVE_BACKUP_DIR = os.path.join(_base, "backups")
     os.makedirs(DRIVE_BACKUP_DIR, exist_ok=True)
     print(f"📁 Backup dir: {DRIVE_BACKUP_DIR}")
-    
-    # Possible opencode config/auth file locations
-    OPENCODE_CONFIG_CANDIDATES = [
-        os.path.expanduser("~/.config/opencode/auth.json"),
-        os.path.expanduser("~/.config/opencode/config.json"),
-        os.path.expanduser("~/.opencode/auth.json"),
-        os.path.expanduser("~/.opencode/config.json"),
-        "/root/.config/opencode/auth.json",
-        "/root/.config/opencode/config.json",
-        "/root/.opencode/auth.json",
-        "/root/.opencode/config.json",
-    ]
-    DRIVE_CONFIG_BACKUP = os.path.join(DRIVE_BACKUP_DIR, "opencode_auth.json")
-    
-    def find_opencode_config():
-        """Return the first existing opencode config/auth file."""
-        for p in OPENCODE_CONFIG_CANDIDATES:
-            if os.path.exists(p):
-                return p
-        # Also search dynamically
-        try:
-            r = subprocess.run(
-                ["find", "/root", os.path.expanduser("~"), "-name", "auth.json", "-path", "*/opencode/*"],
-                capture_output=True, text=True, timeout=3
-            )
-            hits = [l.strip() for l in r.stdout.splitlines() if l.strip()]
-            if hits:
-                return hits[0]
-        except Exception:
-            pass
-        return None
-    
-    def save_opencode_config_to_drive():
-        """Copy opencode auth/config to Drive backup folder.
-
-        v0.6.0: grava CIFRADO com Fernet (o arquivo contém tokens de acesso!).
-        Formato novo: {"_ufvai_enc": true, "data": "<fernet-b64>"}.
-        Fallback: cópia plaintext apenas se a criptografia falhar (compat).
-        """
-        src = find_opencode_config()
-        if src and os.path.exists(src):
-            try:
-                from .security import encrypt_data, _load_or_create_encryption_key
-                raw = open(src, "rb").read()
-                key = _load_or_create_encryption_key(DRIVE_BACKUP_DIR)
-                enc = encrypt_data(key, _b64.b64encode(raw).decode("ascii"))
-                with open(DRIVE_CONFIG_BACKUP, "w", encoding="utf-8") as fh:
-                    json.dump({"_ufvai_enc": True, "data": enc}, fh)
-                return src
-            except Exception:
-                shutil.copy2(src, DRIVE_CONFIG_BACKUP)
-                return src
-        return None
-
-    def restore_opencode_config_from_drive():
-        """Restore opencode auth/config from Drive backup if it exists.
-
-        v0.6.0: aceita formato cifrado (_ufvai_enc=true) e legado plaintext.
-        """
-        if not os.path.exists(DRIVE_CONFIG_BACKUP):
-            return False
-        restored = False
-        try:
-            with open(DRIVE_CONFIG_BACKUP, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-            if isinstance(data, dict) and data.get("_ufvai_enc"):
-                from .security import decrypt_data, _load_or_create_encryption_key
-                key = _load_or_create_encryption_key(DRIVE_BACKUP_DIR)
-                raw = _b64.b64decode(decrypt_data(key, data["data"]).encode("ascii"))
-                src_path = os.path.join("/tmp", "ufvai_oc_auth_restore.json")
-                with open(src_path, "wb") as fb:
-                    fb.write(raw)
-            else:
-                src_path = DRIVE_CONFIG_BACKUP  # legado plaintext
-        except Exception:
-            src_path = DRIVE_CONFIG_BACKUP
-        for dest in OPENCODE_CONFIG_CANDIDATES:
-            try:
-                os.makedirs(os.path.dirname(dest), exist_ok=True)
-                shutil.copy2(src_path, dest)
-                restored = True
-            except Exception:
-                pass
-        return restored
-
-    # Auto-restore opencode config from Drive on startup
-    if restore_opencode_config_from_drive():
-        print(f"🔑 Config do OpenCode restaurada do Drive.")
     
     # v0.4.2.2: restaura idioma persistido (cookie/arquivo)
     # v0.6.15: helper garante detecção ANTES do ttyd (antes bug _current_lang="pt_BR" truthy)
@@ -1628,14 +1828,9 @@ def start_wrapper_server():
                 return
             
             if p == "/api/theme":
-                # Retorna tema atual do tui.json
-                try:
-                    with open(os.path.expanduser("~/.config/opencode/tui.json")) as f:
-                        tui = json.load(f)
-                    current = tui.get("theme", "pesquisai")
-                except Exception:
-                    current = "pesquisai"
-                self._json(200, {"theme": current})
+                # v0.6.20: tema ativo vem do cli.json (OpenCode V2) com
+                # fallback para o tui.json (OpenCode V1).
+                self._json(200, {"theme": _read_theme()})
                 return
 
             if p == "/api/admin/telemetry":
@@ -2455,6 +2650,7 @@ def start_wrapper_server():
                         _tel_event("provider_deleted", {"provider": provider[:24]})
                     except Exception:
                         pass
+                    _apply_opencode_env_change_async()
                     self._json(200, {"ok": True, "deleted": provider})
                     return
 
@@ -2494,6 +2690,7 @@ def start_wrapper_server():
                     _tel_event("provider_saved", {"provider": provider[:24]})
                 except Exception:
                     pass
+                _apply_opencode_env_change_async()
                 self._json(200, {"ok": True})
                 return
             
@@ -2529,6 +2726,11 @@ def start_wrapper_server():
                 # 'opencode' na cmdline e deixava porta morta sem verificação)
                 _stop_terminal()
 
+                # Ajuste 14/10/2026 (v0.6.21): o fallback deste comando é o
+                # próprio opencode (`; opencode; exec bash`) — sem a garantia,
+                # ele poderia iniciar com `build` se o config tivesse mudado.
+                _ensure_ufvai_agent_before_spawn("api/run_terminal")
+
                 # Build bash -c command string de forma segura
                 # O comando do usuario (cmd) ja foi sanitizado acima.
                 # O suffixo "; exec bash" e adicionado pelo codigo (nao pelo usuario),
@@ -2541,7 +2743,7 @@ def start_wrapper_server():
 
                 # v0.4.2.5: usar --index com touch handlers se disponível
                 base_ttyd = ["ttyd", "--writable", "-p", str(TERMINAL_PORT),
-                     "bash", "-i", "-c", bash_cmd]
+                     *_ttyd_shell_argv(bash_cmd)]
                 ttyd_cmd = _build_ttyd_args(base_ttyd, _env)
 
                 # v0.6.5: spawn rastreado + ESPERAR a porta abrir antes de
@@ -2583,13 +2785,17 @@ def start_wrapper_server():
                 # ── Etapa 1: exportar para /tmp/ (SSD local, sem FUSE) ─────────
                 tmp_path = os.path.join("/tmp", fname)
 
+                # OpenCode V2: `session export <id>` escreve o JSON no stdout.
                 r = _run(
-                    [_opencode_bin, "export", session_id, "--format", tmp_path],
+                    [_opencode_bin, "session", "export", session_id],
                     timeout=120,
                 )
-                export_ok = r.returncode == 0 and os.path.exists(tmp_path)
+                export_ok = False
+                if r.returncode == 0 and len(r.stdout) > 0:
+                    with open(tmp_path, "w", encoding="utf-8") as f:
+                        f.write(r.stdout)
+                    export_ok = os.path.exists(tmp_path)
 
-                # Fallback via stdout se o --format falhar
                 if not export_ok:
                     r2 = _run(
                         [_opencode_bin, "export", session_id],
@@ -2790,7 +2996,7 @@ def start_wrapper_server():
                     return
 
                 # 2. Importar do /tmp/ (rápido e confiável)
-                r = _run([_opencode_bin, "import", tmp_restore], timeout=120)
+                r = _run([_opencode_bin, "session", "import", tmp_restore], timeout=120)
                 if r.returncode != 0:
                     self._json(500, {
                         "error": r.stderr.strip()[:500] or "Falha ao importar."
@@ -2822,12 +3028,19 @@ def start_wrapper_server():
                     try:
                         _stop_terminal()
 
+                        # Ajuste 14/10/2026 (v0.6.21): garantia antes do
+                        # reinício pós-import. A V2 não troca o agente de uma
+                        # sessão já gravada (doc agents/"Selection"); sessões
+                        # exportadas do UFVAI já gravam UFVAI — e novas
+                        # sessões, abertas depois, seguem com o default.
+                        _ensure_ufvai_agent_before_spawn("api/session-import")
+
                         def _spawn():
                             opencode_bin, env = resolve_opencode()
                             bash_cmd = f'{opencode_bin} -s "{session_id}" ; exec bash'
                             # v0.6.2: --writable restaurado (regressão v0.6.0 deixava o terminal read-only)
                             base_args = ["ttyd", "-p", str(TERMINAL_PORT), "--writable",
-                                         "bash", "-i", "-c", bash_cmd]
+                                         *_ttyd_shell_argv(bash_cmd)]
                             _spawn_ttyd(_build_ttyd_args(base_args, env), env)
 
                         ttyd_restarted = _ensure_terminal_ready(_spawn, timeout_s=18.0)
@@ -2865,7 +3078,8 @@ def start_wrapper_server():
                 return
             
             if p == "/api/theme":
-                # Persiste escolha de tema (escuro/claro) em tui.json
+                # Persiste escolha de tema (escuro/claro) — v0.6.20 grava em
+                # tui.json (OpenCode V1) E cli.json (OpenCode V2).
                 theme_name = body.get("theme", "").strip()
                 # v0.6.0: aliases de marca mapeiam aos temas internos existentes
                 _alias = {"ufvai": "pesquisai", "ufvai-light": "pesquisai-light"}
@@ -2874,10 +3088,7 @@ def start_wrapper_server():
                     self._json(400, {"error": "Tema inválido. Use 'pesquisai' ou 'pesquisai-light'."})
                     return
                 try:
-                    tui_path = os.path.expanduser("~/.config/opencode/tui.json")
-                    os.makedirs(os.path.dirname(tui_path), exist_ok=True)
-                    with open(tui_path, "w") as f:
-                        json.dump({"$schema": "https://opencode.ai/tui.json", "theme": theme_name}, f, indent=2)
+                    _write_theme(theme_name)
                     try:
                         _tel_event("theme_changed", {"theme": theme_name})
                     except Exception:
@@ -3678,6 +3889,12 @@ def _shutdown_save_memory_note() -> bool:
 
 def _shutdown_kill_keepalive() -> bool:
     """Encerra o subprocesso keep-alive do notebook (best-effort)."""
+    # Keep-alive em célula bloqueante (kernel): pedimos a parada por evento.
+    try:
+        from . import keepalive as _ka
+        _ka.request_stop()
+    except Exception:  # noqa: BLE001
+        pass
     import signal  # import local: módulo não depende de signal no topo
 
     pid: int | None = None
@@ -3710,6 +3927,30 @@ def _shutdown_kill_keepalive() -> bool:
             capture_output=True, timeout=5,
         )
         return True
+    except Exception:
+        return False
+
+
+def _shutdown_stop_opencode_service() -> bool:
+    """v0.6.20 · OpenCode V2: encerra o serviço de fundo compartilhado.
+
+    O V2 sobe um `opencode serve --service` **desanexado** (fora do grupo de
+    processos do ttyd), então ele sobreviveria ao kill da árvore do terminal
+    e continuaria consumindo memória depois do SAIR. Best-effort: com o
+    motor V1 (sem o subcomando `service`) esta função é um no-op.
+    """
+    try:
+        if not is_opencode_v2():
+            return False
+        bin_path = find_opencode()
+    except Exception:
+        return False
+    try:
+        r = subprocess.run(
+            [bin_path, "service", "stop"],
+            capture_output=True, timeout=8,
+        )
+        return r.returncode == 0
     except Exception:
         return False
 
@@ -3773,6 +4014,27 @@ def _shutdown_start(
             _shutdown_kill_keepalive()
         except Exception:  # noqa: BLE001
             pass
+
+        # 2b. v0.6.20 · OpenCode V2: derruba também o serviço de fundo
+        #     (desanexado do ttyd — sobreviveria ao kill da árvore).
+        try:
+            _shutdown_stop_opencode_service()
+        except Exception:  # noqa: BLE001
+            pass
+
+        # 2c. Credenciais do OpenCode V2 (cifradas no Drive), teto de 6 s.
+        auth_done = threading.Event()
+
+        def _save_auth() -> None:
+            try:
+                save_opencode_auth_to_drive(_backup_dir())
+            except Exception:  # noqa: BLE001
+                pass
+            finally:
+                auth_done.set()
+
+        threading.Thread(target=_save_auth, daemon=True, name="ufvai-sair-auth").start()
+        auth_done.wait(timeout=6.0)
 
         # 3. Espera a nota apenas até o teto — nunca além disso.
         note_done.wait(timeout=memory_timeout_s)
@@ -3842,6 +4104,12 @@ def launch():
         # ═══════════════════════════════════════════════════
         boot.done(89)
         
+        boot.active("Restaurando credenciais do OpenCode", 90)
+        try:
+            restore_opencode_auth_from_drive(_pre_backup_dir)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Restauração de credenciais do OpenCode falhou: %s", exc)
+        boot.done(90)
         boot.active("Instalando o terminal (ttyd)", 91)
         install_ttyd()
         boot.done(93)
@@ -3877,7 +4145,24 @@ def launch():
     
     time.sleep(1)
     boot.finish()  # 100% + "✨ UFVAI pronto!"
+
     show_launch_button(banner_url)
+
+    # v0.6.21: cookies de terceiros — ÚLTIMO item do fluxo. O botão "ABRIR O
+    # UFVAI" já está na tela e o diagnóstico fecha a sequência com o veredito
+    # real (✅ liberados / ❌ bloqueados). O proxy do Colab (*.prod.colab.dev)
+    # não abre sem permissão de cookie de 3ª parte. ensure_cookie_check() é
+    # idempotente: se outro caminho já mostrou o bloco (run_fast ou notebook),
+    # aqui devolve 'done' sem repetir. Fora do Colab devolve 'skipped'.
+    try:
+        from .colab_cookies import ensure_cookie_check
+        _cookie_state = ensure_cookie_check()
+        if _cookie_state.get("state") == "error":
+            logger.warning(
+                "Teste de cookies indisponível: %s", _cookie_state.get("error")
+            )
+    except Exception as exc:  # noqa: BLE001 — o aviso é acessório, nunca fatal
+        logger.warning("Verificação de cookies não pôde ser executada: %s", exc)
 
     # v0.6.1: no modo offline (.deb/local) abre o navegador automaticamente
     # quando a UI estiver pronta — o launcher roda em background e antes

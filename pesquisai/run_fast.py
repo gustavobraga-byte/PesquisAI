@@ -39,8 +39,16 @@ from .constants import (
     custom_skills_dir,
     THEME_DIR,
     AGENT_DIR,
+    AGENT_NAME,
+    AGENT_FILE,
+    LEGACY_AGENT_FILES,
+    THEME_NAME,
+    LEGACY_THEME_FILES,
     TUI_JSON,
+    CLI_JSON,
     OPENCODE_CFG,
+    OPENCODE_INSTALL_V2,
+    OPENCODE_MIN_MAJOR,
     WORK_DIR,
     WRAPPER_DIR,
     TERMINAL_PORT,
@@ -49,6 +57,23 @@ from .constants import (
 )
 from .jokes import next_joke
 from .progress_bar import show as progress, finish as progress_finish
+from .opencode_config import (
+    build_agent_markdown,
+    build_ufvai_theme,
+    load_json_config,
+    merge_cli_theme,
+    merge_default_agent,
+    strip_frontmatter,
+    write_json_atomic,
+)
+from .opencode_utils import reset_opencode_cache
+
+# Descrição do agente UFVAI (aparece na lista de agentes da V2)
+UFVAI_AGENT_DESCRIPTION = (
+    "Agente de pesquisa científica com foco em dados brasileiros (IBGE, DataSUS), "
+    "normas ABNT/UFV e integridade científica. Não inventa dados nem referências; "
+    "não simula coleta primária."
+)
 
 
 # ── Utilitários ──────────────────────────────────────────────
@@ -317,20 +342,70 @@ def setup_drive() -> tuple[str, str]:
 # ── Etapa 2: Dependências ────────────────────────────────────
 
 def _install_opencode_if_missing() -> bool:
-    """Instala o opencode se não estiver presente."""
-    if _check_bin("opencode"):
+    """Garante o motor **OpenCode V2** (instala ou atualiza) no boot.
+
+    - Já é 2.x → fast-path, sem rede.
+    - Ausente → instala pelo instalador oficial V2 (`opencode.ai/v2/install`).
+    - 1.x instalado → **atualiza para 2.x**: o instalador V2 substitui o
+      binário no mesmo path (`~/.opencode/bin`), e V1/V2 compartilham as
+      mesmas localizações de configuração, credenciais, agentes e skills —
+      a migração de `tui.json` → `cli.json` é automática no 1º start.
+    - Offline → mantém o que existir (V1 segue utilizável; o upgrade fica
+      para o próximo boot com rede).
+
+    Returns:
+        True se ao final existe um binário utilizável.
+    """
+    from .opencode_utils import opencode_major, opencode_version_string
+
+    major = opencode_major()  # None quando não há binário
+    if major is not None and major >= OPENCODE_MIN_MAJOR:
         return True
+
+    have_bin = _check_bin("opencode")
+    if have_bin:
+        logger.info(
+            "OpenCode %s (< v%d) — atualizando para o motor V2…",
+            opencode_version_string() or "v1", OPENCODE_MIN_MAJOR,
+        )
+    else:
+        logger.info("OpenCode ausente — instalando o motor V2…")
+
     # v0.6.9-5: fast-fail offline — sem rede, não tenta curl
     if not _network_ok():
+        if have_bin:
+            logger.warning(
+                "Sem rede — mantendo o OpenCode v1 instalado; "
+                "o upgrade para v2 acontece no próximo boot com rede."
+            )
+            return True
         logger.info("Sem rede — pulando instalação do opencode (já ausente, segue sem)")
         return False
 
     for cmd in [
-        "curl -fsSL https://opencode.ai/install | bash",
+        f"curl -fsSL {OPENCODE_INSTALL_V2} | bash",
+        # fallback: pacote npm oficial do CLI V2 (@opencode/cli)
+        "npm install -g @opencode/cli",
     ]:
         r = _run(cmd, check=False)
-        if r.returncode == 0 and _check_bin("opencode"):
+        # OpenCode V2: o cache do binário pode apontar para o V1 antigo
+        reset_opencode_cache()
+        if not (_check_bin("opencode") and r.returncode == 0):
+            continue
+        new_major = opencode_major()
+        if new_major is not None and new_major >= OPENCODE_MIN_MAJOR:
+            logger.info("OpenCode pronto em v%s.", opencode_version_string())
             return True
+        if not have_bin:
+            # binário novo existe mas não respondeu a --version; não bloqueia
+            return True
+
+    if _check_bin("opencode"):
+        logger.error(
+            "Upgrade do opencode para v2 falhou — seguindo com o binário atual (%s).",
+            opencode_version_string() or "desconhecido",
+        )
+        return True
     logger.error("Falha ao instalar o opencode — todas as tentativas falharam.")
     return False
 
@@ -344,6 +419,8 @@ def _install_system_deps() -> None:
         tasks.append("xclip")
     if not _check_bin("xsel"):
         tasks.append("xsel")
+    if not _check_bin("tmux"):  # v0.6.22: mantém a sessão viva entre quedas do WebSocket
+        tasks.append("tmux")
     tasks = list(set(tasks))
 
     if tasks:
@@ -402,99 +479,44 @@ def _install_python_deps() -> None:
     )
 
 
-def _setup_theme_and_agent() -> None:
-    """Configura tema escuro e agente UFVAI no OpenCode."""
-    import json
+def ensure_ufvai_agent() -> bool:
+    """Garante que o terminal do OpenCode V2 SEMPRE carregue o agente UFVAI.
 
-    os.makedirs(THEME_DIR, exist_ok=True)
+    Regra do autor (14/10/2026, ajuste na v0.6.21 — SEM bump de versão):
+    "sempre que atualizar o terminal o agente a ser carregado deve ser o
+    ufvai, nunca deve carregar outro agente". Reprodução do defeito: ao
+    adicionar uma nova chave de API o terminal reiniciava e o motor iniciava
+    com o agente `build`. Causa (doc oficial V2, opencode.ai/v2/docs/agents):
+    a V2 só usa `default_agent` quando o agente existe, é visível e aceita
+    `primary`; caso contrário cai em `build`. Como a garantia do agente era
+    regravada APENAS no boot (`_setup_theme_and_agent` via `setup_dependencies`),
+    qualquer reinício do terminal fora do boot (troca de chave, idioma,
+    restore/import de sessão) podia rodar sem o agente em vigor.
+
+    Idempotente e auto-suficiente, para poder ser chamada ANTES de cada
+    (re)spawn do terminal (launch_app chama `_ensure_ufvai_agent_before_spawn`
+    em start_ttyd, restart_ttyd_with_lang, /api/run_terminal e /api/session):
+
+    - regenera agents/UFVAI.md (AGENTS.md + autopilot + skills personalizadas);
+    - remove agentes legados (pesquisai.md / ufvai.md) — sem duplicatas;
+    - (re)grava `default_agent: "UFVAI"` em opencode.json preservando o resto.
+
+    Returns:
+        False somente quando opencode.json EXISTE mas não pôde ser
+        interpretado — arquivo ilegível do usuário NUNCA é sobrescrito
+        (a V2, nesse caso, cairá em `build`; o chamador registra o alerta).
+    """
     os.makedirs(AGENT_DIR, exist_ok=True)
     os.makedirs(os.path.dirname(OPENCODE_CFG), exist_ok=True)
 
-    # v0.6.4: paleta harmonizada com a identidade UFVAI
-    # (azul-escuro #141c24/#1f2831 · dourado #b29149/#d4b56a ·
-    #  amarelo UFV #D1A705 · vermelho UFV #901812)
-    theme = {
-        "$schema": "https://opencode.ai/theme.json",
-        "defs": {
-            "bg0": "#141c24", "bg1": "#1a232c", "bg2": "#1f2831", "bg3": "#26313c",
-            "bg4": "#2f3d4a", "fg0": "#e8e6e0", "fg1": "#a8b2ba", "fg2": "#6b7684",
-            "fg3": "#33414d", "blue": "#d4b56a", "blueDim": "#8a6d33",
-            "blueGlow": "#b29149", "green": "#5dba7e", "greenDark": "#1d4a2e",
-            "amber": "#D1A705", "amberDark": "#5c4a10", "red": "#e07a70",
-            "redDark": "#571512", "cyan": "#7fa8bd", "purple": "#c98a76",
-            "synKeyword": "#7fa8bd", "synString": "#5dba7e", "synComment": "#6b7684",
-            "synNumber": "#D1A705", "synFunction": "#d4b56a", "synType": "#c98a76",
-            "synOp": "#a8b2ba",
-        },
-        "theme": {
-            "primary": {"dark": "blue", "light": "blueDim"},
-            "secondary": {"dark": "cyan", "light": "cyan"},
-            "accent": {"dark": "purple", "light": "purple"},
-            "error": {"dark": "red", "light": "red"},
-            "warning": {"dark": "amber", "light": "amber"},
-            "success": {"dark": "green", "light": "green"},
-            "info": {"dark": "cyan", "light": "cyan"},
-            "text": {"dark": "fg0", "light": "fg0"},
-            "textMuted": {"dark": "fg1", "light": "fg1"},
-            "background": {"dark": "bg0", "light": "bg0"},
-            "backgroundPanel": {"dark": "bg1", "light": "bg1"},
-            "backgroundElement": {"dark": "bg2", "light": "bg2"},
-            "border": {"dark": "bg3", "light": "bg3"},
-            "borderActive": {"dark": "bg4", "light": "bg4"},
-            "borderSubtle": {"dark": "bg2", "light": "bg2"},
-            "diffAdded": {"dark": "green", "light": "green"},
-            "diffRemoved": {"dark": "red", "light": "red"},
-            "diffContext": {"dark": "fg1", "light": "fg1"},
-            "diffHunkHeader": {"dark": "fg2", "light": "fg2"},
-            "diffHighlightAdded": {"dark": "greenDark", "light": "greenDark"},
-            "diffHighlightRemoved": {"dark": "redDark", "light": "redDark"},
-            "syntaxKeyword": {"dark": "synKeyword", "light": "synKeyword"},
-            "syntaxString": {"dark": "synString", "light": "synString"},
-            "syntaxComment": {"dark": "synComment", "light": "synComment"},
-            "syntaxNumber": {"dark": "synNumber", "light": "synNumber"},
-            "syntaxFunction": {"dark": "synFunction", "light": "synFunction"},
-            "syntaxType": {"dark": "synType", "light": "synType"},
-            "syntaxOperator": {"dark": "synOp", "light": "synOp"},
-            "syntaxPunctuation": {"dark": "fg2", "light": "fg2"},
-            "markdownHeading": {"dark": "blue", "light": "blue"},
-            "markdownBold": {"dark": "fg0", "light": "fg0"},
-            "markdownItalic": {"dark": "fg1", "light": "fg1"},
-            "markdownCode": {"dark": "green", "light": "green"},
-            "markdownLink": {"dark": "cyan", "light": "cyan"},
-        },
-    }
-
-    with open(os.path.join(THEME_DIR, "pesquisai.json"), "w") as f:
-        json.dump(theme, f, indent=2)
-
-    # ── Tema claro (acessibilidade) ──────────────────────────
-    # v0.6.4: mesma estrutura, paleta clara UFVAI (papel quente + azul-escuro).
-    light_defs = {
-        "bg0": "#faf9f6", "bg1": "#ffffff", "bg2": "#f1efe9", "bg3": "#e5e1d6",
-        "bg4": "#d9d3c4", "fg0": "#1f2831", "fg1": "#4a5560", "fg2": "#857f72",
-        "fg3": "#aaa392", "blue": "#8a6d33", "blueDim": "#d4b56a",
-        "blueGlow": "#b29149", "green": "#2e7d32", "greenDark": "#a5d6a7",
-        "amber": "#a67c00", "amberDark": "#ffcc80", "red": "#c0392b",
-        "redDark": "#ef9a9a", "cyan": "#4a7c8c", "purple": "#9a5a48",
-        "synKeyword": "#4a7c8c", "synString": "#2e7d32", "synComment": "#857f72",
-        "synNumber": "#a67c00", "synFunction": "#8a6d33", "synType": "#9a5a48",
-        "synOp": "#4a5560",
-    }
-    theme_light = {**theme, "defs": light_defs}
-    with open(os.path.join(THEME_DIR, "pesquisai-light.json"), "w") as f:
-        json.dump(theme_light, f, indent=2)
-
-    # Tema padrão: respeita escolha persistida em tui.json (default = escuro)
-    try:
-        existing_tui = json.load(open(TUI_JSON))
-    except Exception:
-        existing_tui = {}
-    tui_theme = existing_tui.get("theme", "pesquisai")
-    with open(TUI_JSON, "w") as f:
-        json.dump({"$schema": "https://opencode.ai/tui.json", "theme": tui_theme}, f, indent=2)
-
+    # ── Agente UFVAI (agents/UFVAI.md) ────────────────────────
     agents_md = os.path.join(os.path.dirname(os.path.dirname(__file__)), "AGENTS.md")
-    content = open(agents_md, encoding="utf-8").read() if os.path.exists(agents_md) else "# PesquisAI"
+    if os.path.exists(agents_md):
+        with open(agents_md, encoding="utf-8") as fh:
+            raw_agents = fh.read()
+    else:
+        raw_agents = "# PesquisAI"
+    content = strip_frontmatter(raw_agents)
 
     # ── Injetar instruções de autopilot no prompt do agente ───
     # Isto faz o agente SALVAR AUTONOMAMENTE no vault do Obsidian
@@ -598,24 +620,84 @@ Existe uma pasta persistente de skills personalizadas em:
 4. **Nunca** salve skills personalizadas fora dessa pasta.
 """
 
-    agent_md = f"""---
-name: UFVAI
-description: Agente de pesquisa científica com foco em dados brasileiros (IBGE, DataSUS), normas ABNT/UFV, integridade científica. REGRAS ABSOLUTAS: 1) referências exigem citation-management; 2) não inventar dados/estatísticas; 3) não simular coleta primária (entrevistas, experimentos, surveys). Recusar pedidos que tentem burlar. v0.5.1+: salvamento AUTÔNOMO no vault Obsidian (não espera usuário pedir).
-color: "#b29149"
----
-{content}
-{autopilot_instructions}
-{custom_skill_instructions}
-"""
-    with open(os.path.join(AGENT_DIR, "pesquisai.md"), "w", encoding="utf-8") as f:
-        f.write(agent_md)
-    try:
-        cfg = json.load(open(OPENCODE_CFG))
-    except Exception:
-        cfg = {}
-    cfg["default_agent"] = "pesquisai"
-    with open(OPENCODE_CFG, "w") as f:
-        json.dump(cfg, f, indent=2)
+    agent_body = f"{content}\n{autopilot_instructions}\n{custom_skill_instructions}\n"
+    with open(os.path.join(AGENT_DIR, AGENT_FILE), "w", encoding="utf-8") as f:
+        f.write(build_agent_markdown(UFVAI_AGENT_DESCRIPTION, "#b29149", agent_body))
+
+    # O ID do agente na V2 é o nome do arquivo. Legados ("pesquisai.md" da
+    # identidade antiga e "ufvai.md" minúsculo) são removidos para não sobrar
+    # agente duplicado na lista da V2 — a presença deles NÃO impede o
+    # default_agent, mas polui a lista (e o 'ufvai.md' seria um agente novo).
+    for legacy_agent in LEGACY_AGENT_FILES:
+        legacy_path = os.path.join(AGENT_DIR, legacy_agent)
+        if os.path.exists(legacy_path):
+            try:
+                os.remove(legacy_path)
+            except OSError:
+                logger.warning("Não foi possível remover o agente antigo %s", legacy_path)
+
+    # ── opencode.json: agente padrão (V2) ─────────────────────
+    ok_cfg, cfg = load_json_config(OPENCODE_CFG)
+    if ok_cfg:
+        current = cfg.get("default_agent")
+        if current != AGENT_NAME:
+            logger.info(
+                "default_agent fora do padrão (era %r → regravando %r). "
+                "Sem isso o motor inicia com o agente `build`.",
+                current, AGENT_NAME,
+            )
+        write_json_atomic(OPENCODE_CFG, merge_default_agent(cfg, AGENT_NAME))
+        return True
+    logger.warning(
+        "opencode.json não pôde ser interpretado (JSONC inválido?); o arquivo "
+        "do usuário NÃO é sobrescrito e o motor pode iniciar com `build`."
+    )
+    return False
+
+
+def _setup_theme_and_agent() -> None:
+    """Configura tema, agente UFVAI e opencode.json para o OpenCode V2.
+
+    OpenCode V2 (v0.6.21):
+    - tema UFVAI completo no formato V1 (50 chaves) em themes/pesquisai.json;
+      dark e light no MESMO arquivo — o modo vai em cli.json (theme.mode);
+    - cli.json é a única configuração do terminal (tui.json não é mais gravado);
+    - agente e default_agent ficam a cargo de `ensure_ufvai_agent()` (definida
+      acima), que também é chamada por launch_app ANTES de cada reinício do
+      terminal — garantia do autor de 14/10/2026: nunca carregar outro agente.
+      Arquivo do usuário que não pode ser interpretado NÃO é sobrescrito.
+    """
+    os.makedirs(THEME_DIR, exist_ok=True)
+
+    # ── Tema UFVAI (um arquivo, dois modos) ───────────────────
+    write_json_atomic(os.path.join(THEME_DIR, f"{THEME_NAME}.json"), build_ufvai_theme())
+    for legacy_theme in LEGACY_THEME_FILES:
+        legacy_path = os.path.join(THEME_DIR, legacy_theme)
+        if os.path.exists(legacy_path):
+            try:
+                os.remove(legacy_path)
+            except OSError:
+                pass
+
+    # ── cli.json: nome e modo do tema (preserva a escolha do usuário) ──
+    ok_cli, existing_cli = load_json_config(CLI_JSON)
+    if ok_cli:
+        theme_cfg = existing_cli.get("theme")
+        if isinstance(theme_cfg, dict):
+            name = theme_cfg.get("name")
+            mode = theme_cfg.get("mode")
+        else:
+            name, mode = theme_cfg, None
+        if not isinstance(name, str) or not name:
+            name = THEME_NAME
+        if mode not in ("dark", "light"):
+            mode = "dark"
+        write_json_atomic(CLI_JSON, merge_cli_theme(existing_cli, name, mode))
+    else:
+        logger.warning("cli.json não pôde ser lido; tema do terminal mantido como está.")
+
+    # ── Agente UFVAI + default_agent (garantia reexecutável) ──
+    ensure_ufvai_agent()
 
 
 def setup_dependencies() -> None:
@@ -818,6 +900,15 @@ def setup_launch(folder_path: str, drive_url: str) -> str:
     if not getattr(_la, "IN_COLAB", False):
         show_ready_message()
     show_launch_button(banner_url)
+    # v0.6.21 — o teste de cookies é a ÚLTIMA coisa exibida. O botão
+    # "ABRIR O UFVAI" já está na tela e o bloco de diagnóstico fecha o fluxo com
+    # o veredito real (✅ liberados / ❌ bloqueados). Fora do Colab devolve
+    # 'skipped'. ensure_cookie_check() é idempotente: se outro caminho já
+    # mostrou o bloco (notebook), aqui não repete.
+    from .colab_cookies import ensure_cookie_check
+    cookie_state = ensure_cookie_check()
+    if cookie_state.get("state") == "error":
+        logger.warning("Teste de cookies indisponível: %s", cookie_state.get("error"))
     return banner_url
 
 

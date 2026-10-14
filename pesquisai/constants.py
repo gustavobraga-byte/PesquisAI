@@ -42,8 +42,37 @@ WRAPPER_DIR: str = "/tmp/pesquisai-wrapper"
 SKILLS_DIR: str = os.path.expanduser("~/.agents/skills")
 THEME_DIR: str = os.path.expanduser("~/.config/opencode/themes")
 AGENT_DIR: str = os.path.expanduser("~/.config/opencode/agents")
-OPENCODE_CFG: str = os.path.expanduser("~/.config/opencode/config.json")
+# OpenCode V2 (v0.6.21): a configuração global do motor é
+# ~/.config/opencode/opencode.json (JSONC aceito). O antigo config.json NÃO é
+# lido pela V2 — por isso o default_agent passa a ser gravado em opencode.json.
+OPENCODE_CFG: str = os.path.expanduser("~/.config/opencode/opencode.json")
+# OpenCode V2: as configurações do cliente de terminal (tema, modo, atalhos)
+# vivem SOMENTE em cli.json. tui.json é formato V1 e só é lido pela V2 para
+# migração quando cli.json ainda não existe. Não gravamos mais tui.json.
 TUI_JSON: str = os.path.expanduser("~/.config/opencode/tui.json")
+CLI_JSON: str = os.path.expanduser("~/.config/opencode/cli.json")
+# Pasta global de temas (V2 lê arquivos .json daqui; formato V1 é convertido).
+OPENCODE_THEME_DIR: str = os.path.expanduser("~/.config/opencode/themes")
+# Credenciais do motor V2 ficam no SQLite (opencode.db). Backup e restauração
+# usam `opencode auth export` / `opencode auth import` — nunca copiamos o banco.
+OPENCODE_DB_PATH: str = os.path.expanduser("~/.local/share/opencode/opencode.db")
+# Instalador oficial do OpenCode V2 (substitui o binário V1 no mesmo path)
+OPENCODE_INSTALL_V2: str = "https://opencode.ai/v2/install"
+# Versão mínima do motor exigida pelo UFVAI (V2 = OpenCode 2.x)
+OPENCODE_MIN_MAJOR: int = 2
+# v0.6.21 — identidade do agente. A OpenCode V2 deriva o ID do agente do NOME DO
+# ARQUIVO em agents/ (é por isso que o frontmatter não leva `name`: testado em
+# 13/10/2026, um `name: UFVAI` no frontmatter é IGNORADO pelo motor). O ID pedido
+# pelo autor é "UFVAI" — maiúsculo, como ele quer que o agente se chame; o
+# arquivo antigo "pesquisai.md" é removido na migração.
+AGENT_NAME: str = "UFVAI"
+AGENT_FILE: str = "UFVAI.md"
+# "pesquisai.md" = identidade antiga; "ufvai.md" = variante minúscula testada
+# durante a validação (o motor a exibia como "ufvai", diferente do pedido).
+LEGACY_AGENT_FILES: tuple[str, ...] = ("pesquisai.md", "ufvai.md")
+# O TEMA tem identidade própria, independente do agente: continua "pesquisai".
+THEME_NAME: str = "pesquisai"
+LEGACY_THEME_FILES: tuple[str, ...] = ("pesquisai-light.json",)
 
 # ── Portas ─────────────────────────────────────────────────
 TERMINAL_PORT: int = 8000
