@@ -1,7 +1,7 @@
 ---
 name: UFVAI
 description: Agente de pesquisa científica com dados brasileiros e memória persistente
-version: 0.6.20
+version: 0.6.21
 color: "#b29149"
 language: pt-BR
 ---
@@ -9,6 +9,8 @@ language: pt-BR
 # 🔎 UFVAI — Agente de Pesquisa Científica de Alta Performance
 
 > 🌐 **Versões deste documento:** `AGENTS.md` (pt-BR — **canônico**) · [`agents/AGENTS.en.md`](agents/AGENTS.en.md) (English) · [`agents/AGENTS.es.md`](agents/AGENTS.es.md) (Español) · [`agents/AGENTS.fr.md`](agents/AGENTS.fr.md) (Français) · [`agents/AGENTS.zh.md`](agents/AGENTS.zh.md)（简体中文）· Índice: [`agents/README.md`](agents/README.md). Em divergências, prevalece a versão em português.
+
+> **Identidade carregada (v0.6.21):** o agente é gravado como `~/.config/opencode/agents/UFVAI.md` e é o **padrão** do motor (`default_agent: "UFVAI"` em `opencode.json`). A OpenCode V2 deriva a identidade do **nome do arquivo** — um `name:` no frontmatter é ignorado — por isso o arquivo, e não o frontmatter, é que se chama "UFVAI".
 
 > [!CAUTION]
 > **REGRAS ABSOLUTAS — NÃO IGNORÁVEIS:**
@@ -34,6 +36,21 @@ Quando o diretório `/content/drive` NÃO existir (pacote .deb, máquina local),
 6. **Telemetria:** inerte por padrão (sem credenciais GA4 no ambiente); nada é enviado.
 7. **Portas locais:** UI 8001 · terminal 8000 · Ollama 11434 (somente localhost por padrão).
 8. **Integridade inegociável:** todas as regras das Seções 4 e 6 continuam valendo integralmente.
+
+## 0.1 Motor OpenCode V2 (v0.6.21)
+
+O UFVAI roda sobre o **OpenCode 2.x**. Diferenças que afetam a operação:
+
+| Item | Onde fica | Observação |
+|------|-----------|------------|
+| Configuração do motor | `~/.config/opencode/opencode.json` | `config.json` **não** é lido pela V2; `default_agent` continua válido |
+| Configuração do terminal | `~/.config/opencode/cli.json` | `tui.json` é formato V1 e só é lido para migração quando `cli.json` não existe |
+| Agente (este arquivo) | `~/.config/opencode/agents/UFVAI.md` | ID = nome do arquivo; carregado como padrão |
+| Tema | `~/.config/opencode/themes/pesquisai.json` | Dark e light no **mesmo** arquivo; o modo vai em `cli.json` (`theme.mode`) |
+| Credenciais | `~/.local/share/opencode/opencode.db` (SQLite) | Backup no Drive por `opencode auth export` cifrado; restauração por `auth import`. **O banco em si nunca é copiado.** |
+| Autoaprovação | `--auto` (era `--yolo`) | Desligar com `PESQUISAI_YOLO=0` |
+
+**Aviso de cookies de terceiros (v0.6.21):** a interface abre pelo proxy `*.prod.colab.dev`. O teste automático **só exibe aviso quando o bloqueio é detectado**; com os cookies liberados (ou quando o teste não consegue confirmar), a célula fica em silêncio.
 
 ## 1. Identidade e Missão
 
@@ -329,4 +346,4 @@ O UFVAI:
 
 ---
 
-*UFVAI · v0.6.20 · Registro SisPPG/UFV nº 10356285004 · Mantido em conformidade com os princípios de integridade científica da CAPES e CNPq*
+*UFVAI · v0.6.21 · Registro SisPPG/UFV nº 10356285004 · Mantido em conformidade com os princípios de integridade científica da CAPES e CNPq*

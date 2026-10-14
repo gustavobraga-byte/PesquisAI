@@ -1,7 +1,7 @@
 # Dockerfile — UFVAI v0.6.20
 #
-# Imagem para execução offline (fora do Google Colab).
-# Requer binário opencode instalado separadamente ou montado como volume.
+# Imagem para execução offline (fora do Google Colab), já com o motor
+# **OpenCode V2** instalado para o usuário não-root `ufvai`.
 #
 # Uso:
 #   docker build -t ufvai .
@@ -12,6 +12,9 @@
 #     -v ufvai-vault:/home/ufvai/PesquisAI/vault \
 #     -v ufvai-config:/home/ufvai/PesquisAI/config \
 #     ufvai
+#
+# Sem buildkit/sem rede, o binário pode ser montado como volume — neste caso
+# defina UFVAI_NO_OPENCODE_INSTALL=1 para pular a etapa de instalação.
 
 FROM python:3.12-slim AS base
 
@@ -28,6 +31,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     UFVAI_NO_OPEN=1 \
     UFVAI_NO_KEEPALIVE=1 \
+    PATH=/home/ufvai/.opencode/bin:$PATH \
     PESQUISAI_OBSIDIAN_VAULT=/home/ufvai/PesquisAI/vault
 
 # ── Dependências de sistema ───────────────────────────────────
@@ -36,6 +40,7 @@ RUN apt-get update -qq && \
         ttyd \
         git \
         curl \
+        ca-certificates \
         xclip \
         xsel \
         procps \
@@ -63,11 +68,34 @@ RUN pip install --no-cache-dir -e . 2>/dev/null || \
 # ── Copiar código completo ────────────────────────────────────
 COPY . .
 
+# ── Motor OpenCode V2 (instalado como o usuário ufvai) ────────
+# Mesmo instalador oficial usado no Colab por run_fast._install_opencode_if_missing
+# (OPENCODE_INSTALL_V2). O binário fica em ~/.opencode/bin do usuário, que é o
+# caminho que opencode_utils procura — nada precisa rodar como root.
+ENV OPENCODE_INSTALL_V2=https://opencode.ai/v2/install \
+    OPENCODE_MIN_MAJOR=2
+RUN set -eu; \
+    if [ "${UFVAI_NO_OPENCODE_INSTALL:-0}" = "1" ]; then \
+        echo "UFVAI_NO_OPENCODE_INSTALL=1 — pulando a instalação do OpenCode."; \
+        exit 0; \
+    fi; \
+    su -s /bin/bash ufvai -c "curl -fsSL ${OPENCODE_INSTALL_V2} | bash" || \
+    su -s /bin/bash ufvai -c "npm install -g @opencode/cli"; \
+    su -s /bin/bash ufvai -c 'export PATH="$HOME/.opencode/bin:$PATH"; opencode --version' \
+        || echo "AVISO: opencode não respondeu a --version (o run_fast tentará de novo no boot)."
+
 # ── Criar estrutura de diretórios do usuário ──────────────────
 RUN mkdir -p /home/ufvai/PesquisAI/vault \
              /home/ufvai/PesquisAI/config \
              /home/ufvai/PesquisAI/outputs \
+             /home/ufvai/.config/opencode/themes \
+             /home/ufvai/.config/opencode/agents \
+             /home/ufvai/.agents/skills \
     && chown -R ufvai:ufvai /home/ufvai/PesquisAI \
+             /home/ufvai/.config \
+             /home/ufvai/.agents \
+             /home/ufvai/.opencode \
+             /home/ufvai/.local \
     && chown -R ufvai:ufvai /app
 
 # ── Portas ────────────────────────────────────────────────────
