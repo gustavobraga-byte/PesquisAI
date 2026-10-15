@@ -167,6 +167,40 @@ def merge_default_agent(existing: dict[str, Any], agent_name: str) -> dict[str, 
     return merged
 
 
+# v0.6.22 (15/10/2026): agentes embutidos que NUNCA podem ser usados pelo
+# UFVAI. Regra do autor: "exclua o build e o plan… tem que SEMPRE carregar
+# o ufvai". Como docs oficiais da V2 (opencode.ai/v2/docs/agents) não
+# permitem remover built-ins do catálogo de fábrica — mas aceitam
+# ``disabled: true`` para removê-los na carga de configuração — a garantia
+# implementada abaixo os desliga em ``agents`` dentro do opencode.json.
+DISABLED_BUILTIN_AGENTS: tuple[str, ...] = ("build", "plan")
+
+
+def merge_agent_policy(existing: dict[str, Any], agent_name: str) -> dict[str, Any]:
+    """Define ``default_agent`` e desabilita os built-ins ``build`` e ``plan``.
+
+    Preserva todo o restante da configuração (providers, mcp, chaves já
+    desabilitadas pelo usuário etc.). Entradas existentes em ``agents`` para
+    os built-ins recebem ``disabled: True``; entradas inexistente são criadas
+    já desabilitadas. Com isso a V2 não só evita cair em ``build``/``plan``
+    no fallback do ``default_agent`` — como doc oficial: "Otherwise OpenCode
+    uses ``build``, then the first visible primary-capable agent" — como
+    também os remove da lista de agentes da TUI, impossibilitando seleção
+    manual acidental.
+
+    Returns:
+        Dicionário mesclado (cópia; nunca muta o argumento recebido).
+    """
+    merged = merge_default_agent(existing, agent_name)
+    agents = dict(merged.get("agents") or {})
+    for name in DISABLED_BUILTIN_AGENTS:
+        entry = dict(agents.get(name) or {})
+        entry["disabled"] = True
+        agents[name] = entry
+    merged["agents"] = agents
+    return merged
+
+
 # ─────────────────────────────────────────────────────────────────
 # Agente Markdown (agents/<nome>.md)
 # ─────────────────────────────────────────────────────────────────

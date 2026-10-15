@@ -61,8 +61,8 @@ from .opencode_config import (
     build_agent_markdown,
     build_ufvai_theme,
     load_json_config,
+    merge_agent_policy,
     merge_cli_theme,
-    merge_default_agent,
     strip_frontmatter,
     write_json_atomic,
 )
@@ -499,7 +499,12 @@ def ensure_ufvai_agent() -> bool:
 
     - regenera agents/UFVAI.md (AGENTS.md + autopilot + skills personalizadas);
     - remove agentes legados (pesquisai.md / ufvai.md) — sem duplicatas;
-    - (re)grava `default_agent: "UFVAI"` em opencode.json preservando o resto.
+    - (re)grava em opencode.json preservando o resto:
+      · `default_agent: "UFVAI"` (v0.6.21);
+      · `agents.build.disabled: true` e `agents.plan.disabled: true`
+        (v0.6.22) — build e plan saem da TUI e do fallback, e o único
+        agente carregável passa a ser o UFVAI, inclusive na mensagem
+        inicial de um usuário novo.
 
     Returns:
         False somente quando opencode.json EXISTE mas não pôde ser
@@ -646,7 +651,11 @@ Existe uma pasta persistente de skills personalizadas em:
                 "Sem isso o motor inicia com o agente `build`.",
                 current, AGENT_NAME,
             )
-        write_json_atomic(OPENCODE_CFG, merge_default_agent(cfg, AGENT_NAME))
+        # v0.6.22: `merge_agent_policy` também DESABILITA os built-ins
+        # `build` e `plan` em `agents` do opencode.json — regra do autor
+        # ("exclua o build e o plan; tem que SEMPRE carregar o ufvai").
+        # Assim o único fallback visível da V2 continua sendo o UFVAI.
+        write_json_atomic(OPENCODE_CFG, merge_agent_policy(cfg, AGENT_NAME))
         return True
     logger.warning(
         "opencode.json não pôde ser interpretado (JSONC inválido?); o arquivo "

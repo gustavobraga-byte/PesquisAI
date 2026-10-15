@@ -24,6 +24,21 @@ Compatível com o PesquisAI principal (v0.2.1+).
 ═════════════════════════════════════════════════════════════════════════
 Histórico de versões:
 ═══════════════════════════════════════════════════════════════════════
+  v0.6.22 — 15/10/2026: 🔒 exclusão efetiva dos agentes `build` e `plan`
+            • Regra do autor: "exclua o build e o plan… tem que SEMPRE
+              carregar o ufvai, inclusive na mensagem inicial do usuário
+              novo".
+            • `merge_agent_policy()` (opencode_config.py) grava em
+              opencode.json: default_agent="UFVAI" + agents.build.disabled
+              e agents.plan.disabled (mecanismo oficial da V2 — doc
+              agents/#disabled).
+            • `ensure_ufvai_agent()` adotou a política: qualquer
+              (re)spawn do terminal (boot, start_ttyd, troca de idioma,
+              troca de chave, /api/run_terminal, import de sessão)
+              reafirma o UFVAI e mantém build/plan fora do catálogo e do
+              fallback da V2.
+            • Verificado em runtime: /api/agent sem build/plan após
+              garantia; sessão nova criada com agent=UFVAI.
   v0.6.16 — 🐛 Fix retorno: heartbeat único apenas no clique "Continuar"
              • BUG v0.6.14: ao exibir "Bem-vindo de volta" o frontend disparava
                _heartbeat() imediato + setTimeout 2,5s + clique → 2-3 linhas
@@ -329,7 +344,7 @@ Histórico de versões:
 """
 
 # ── Versão semântica (SemVer) ──────────────────────────────────
-__version__: str = "0.6.21"
+__version__: str = "0.6.22"
 __brand__: str = "UFVAI"
 __brand_tagline__: str = "Pesquisa científica com integridade."
 
