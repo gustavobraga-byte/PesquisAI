@@ -62,7 +62,7 @@ from .opencode_utils import (
     is_opencode_v2,
 )
 from .security import load_encrypted_keys, save_encrypted_keys, sanitize_command
-from .run_fast import ensure_ufvai_agent
+from .run_fast import ensure_ufvai_agent, preflight_ufvai_session, seed_ufvai_greeting
 
 
 def _ensure_ufvai_agent_before_spawn(where: str = "terminal") -> None:
@@ -1166,7 +1166,44 @@ def _build_ttyd_cmd(lang: str | None = None):
     # Auto-aprovação de permissões (flag do OpenCode V2 é --auto; antes --yolo).
     # Mantido ligado por padrão (decisão do usuário). Para desligar: PESQUISAI_YOLO=0
     _yolo = "" if os.environ.get("PESQUISAI_YOLO", "1").strip().lower() in ("0", "false", "off", "no") else " --auto"
-    bash_cmd = f'{opencode_bin} --prompt "{safe_prompt}" {_yolo} ; exec bash'
+    # v0.6.22b (ajuste 15/10/2026 — SEM bump): o TUI criava a sessão nova com o
+    # agente `build` na primeira mensagem, mesmo com default_agent UFVAI válido
+    # (defeito reproduzido: "switched agent from Build to UFVAI" após o clique).
+    # Solução: pré-criar a sessão via API já com agent=UFVAI e abrir o TUI
+    # nela (`--session`); best-effort — qualquer falha volta ao comportamento
+    # anterior (default_agent + build/plan desabilitados continuam ativos).
+    # O cwd bate com o do TUI que será spawnado (projeção de projeto do serviço).
+    # Seed the initial greeting ALREADY in the UFVAI-pinned session, via the
+    # headless `opencode run`, instead of passing `--prompt` to the
+    # interactive TUI (which on V2 restarts/leaks into a `build` session and
+    # leaves the saudação unanswered). Best-effort: any failure (key/model/quota)
+    # leaves the pinned session available; later typed messages still target
+    # the UFVAI (post-baseline session agent persiste).
+    try:
+        from .constants import DRIVE_PATH as _DRIVE_PATH
+    except Exception:  # noqa: BLE001
+        _DRIVE_PATH = os.path.join(os.environ.get("HOME", "/"), "PesquisAI")
+    project_dir = _DRIVE_PATH if _DRIVE_PATH and os.path.isdir(_DRIVE_PATH) else os.getcwd()
+
+    session_id: str | None = None
+    try:
+        session_id = preflight_ufvai_session(cwd=project_dir)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("preflight_ufvai_session falhou inesperadamente: %s", exc)
+    if session_id:
+        # Envia a saudação em background para não bloquear o spawn do TUI.
+        # Sem isso, o opencode run espera ~6s e adia a aparição do terminal.
+        try:
+            subprocess.Popen(
+                [opencode_bin, "run", "--session", str(session_id), greeting],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                cwd=project_dir, env=env, start_new_session=True,
+            )
+        except Exception:  # noqa: BLE001
+            logger.debug("seed assíncrono da saudação não iniciado (ttyd continua)")
+        bash_cmd = f"cd \"{project_dir}\" && {opencode_bin} --session \"{session_id}\" {_yolo} ; exec bash"
+    else:
+        bash_cmd = f"cd \"{project_dir}\" && {opencode_bin} --prompt \"{safe_prompt}\" {_yolo} ; exec bash"
 
     # v0.4.2.5: construir args com --index (touch handlers)
     # v0.6.2: --writable restaurado (regressão v0.6.0 deixava o terminal read-only)

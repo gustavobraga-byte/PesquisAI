@@ -66,7 +66,7 @@ from .opencode_config import (
     strip_frontmatter,
     write_json_atomic,
 )
-from .opencode_utils import reset_opencode_cache
+from .opencode_utils import find_opencode, reset_opencode_cache
 
 # Descrição do agente UFVAI (aparece na lista de agentes da V2)
 UFVAI_AGENT_DESCRIPTION = (
@@ -664,6 +664,98 @@ Existe uma pasta persistente de skills personalizadas em:
     return False
 
 
+def preflight_ufvai_session(
+    cwd: Optional[str] = None,
+    timeout_s: float = 10.0,
+) -> Optional[str]:
+    """v0.6.22 (ajuste 15/10/2026 — SEM bump): pré-cria a sessão do terminal
+    JÁ presa ao agente UFVAI, via API do opencode.
+
+    Defeito reproduzido pelo autor: a PRIMEIRA mensagem de um usuário novo
+    ("Olá! (Dica: ...)") era processada pelo agente `build` — o TUI criava a
+    sessão nova com `build` mesmo com `default_agent: "UFVAI"` válido e
+    confirmado em opencode.json (config escrita ANTES da criação da sessão;
+    conferido por mtime 22:45:23 vs. sessão 22:45:34 em 15/10/2026). Depois de
+    um clique do usuário na TUI a sessão era trocada ("switched agent from
+    Build to UFVAI") — aí sim ia para o UFVAI.
+
+    Causa [DADO CONFIRMADO]: a seleção do agente na criação de sessão da TUI
+    acontece no lado cliente/serviço e pode não honrar `default_agent` na
+    primeira mensagem (headless `opencode run` honra — a divergência é só na
+    TUI). A doc oficial garante o caminho inverso: "changing this setting
+    does not replace the agent stored on an existing session" — ou seja,
+    uma sessão criada COM `agent` fixado mantém o agente.
+
+    Solução: criar a sessão ANTES do spawn com
+    `opencode api post /api/session -d '{"agent":"UFVAI", ...}'`, validar o
+    retorno por `GET /api/session/<id>` (agent == UFVAI) e abrir o TUI com
+    `--session <id>`. O TUI continua a sessão existente e a saudação já
+    parte direto para o UFVAI — inclusive no primeiro boot de um usuário
+    novo, em reinício por troca de chave/idioma e em /api/run_terminal.
+
+    Best-effort: qualquer falha (binário ausente, serviço fora/ar, JSON
+    inválido, agente não confirmado) devolve None e o chamador mantém o
+    comportamento anterior (`--prompt` sem `--session`), em que os outros
+    mecanismos (default_agent + built-ins desabilitados) continuam ativos.
+
+    Args:
+        cwd: projeto em que a sessão é criada (deve bater com o cwd do TUI
+             que será spawnado — normalmente `os.getcwd()` do processo que
+             serve o terminal). None usa o cwd atual do processo.
+        timeout_s: limite de tempo total para POST + GET (best-effort).
+
+    Returns:
+        ID (`ses_*`) da sessão criada e validada, ou None em qualquer falha.
+    """
+    import json as _json
+
+    try:
+        opencode_bin = find_opencode()
+    except FileNotFoundError:
+        logger.debug("preflight_ufvai_session: opencode não encontrado")
+        return None
+
+    payload = _json.dumps({
+        "agent": AGENT_NAME,
+        "title": "Terminal PesquisAI (UFVAI)",
+    })
+
+    def _api(arguments: list[str]) -> dict:
+        result = subprocess.run(
+            [opencode_bin, "api", *arguments],
+            capture_output=True, text=True, timeout=timeout_s / 2,
+            cwd=cwd or os.getcwd(),
+        )
+        raw = result.stdout.strip()
+        start = raw.find("{")
+        if start < 0:
+            raise ValueError(f"resposta sem JSON: {raw[:120]!r}")
+        parsed = _json.loads(raw[start:])
+        if not isinstance(parsed, dict):
+            raise ValueError("resposta não é um objeto JSON")
+        return parsed
+
+    try:
+        created = _api(["post", "/api/session", "--data", payload])
+        session_id = ((created.get("data") or {}).get("id") or "").strip()
+        if not session_id.startswith("ses_"):
+            logger.debug("preflight_ufvai_session: id inválido no POST (%r)", session_id[:40])
+            return None
+        # Validação fail-closed: a sessão SÓ vale se nasceu presa ao UFVAI.
+        fetched = _api(["get", f"/api/session/{session_id}"])
+        agent = (fetched.get("data") or {}).get("agent")
+        if agent != AGENT_NAME:
+            logger.debug(
+                "preflight_ufvai_session: sessão criada com agent=%r (≠ %r) — descartando",
+                agent, AGENT_NAME,
+            )
+            return None
+        return session_id
+    except (subprocess.TimeoutExpired, ValueError, KeyError, OSError) as exc:
+        logger.debug("preflight_ufvai_session indisponível (%s) — seguindo sem --session", exc)
+        return None
+
+
 def _setup_theme_and_agent() -> None:
     """Configura tema, agente UFVAI e opencode.json para o OpenCode V2.
 
@@ -891,6 +983,51 @@ def setup_obsidian_vault() -> None:
 
 
 # ── Etapa 4: Launch ───────────────────────────────────────────
+
+
+def seed_ufvai_greeting(
+    session_id,
+    greeting,
+    model=None,
+    timeout_s=25.0,
+    opencode_bin=None,
+    env=None,
+):
+    """Envia a saudação inicial na sessão ja pinned ao UFVAI (best-effort)."""
+    import os as _os
+    import shutil
+    import subprocess
+    bin_path = opencode_bin
+    if not bin_path:
+        bin_path = shutil.which("opencode") or "/root/.opencode/bin/opencode"
+    run_env = env if isinstance(env, dict) else dict(_os.environ)
+    # Verifica disponibilidade do "big pickle free" (OpenCode Zen).
+    if model is None:
+        try:
+            listed = subprocess.run(
+                [bin_path, "models"], capture_output=True, text=True,
+                timeout=10, env=run_env,
+            ).stdout or ""
+            if "opencode/big-pickle" in listed:
+                model = "opencode/big-pickle"
+            else:
+                model = None
+        except Exception:
+            model = None
+    try:
+        cmd = [bin_path, "run", "--session", str(session_id)]
+        if model:
+            cmd += ["--model", str(model)]
+        cmd += [greeting]
+        result = subprocess.run(cmd,
+            capture_output=True, text=True, timeout=timeout_s,
+            cwd=_os.getcwd(), env=run_env,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 
 def setup_launch(folder_path: str, drive_url: str) -> str:
     """Inicia os servidores e a interface web.
