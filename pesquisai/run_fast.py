@@ -60,13 +60,18 @@ from .progress_bar import show as progress, finish as progress_finish
 from .opencode_config import (
     build_agent_markdown,
     build_ufvai_theme,
+    cleanup_i18n_leftovers,
     load_json_config,
     merge_agent_policy,
+    merge_cli_plugins,
+    merge_cli_preset,
     merge_cli_theme,
+    merge_opencode_config,
     strip_frontmatter,
     write_json_atomic,
 )
 from .opencode_utils import find_opencode, reset_opencode_cache
+from .tui_pt import install_pt_plugin
 
 # Descrição do agente UFVAI (aparece na lista de agentes da V2)
 UFVAI_AGENT_DESCRIPTION = (
@@ -655,7 +660,18 @@ Existe uma pasta persistente de skills personalizadas em:
         # `build` e `plan` em `agents` do opencode.json — regra do autor
         # ("exclua o build e o plan; tem que SEMPRE carregar o ufvai").
         # Assim o único fallback visível da V2 continua sendo o UFVAI.
-        write_json_atomic(OPENCODE_CFG, merge_agent_policy(cfg, AGENT_NAME))
+        # v0.6.22 (16/10, SEM bump): `merge_opencode_config` também instala os
+        # comandos slash em PT (merge_ufvai_commands) — nunca sobrescreve os
+        # comandos já definidos pelo usuário.
+        write_json_atomic(OPENCODE_CFG, merge_opencode_config(cfg, AGENT_NAME))
+        # v0.6.24 (ajuste 18/10/2026, SEM bump): o plugin opencode-i18n-v2 foi
+        # REMOVIDO (duplicava comandos na paleta e trazia títulos em chinês).
+        # Limpa instalações/estado deixados por ele para que nenhuma versão
+        # anterior continue injetando a camada de tradução concorrente.
+        try:
+            cleanup_i18n_leftovers()
+        except Exception:  # fail-open
+            logger.exception("i18n: falha na limpeza de resíduos (boot segue).")
         return True
     logger.warning(
         "opencode.json não pôde ser interpretado (JSONC inválido?); o arquivo "
@@ -780,6 +796,15 @@ def _setup_theme_and_agent() -> None:
             except OSError:
                 pass
 
+    # ── Plugin de TUI: comandos barra em português (v0.6.24) ──────────
+    # Instala o pacote local ANTES de ler o cli.json: o caminho precisa
+    # existir quando o motor carregar o plugin no próximo start da TUI.
+    try:
+        pt_plugin_dir = install_pt_plugin()
+    except OSError as exc:  # sem permissão/FS somente leitura: não aborta o boot
+        logger.warning(f"Plugin PT da TUI não pôde ser instalado: {exc}")
+        pt_plugin_dir = ""
+
     # ── cli.json: nome e modo do tema (preserva a escolha do usuário) ──
     ok_cli, existing_cli = load_json_config(CLI_JSON)
     if ok_cli:
@@ -793,12 +818,34 @@ def _setup_theme_and_agent() -> None:
             name = THEME_NAME
         if mode not in ("dark", "light"):
             mode = "dark"
-        write_json_atomic(CLI_JSON, merge_cli_theme(existing_cli, name, mode))
+        # v0.6.22 (16/10, SEM bump): preset cli.json do UFVAI preenche
+        # SOMENTE chaves ausentes (session/diffs/tabs/highlights) —
+        # escolhas já gravadas pelo usuário são preservadas.
+        merged_cli = merge_cli_preset(merge_cli_theme(existing_cli, name, mode))
+        if pt_plugin_dir:
+            # Habilita o plugin PT (idempotente; preserva plugins do usuário).
+            merged_cli = merge_cli_plugins(merged_cli, pt_plugin_dir)
+        write_json_atomic(CLI_JSON, merged_cli)
     else:
         logger.warning("cli.json não pôde ser lido; tema do terminal mantido como está.")
 
     # ── Agente UFVAI + default_agent (garantia reexecutável) ──
     ensure_ufvai_agent()
+
+    # ── Reversão de patches antigos no binário (v0.6.24, 18/10/2026) ──
+    # A decisão do autor foi NÃO fazer patch no binário do motor (frágil em
+    # atualização). Se uma versão anterior já o alterou, existe o backup
+    # `<binário>.orig-ufvai`: restauramos o original uma única vez e removemos
+    # o backup. Fail-open — nunca interrompe o boot.
+    try:
+        from .tui_prompt import restore_if_needed
+        status = restore_if_needed(find_opencode())
+        if status == "restored":
+            logger.info("Binário do motor: patch antigo revertido (backup .orig-ufvai).")
+        elif status == "failed":
+            logger.warning("Binário do motor: não foi possível reverter o patch antigo.")
+    except Exception as exc:  # noqa: BLE001 — boot nunca deve quebrar por isso
+        logger.warning(f"Reversão de patch do binário não aplicada: {exc}")
 
 
 def setup_dependencies() -> None:

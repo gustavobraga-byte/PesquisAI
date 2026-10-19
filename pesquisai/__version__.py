@@ -24,6 +24,45 @@ Compatível com o PesquisAI principal (v0.2.1+).
 ═════════════════════════════════════════════════════════════════════════
 Histórico de versões:
 ═══════════════════════════════════════════════════════════════════════
+  v0.6.24 — 18/10/2026: 🈯 TUI 100% em português (comandos, menus e frases de
+            abertura) + 🌍 4 idiomas no mesmo plugin
+            • Comandos barra da TUI em PT-BR/es/fr/zh: plugin de CLI
+              `ufvai-pt` (37 comandos nativos traduzidos pelo keymap, mesmo
+              `id` do nativo, `palette`/atalhos preservados) + comando
+              `/idioma` com troca ao vivo; catálogo em
+              `~/.config/opencode/tui/ufvai-pt/` (revisto no boot por
+              `install_pt_plugin` + `merge_cli_plugins`).
+            • Frases iniciais da tela de nova sessão: NÃO se faz patch no binário
+              do motor (decisão de 18/10/2026). `pesquisai/tui_prompt.py` foi
+              reduzido a `restore_if_needed()` — ele apenas restaura o original
+              (`<binário>.orig-ufvai`) se uma versão anterior tiver alterado o
+              bytecode, e remove o backup. Textos internos ("Ask anything…",
+              exemplos da tela inicial, rótulos do rodapé) permanecem no idioma
+              original do motor: literais do bytecode são compartilhados com
+              contratos internos (renomear `commands` quebrava o SQLite com
+              `table project has no column named comandos`).
+            • Idioma resolvido por `tui_pt.detect_locale()`: `/idioma` (arquivo
+              `ufvai-language.json`) → UFVAI_LANG/PESQUISAI_LOCALE → LANG →
+              pt-BR; a troca no seletor da UI web (`/api/lang`) chama
+              `launch_app._sync_terminal_locale()`, que grava o arquivo e só
+              então reinicia o ttyd — terminal e interface no mesmo idioma.
+            • Plugin `opencode-i18n-v2` REMOVIDO (duplicava comandos na paleta
+              e trazia títulos em chinês): `strip_i18n_plugin()` +
+              `cleanup_i18n_leftovers()`; removidos `pesquisai/opencode_i18n.py`
+              e `pesquisai/assets/i18n/`.
+            • 2 novos comandos de prompt em PT: `/iniciar` (≈ /init) e
+              `/revisar-codigo` (≈ /review).
+            • Testes novos: tests/test_comandos_pt.py,
+              tests/test_prompt_restore.py e tests/test_sem_i18n.py.
+  v0.6.23 — 17/10/2026: 🌐 i18n do TUI em PT-BR (plugin opencode-i18n-v2)
+            • Locale pt-BR COMPLETO (190 comandos + grupos + 49 slash
+              commands) implantado em ~/.config/opencode/i18n/locales/.
+            • Detecção de idioma: PESQUISAI_LOCALE → língua do navegador
+              (Accept-Language gravado pela UI web) → LANG/LC_ALL → pt-BR.
+            • Novo módulo pesquisai/opencode_i18n.py (fail-open) + asset
+              pesquisai/assets/i18n/pt-BR.json + testes dedicados.
+            • Cadeia de boot: merge_opencode_config agora garante o plugin
+              na lista `plugins`; apply_i18n implanta locale + estado.
   v0.6.22 — 15/10/2026: 🔒 exclusão efetiva dos agentes `build` e `plan`
             • Regra do autor: "exclua o build e o plan… tem que SEMPRE
               carregar o ufvai, inclusive na mensagem inicial do usuário
@@ -344,7 +383,7 @@ Histórico de versões:
 """
 
 # ── Versão semântica (SemVer) ──────────────────────────────────
-__version__: str = "0.6.22"
+__version__: str = "0.6.24"
 __brand__: str = "UFVAI"
 __brand_tagline__: str = "Pesquisa científica com integridade."
 
@@ -387,7 +426,7 @@ __components__: dict[str, str] = {
 }
 
 # ── Idiomas suportados ─────────────────────────────────────────
-__supported_languages__: list[str] = ["pt_BR", "en_US", "es_ES", "fr_FR"]
+__supported_languages__: list[str] = ["pt_BR", "en_US", "es_ES", "fr_FR", "zh_CN"]
 
 # ── Saudações iniciais por idioma (v0.4.2.2) ───────────────────
 # Usadas pelo ttyd ao iniciar o terminal e ao trocar de idioma.

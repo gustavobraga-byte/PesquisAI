@@ -167,6 +167,264 @@ def merge_default_agent(existing: dict[str, Any], agent_name: str) -> dict[str, 
     return merged
 
 
+# v0.6.22 (16/10/2026, SEM bump): presets de personalização da TUI
+# (recomendações 1 e 2 do estudo de 16/10 — cli.json + comandos PT).
+# Filosofia: preencher somente chaves AUSENTES (a escolha do usuário vence) e
+# usar apenas chaves documentadas na V2 (a V2 rejeita desconhecidas em cli.json).
+CLI_PRESET: dict[str, Any] = {
+    # session.* — configuração de sessão (docs cli/config.md#sessions)
+    "session": {"thinking": "show", "markdown": "rendered"},
+    # diffs.* — revisão de mudanças (docs cli/config.md#diffs)
+    "diffs": {"wrap": "word"},
+    # tabs.* — faixa de abas (docs cli/config.md#tabs)
+    "tabs": {"mode": "auto"},
+    # banner de release da TUI desligado (docs cli/config.md#highlights)
+    "highlights": False,
+}
+
+
+def merge_cli_preset(existing: dict[str, Any]) -> dict[str, Any]:
+    """Aplica ``CLI_PRESET`` em cli.json preenchendo somente chaves ausentes.
+
+    Regras:
+    - valor presente do usuário é preservado (não sobrescreve, nem por nível);
+    - chaves de grupo existentes recebem apenas os subitens ausentes;
+    - nunca muta o argumento recebido (cópia em dois níveis).
+    """
+    merged = dict(existing)
+    for key, value in CLI_PRESET.items():
+        if key not in merged:
+            merged[key] = dict(value) if isinstance(value, dict) else value
+            continue
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            sub = dict(merged[key])  # preserva subitens já definidos pelo usuário
+            for sub_key, sub_value in value.items():
+                sub.setdefault(sub_key, sub_value)
+            merged[key] = sub
+    return merged
+
+
+def merge_cli_plugins(existing: dict[str, Any], plugin_path: str) -> dict[str, Any]:
+    """Habilita um plugin de CLI (TUI) em ``cli.json`` sem duplicar entradas.
+
+    A lista ``plugins`` do cli.json aceita nomes de pacote, caminhos locais e
+    o formato ``{"package": ...}``. Só acrescentamos o caminho do plugin do
+    UFVAI se ele ainda não estiver presente (em qualquer das duas formas) e
+    preservamos a ordem e as escolhas do usuário.
+
+    Plugins de TUI são "CLI-only" (docs: opencode.ai/v2/docs/plugins): ficam
+    em ``cli.json`` e continuam ativos mesmo quando a TUI se conecta a um
+    servidor remoto.
+    """
+    merged = dict(existing)
+    current = merged.get("plugins")
+    items: list[Any] = list(current) if isinstance(current, list) else []
+    if not any(
+        item == plugin_path
+        or (isinstance(item, dict) and item.get("package") == plugin_path)
+        for item in items
+    ):
+        items.append(plugin_path)
+    merged["plugins"] = items
+    merged.setdefault("$schema", CLI_SCHEMA_URL)
+    return merged
+
+
+# Comandos slash em português para o fluxo científico do UFVAI.
+# São PROMPT TEMPLATES (docs opencode.ai/v2/docs/commands/): rodam em sessão
+# com o agente padrão (UFVAI). Os comandos NATIVOS da TUI (/new, /undo,
+# /themes, /help, /models…) também estão em português desde a v0.6.24, mas por
+# outra via: o plugin de CLI em `pesquisai/tui_pt.py`, que traduz o token
+# digitado no próprio keymap (aqui ficam apenas os comandos de PROMPT).
+UFVAI_COMMANDS: dict[str, dict[str, str]] = {
+    "pesquisar": {
+        "description": "Pesquisa científica completa sobre um tema",
+        "template": (
+            "Conduza uma pesquisa científica sobre: $ARGUMENTS.\n"
+            "- Colete somente dados reais das skills adequadas (ibge-br, opendatasus etc.)\n"
+            "  e papers validados (citation-management).\n"
+            "- Marque cada afirmação com [DADO CONFIRMADO], [ESTIMATIVA FUNDAMENTADA]\n"
+            "  ou [SEM DADOS SUFICIENTES].\n"
+            "- Registre parâmetros e achados em Minha memória."
+        ),
+    },
+    "revisar": {
+        "description": "Revisão de literatura sobre um tema",
+        "template": (
+            "Faça uma revisão de literatura sobre: $ARGUMENTS.\n"
+            "- Busque papers nas bases acadêmicas e registre cada referência em "
+            "Minha memória, com DOI/ISBN validado.\n"
+            "- Sintetize por eixo temático e indique lacunas de pesquisa."
+        ),
+    },
+    "dados": {
+        "description": "Dados oficiais brasileiros sobre um tema",
+        "template": (
+            "Consulte dados oficiais brasileiros sobre: $ARGUMENTS.\n"
+            "- Use ibge-br, opendatasus, dados-brasil ou agrobr conforme o domínio.\n"
+            "- Reporte cada número com fonte, série/ano e período; nunca invente dados."
+        ),
+    },
+    "referencias": {
+        "description": "Valida as referências citadas nesta conversa",
+        "template": (
+            "Valide todas as referências desta conversa com um identificador "
+            "persistente (DOI/ISBN/ISSN/URL oficial) em Minha memória.\n"
+            "- Reporte o status de cada uma (validada/inválida/pendente)\n"
+            "  e corrija o que puder, sem inventar campos."
+        ),
+    },
+    "abnt": {
+        "description": "Normaliza texto ou referências no padrão UFV/ABNT",
+        "template": "Normalize no padrão UFV/ABNT o texto ou as referências indicadas: $ARGUMENTS.",
+    },
+    "ajuda": {
+        "description": "Help do UFVAI: uso, skills, comandos e atalhos (em PT)",
+        "template": (
+            "Explique de forma prática como usar o UFVAI: fluxo de trabalho\n"
+            "(seções do §3), marcadores de evidência (§4.2), skills disponíveis\n"
+            "e como registrar a sessão em Minha memória. Responda em português.\n"
+            "Se o usuário indicar um tema, foque nele: $ARGUMENTS"
+        ),
+    },
+    "memoria": {
+        "description": "Consulta/salva na memória persistente (Minha memória)",
+        "template": (
+            "Trabalhe com Minha memória (vault do PesquisAI): $ARGUMENTS\n"
+            "- Sem argumento: mostre o último estado (moc/last-state.md),\n"
+            "  as 3 últimas dailies e o que está pendente (fila/próximos passos).\n"
+            "- Para salvar: crie a nota com o template oficial da pasta certa\n"
+            "  e o frontmatter obrigatório (created, created_by, updated,\n"
+            "  tags da taxonomia oficial pesquisai/*)."
+        ),
+    },
+    # Equivalentes em PT dos comandos de servidor nativos do motor
+    # (/init e /review). São prompt templates: reproduzem o fluxo, não o
+    # diálogo interativo original.
+    "iniciar": {
+        "description": "Configuração guiada do AGENTS.md (regras do projeto)",
+        "template": (
+            "Faça a configuração guiada do AGENTS.md deste projeto: $ARGUMENTS\n"
+            "- Inspecione a estrutura, a stack e os comandos de build/teste reais.\n"
+            "- Crie ou atualize AGENTS.md com o que um agente precisa saber\n"
+            "  (arquitetura, como rodar, convenções, armadilhas).\n"
+            "- Não invente comandos: confirme cada um no repositório."
+        ),
+    },
+    "revisar-codigo": {
+        "description": "Revisa mudanças de código (commit, branch ou PR)",
+        "template": (
+            "Revise as mudanças de código indicadas: $ARGUMENTS\n"
+            "- Sem argumento, use as alterações não commitadas (git diff).\n"
+            "- Aponte bugs, riscos, regressões e testes faltando, com arquivo:linha.\n"
+            "- Não reescreva o código sem pedir; priorize achados acionáveis."
+        ),
+    },
+}
+
+
+def merge_ufvai_commands(existing: dict[str, Any]) -> dict[str, Any]:
+    """Instala ``UFVAI_COMMANDS`` em opencode.json sem sobrescrever o usuário.
+
+    Comandos já definidos pelo usuário (ou em outro nível de configuração)
+    mantêm prioridade: aqui só adicionamos os que ainda não existem.
+    """
+    merged = dict(existing)
+    commands = dict(merged.get("commands") or {})
+    for name, spec in UFVAI_COMMANDS.items():
+        if name not in commands:
+            commands[name] = dict(spec)
+    merged["commands"] = commands
+    merged.setdefault("$schema", CONFIG_SCHEMA_URL)
+    return merged
+
+
+def cleanup_i18n_leftovers() -> list[str]:
+    """Remove instalações/resíduos do plugin ``opencode-i18n`` (v0.6.24).
+
+    Apaga ``~/.config/opencode/i18n/``, ``~/.local/state/opencode/i18n-state.json``
+    e ``~/.local/state/opencode/pesquisai-browser-locale.json`` — arquivos que a
+    v0.6.23 criava e que, se ficarem no disco, reativariam a camada de tradução
+    concorrente assim que o plugin fosse reinstalado pelo usuário. Fail-open:
+    qualquer erro de I/O é ignorado e o boot continua.
+
+    Returns:
+        Lista dos caminhos efetivamente removidos (para log).
+    """
+    removed: list[str] = []
+    home = os.path.expanduser("~")
+    config_root = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.join(home, ".config")), "opencode")
+    state_root = os.path.join(os.environ.get("XDG_STATE_HOME", os.path.join(home, ".local", "state")), "opencode")
+    targets = [
+        os.path.join(config_root, "i18n"),
+        os.path.join(state_root, "i18n-state.json"),
+        os.path.join(state_root, "pesquisai-browser-locale.json"),
+    ]
+    for path in targets:
+        try:
+            if os.path.isdir(path):
+                import shutil
+                shutil.rmtree(path, ignore_errors=True)
+                removed.append(path)
+            elif os.path.exists(path):
+                os.remove(path)
+                removed.append(path)
+        except OSError:
+            continue
+    return removed
+
+
+def strip_i18n_plugin(existing: dict[str, Any]) -> dict[str, Any]:
+    """Remove o plugin ``opencode-i18n`` (v1/v2) da lista de plugins.
+
+    v0.6.24 (ajuste 18/10/2026, SEM bump): o plugin de i18n de terceiros
+    duplicava os comandos na paleta (ele e o ``ufvai-pt`` criam camadas de
+    espelho para os MESMOS ids) e injetava comandos próprios com título em
+    chinês ("界面语言"). A tradução da TUI é responsabilidade exclusiva do
+    plugin autoral ``ufvai-pt`` (``cli.json``), então o ``opencode.json``
+    nunca deve conter o plugin de i18n.
+
+    Preserva qualquer outro plugin do usuário; remove apenas entradas cujo
+    nome/pacote comece por ``opencode-i18n``.
+    """
+    merged = dict(existing)
+    plugins = list(merged.get("plugins") or [])
+
+    def _is_i18n(entry: Any) -> bool:
+        if isinstance(entry, str):
+            return entry.split("/")[-1].startswith("opencode-i18n")
+        if isinstance(entry, dict):
+            package = entry.get("package")
+            if isinstance(package, str):
+                return package.split("/")[-1].startswith("opencode-i18n")
+            if len(entry) == 1:
+                key = next(iter(entry))
+                if isinstance(key, str):
+                    return key.split("/")[-1].startswith("opencode-i18n")
+        return False
+
+    filtered = [entry for entry in plugins if not _is_i18n(entry)]
+    if filtered:
+        merged["plugins"] = filtered
+    elif "plugins" in merged:
+        merged["plugins"] = filtered
+    return merged
+
+
+def merge_opencode_config(existing: dict[str, Any], agent_name: str) -> dict[str, Any]:
+    """Cadeia oficial de boot: agentes + comandos UFVAI (PT), SEM plugin i18n.
+
+    A referência a ``merge_agent_policy`` é resolvida no momento da chamada
+    (o run_fast só invoca com todos os nomes já definidos), então posicioná-la
+    antes da outra definição é apenas questão de leitura do fluxo de boot.
+    v0.6.24 (ajuste 18/10/2026): o plugin ``opencode-i18n-v2`` da v0.6.23 foi
+    REMOVIDO — ele duplicava os comandos na paleta e injetava entradas em
+    chinês. O ``ufvai-pt`` (``cli.json``) é a única camada de tradução da TUI.
+    """
+    return strip_i18n_plugin(merge_ufvai_commands(merge_agent_policy(existing, agent_name)))
+
+
+
 # v0.6.22 (15/10/2026): agentes embutidos que NUNCA podem ser usados pelo
 # UFVAI. Regra do autor: "exclua o build e o plan… tem que SEMPRE carregar
 # o ufvai". Como docs oficiais da V2 (opencode.ai/v2/docs/agents) não

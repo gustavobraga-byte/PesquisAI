@@ -729,6 +729,13 @@ def _build_ttyd_args(base_args: list, env: dict) -> list:
 
 
 _LANG_MAP = {"pt": "pt_BR", "en": "en_US", "es": "es_ES", "fr": "fr_FR", "zh": "zh_CN"}
+# v0.6.24 (ajuste 18/10/2026): idioma da UI web → idioma da TUI do OpenCode.
+# A troca no seletor da interface grava ``~/.config/opencode/ufvai-language.json``
+# (fonte de verdade do plugin ``ufvai-pt``) ANTES de reiniciar o ttyd — assim,
+# quando a interface recarrega, os comandos/menus do terminal já abrem no mesmo
+# idioma. NÃO se faz patch no binário do motor (ver `tui_prompt.py`); os textos
+# internos do OpenCode permanecem no idioma original.
+_UI_TO_TUI_LOCALE = {"pt_BR": "pt-BR", "en_US": "en", "es_ES": "es", "fr_FR": "fr"}
 
 
 def _detect_system_lang() -> str:
@@ -1235,6 +1242,31 @@ def start_ttyd(lang: str | None = None):
     time.sleep(0.8)
 
 
+def _sync_terminal_locale(full_lang: str) -> bool:
+    """Alinha a TUI do OpenCode ao idioma escolhido na interface web (v0.6.24).
+
+    Grava a escolha em ``~/.config/opencode/ufvai-language.json`` — fonte de
+    verdade do plugin ``ufvai-pt`` — para que, ao recarregar a página, os
+    comandos e menus da TUI abram no mesmo idioma da interface.
+
+    NÃO se faz patch no binário do motor (decisão de 18/10/2026): textos
+    internos (frases de exemplo, "Ask anything…", rodapé) permanecem no idioma
+    original do OpenCode, evitando quebra em atualização.
+
+    Fail-open: qualquer falha não impede o reinício do terminal.
+    """
+    locale = _UI_TO_TUI_LOCALE.get(full_lang)
+    if not locale:
+        return False
+    try:
+        from .tui_pt import save_locale as _save_tui_locale
+        _save_tui_locale(locale)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Não foi possível gravar o idioma da TUI (%s): %s", locale, exc)
+        return False
+
+
 def restart_ttyd_with_lang(lang: str) -> bool:
     """Reinicia o ttyd com saudação no novo idioma.
 
@@ -1256,6 +1288,9 @@ def restart_ttyd_with_lang(lang: str) -> bool:
         # Persiste o idioma
         _current_lang = lang
         _persist_lang(lang)
+        # v0.6.24: alinha a TUI (comandos, frases e rodapé) ao idioma da UI
+        # ANTES de subir o terminal novo.
+        _sync_terminal_locale(lang)
 
         # Ajuste 14/10/2026 (v0.6.21): troca de idioma E de chave de API passam
         # por aqui (via _apply_opencode_env_change_async) — é EXATAMENTE o fluxo
@@ -1284,7 +1319,7 @@ def restart_ttyd_with_lang(lang: str) -> bool:
 # Mudanças aplicadas:
 #   1. 📱 Site responsivo (6 media queries + hamburger menu)
 #   2. 🎨 Tema claro/escuro com reload do iframe do ttyd
-#   3. 🌐 Seletor de idioma na topbar (4 idiomas: pt_BR, en_US, es_ES, fr_FR)
+#   3. 🌐 Seletor de idioma na topbar (5 idiomas: pt_BR, en_US, es_ES, fr_FR, zh_CN)
 #   4. 🌙 Tema padrão ESCURO com anti-flash CSS
 # 
 # Compatibilidade: API inalterada (create_wrapper_html(terminal_url, drive_url))
