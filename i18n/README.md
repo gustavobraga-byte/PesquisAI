@@ -1,6 +1,6 @@
 # 🌐 PesquisAI i18n — Suporte Multilíngue
 
-> **Idiomas suportados:** pt_BR (padrão), en_US, es_ES
+> **Idiomas suportados:** pt_BR (padrão), en_US, es_ES, fr_FR, zh_CN
 > **Detecção automática:** variável de ambiente, header HTTP, fallback
 
 ## 🚀 Uso Rápido
