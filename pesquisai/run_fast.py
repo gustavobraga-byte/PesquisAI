@@ -847,6 +847,24 @@ def _setup_theme_and_agent() -> None:
     except Exception as exc:  # noqa: BLE001 — boot nunca deve quebrar por isso
         logger.warning(f"Reversão de patch do binário não aplicada: {exc}")
 
+    # ── Marca UFVAI na tela de NOVA SESSÃO (v0.6.25, 21/10/2026) ──────────
+    # Aplica o patch cirúrgico de mesmo comprimento de byte no binário do motor
+    # (logo "UFVAI" + sugestões de prompt do UFVAI). Decide o autor em 21/10
+    # revogar a proibição de patch de 18/10 — não há slot de logo na API de
+    # plugins nem chave de branding no config.json.
+    # Fail-open: falha aqui NÃO interrompe o boot (o logo volta ao original).
+    try:
+        from .tui_branding import apply_branding as _apply_branding, detect_locale as _detect_brand_locale
+        _bin = find_opencode()
+        _locale = _detect_brand_locale()
+        _status = _apply_branding(_bin, _locale)
+        if _status == "applied":
+            logger.info(f"Binário do motor: textos da nova sessão em {_locale}.")
+        elif _status == "failed":
+            logger.warning("Binário do motor: patch de textos recusado (literais divergentes).")
+    except Exception as exc:  # noqa: BLE001 — boot nunca deve quebrar por isso
+        logger.warning(f"Marca UFVAI na TUI não aplicada: {exc}")
+
 
 def setup_dependencies() -> None:
     """Instala todas as dependências (OpenCode, sistema, Python, tema)."""

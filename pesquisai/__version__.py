@@ -24,6 +24,36 @@ Compatível com o PesquisAI principal (v0.2.1+).
 ═════════════════════════════════════════════════════════════════════════
 Histórico de versões:
 ═══════════════════════════════════════════════════════════════════════
+  v0.7.0 — 21/10/2026: 🏷️ Marca UFVAI na tela de NOVA SESSÃO + 4 correções
+            de interface
+            • LOGO: a arte de blocos "opencode" da tela de nova sessão foi
+              redesenhada como "UFVAI" (5 letras, mesma grade de 4 linhas x 19
+              células por metade, mesmo two-tone: esquerda muted / direita base).
+              O logo compacto (tela < 22 colunas) virou "U".
+            • SUGESTÕES DO PROMPT: o placeholder "Ask anything… \"<sugestão>\""
+              passa a sugerir uso do UFVAI e uso agentico:
+                "Monte um plano de pesquisa" · "Qual a base de dados da minha
+                pesquisa?" · "Revise o artigo."
+            • MECANISMO: `pesquisai/tui_branding.py` faz patch do binário do
+              motor com substituições de MESMO COMPRIMENTO DE BYTE (o bytecode
+              do Bun referencia literais por offset — mudar o tamanho
+              corromperia o binário), backup em `<binário>.orig-ufvai-brand`,
+              restauração no boot, fail-open e desligável por
+              `UFVAI_TUI_BRANDING=0`. Só literais de EXIBIÇÃO são tocados.
+              Isto revoga a decisão de 18/10 ("não patchar o binário").
+            • CHINÊS TAMBÉM TROCA O TERMINAL: `_UI_TO_TUI_LOCALE` não tinha a
+              entrada `zh_CN` → a troca de idioma na UI web aceitava o chinês
+              mas o terminal continuava no idioma anterior (retorno silencioso).
+            • TEMA CLARO NO MANUAL E NAS DIRETRIZES: o wrapper carregava só
+              `github-markdown-dark.min.css` → o markdown do MANUAL.md e do
+              AGENTS.md saía escuro no tema claro. Paleta remapeada para as
+              variáveis do tema claro (sem depender do CDN — funciona offline).
+            • SANDUÍCHE DO RESPONSIVO: o item "Idioma" foi REMOVIDO do drawer —
+              o seletor `.lang-btn` da topbar continua visível no mobile.
+            • SEGUNDO CÉREBRO NO RESPONSIVO: o container do split da Memória era
+              um div anônimo (sem id) → no mobile o pai ficava em flex ROW, a
+              sidebar com width:100% tomava a linha inteira e o pane da NOTA
+              saía da tela. Agora tem id (`memory-body`) e empilha no mobile.
   v0.6.24 — 18/10/2026: 🈯 TUI 100% em português (comandos, menus e frases de
             abertura) + 🌍 4 idiomas no mesmo plugin
             • Comandos barra da TUI em PT-BR/es/fr/zh: plugin de CLI
@@ -379,17 +409,29 @@ Histórico de versões:
               saudação no idioma + "(a partir de agora responda em X)"
               ao invés de "--prompt 'oi'" genérico
             • 📦 __version__.py movido para pesquisai/__version__.py
+            • 🔄 v0.7.2 — RETOMADA DO AUTOSAVE SEM LOOP
+              + CALENDÁRIO DO "RESTAURAR" CORRIGIDO
+            • 🔄 LOOP DA RETOMADA: "Continuar de onde parei" fazia
+              location.reload() -> a pagina recarregava -> a pergunta
+              de retomada voltava -> o usuario clicava de novo -> LOOP.
+              Agora a pergunta e OFERTADA UMA VEZ por aba do navegador
+              (flag em sessionStorage, que sobrevive ao reload da mesma
+              aba). O botao ↻ no rodape reoferece sob demanda.
+            • 🗒️ CALENDÁRIO: dias com backup mostram a contagem,
+              tooltip corrigido ("3 backups", nao "3)"), chips dos meses
+              que TEM backup, item sem data nunca some do filtro e
+              estado vazio oferece "Todas as datas".
             • 🧹 AGENTS.md: removido "- [link/lien/enlace]" das 4 variantes
 """
 
 # ── Versão semântica (SemVer) ──────────────────────────────────
-__version__: str = "0.6.24"
+__version__: str = "0.7.3"
 __brand__: str = "UFVAI"
 __brand_tagline__: str = "Pesquisa científica com integridade."
 
 # ── Metadados do release ───────────────────────────────────────
-__release_date__: str = "2026-10-13"
-__codename__: str = "Boot simplificado + keep-alive em subprocesso + botão SAIR no Colab"
+__release_date__: str = "2026-10-22"
+__codename__: str = "Retomada do autosave uma unica vez + calendario do Restaurar corrigido + pacote pesquisai instalado"
 
 # ── Identidade do projeto ──────────────────────────────────────
 __author__: str = "Gustavo Bastos Braga"

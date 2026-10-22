@@ -333,6 +333,98 @@ RESPONSIVE_CSS: str = """
     --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   }
 
+  /* === v0.6.25: Markdown do MANUAL e das DIRETRIZES no TEMA CLARO ==========
+     O wrapper carrega apenas `github-markdown-dark.min.css`; no tema claro o
+     MANUAL.md e as DIRETRIZES do agente saíam com a paleta ESCURA (texto
+     claro sobre fundo claro). Aqui a paleta do markdown é remapeada para as
+     variáveis do tema claro — sem depender de um segundo arquivo do CDN,
+     portanto também funciona no ambiente offline (.deb). ================ */
+  html.theme-light .markdown-body {
+    color: var(--ink) !important;
+    background-color: transparent !important;
+  }
+  html.theme-light .markdown-body h1,
+  html.theme-light .markdown-body h2,
+  html.theme-light .markdown-body h3,
+  html.theme-light .markdown-body h4,
+  html.theme-light .markdown-body h5,
+  html.theme-light .markdown-body h6 {
+    color: var(--ink) !important;
+    border-bottom-color: var(--line) !important;
+  }
+  html.theme-light .markdown-body p,
+  html.theme-light .markdown-body li,
+  html.theme-light .markdown-body dl,
+  html.theme-light .markdown-body dd,
+  html.theme-light .markdown-body td,
+  html.theme-light .markdown-body th,
+  html.theme-light .markdown-body strong,
+  html.theme-light .markdown-body b,
+  html.theme-light .markdown-body summary,
+  html.theme-light .markdown-body label {
+    color: var(--ink) !important;
+  }
+  html.theme-light .markdown-body th {
+    background-color: var(--surface) !important;
+  }
+  html.theme-light .markdown-body a,
+  html.theme-light .markdown-body a:visited {
+    color: var(--accent) !important;
+  }
+  html.theme-light .markdown-body a:hover {
+    color: var(--ink) !important;
+  }
+  html.theme-light .markdown-body blockquote {
+    color: var(--ink-muted) !important;
+    border-left-color: var(--accent) !important;
+    background-color: var(--accent-dim) !important;
+  }
+  html.theme-light .markdown-body code,
+  html.theme-light .markdown-body tt {
+    color: #7a3b1d !important;
+    background-color: #f1efe9 !important;
+    border-color: rgba(0,0,0,.08) !important;
+  }
+  html.theme-light .markdown-body pre {
+    color: var(--ink) !important;
+    background-color: #f1efe9 !important;
+    border-color: rgba(0,0,0,.08) !important;
+  }
+  html.theme-light .markdown-body pre code,
+  html.theme-light .markdown-body pre tt {
+    color: #7a3b1d !important;
+    background-color: transparent !important;
+  }
+  html.theme-light .markdown-body hr {
+    background-color: var(--line) !important;
+    border-color: var(--line) !important;
+  }
+  html.theme-light .markdown-body table th,
+  html.theme-light .markdown-body table td {
+    border-color: var(--line) !important;
+  }
+  html.theme-light .markdown-body table tr {
+    background-color: transparent !important;
+    border-top-color: var(--line) !important;
+  }
+  html.theme-light .markdown-body table tr:nth-child(2n) {
+    background-color: var(--surface) !important;
+  }
+  html.theme-light .markdown-body img {
+    background-color: transparent !important;
+    border-color: var(--line) !important;
+  }
+  html.theme-light .markdown-body kbd {
+    color: var(--ink) !important;
+    background-color: #f1efe9 !important;
+    border-color: rgba(0,0,0,.12) !important;
+    box-shadow: inset 0 -1px 0 rgba(0,0,0,.08) !important;
+  }
+  html.theme-light .markdown-body .highlight,
+  html.theme-light .markdown-body .highlight pre {
+    background-color: #f1efe9 !important;
+  }
+
   /* === Indicador de tema ativo (NOVO em v0.4.1) === */
   #theme-toggle[data-theme="pesquisai-light"] {
     color: var(--amber);
@@ -401,6 +493,9 @@ RESPONSIVE_CSS: str = """
     #memory-editor { min-height: 120px; flex: 1 1 40% !important; }
     #memory-preview { min-height: 150px; flex: 1 1 60% !important; overflow-y:auto !important; -webkit-overflow-scrolling:touch; display:block !important; }
     #memory-overlay .modal-title { font-size: 14px !important; }
+    /* v0.6.25: empilha lista + editor no mobile (o pai era flex ROW). */
+    #memory-body { flex-direction: column !important; }
+    #memory-editor-pane { width: 100% !important; }
     /* v0.6.12 fix: garante preview visível no mobile mesmo quando em modo preview */
     #memory-editor-body #memory-preview[style*="display: none"] { display:none !important; }
     #memory-editor-body #memory-preview:not([style*="display: none"]) { display:block !important; }
@@ -705,6 +800,128 @@ def create_wrapper_html(
       background: var(--amber-dim); color: var(--amber);
       border: 1px solid rgba(232,184,75,.3); border-radius: 3px;
     }
+    /* ── v0.7.0: "Restaurar" com CALENDARIO e FILTRO por data ── */
+    #modal.restore-modal { width: 560px; max-width: 94vw; }
+    .restore-sub {
+      font-size: 11px; color: var(--ink-muted);
+      margin: -10px 0 12px;
+    }
+    .restore-toolbar {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .restore-toolbar .rnav {
+      width: 26px; height: 26px; border-radius: var(--radius);
+      background: rgba(255,255,255,.04); border: 1px solid var(--line);
+      color: var(--ink-muted); cursor: pointer; font-size: 13px; line-height: 1;
+      flex-shrink: 0;
+    }
+    .restore-toolbar .rnav:hover { background: var(--accent-dim); color: var(--accent); }
+    .restore-toolbar .rmonth {
+      font-size: 12px; font-weight: 700; color: var(--ink);
+      min-width: 118px; text-align: center; text-transform: capitalize;
+    }
+    .restore-toolbar input[type="date"] {
+      background: rgba(255,255,255,.04); border: 1px solid var(--line);
+      color: var(--ink); border-radius: var(--radius); padding: 4px 6px;
+      font-family: var(--font-sans); font-size: 11px; color-scheme: dark;
+    }
+    .restore-toolbar .rghost {
+      font-size: 11px; padding: 4px 10px; border-radius: var(--radius);
+      background: rgba(255,255,255,.04); border: 1px solid var(--line);
+      color: var(--ink-muted); cursor: pointer; font-family: var(--font-sans);
+    }
+    .restore-toolbar .rghost:hover { background: var(--accent-dim); color: var(--accent); }
+    .restore-cal {
+      border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 8px 8px 6px; margin-bottom: 12px;
+    }
+    .restore-dow, .restore-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+    }
+    .restore-dow div {
+      text-align: center; font-size: 9.5px; color: var(--ink-muted);
+      text-transform: uppercase; letter-spacing: .04em; padding-bottom: 4px;
+    }
+    .restore-day {
+      position: relative; min-height: 26px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: var(--ink-muted);
+      border-radius: 4px; cursor: pointer; border: 1px solid transparent;
+    }
+    .restore-day:hover { background: rgba(255,255,255,.06); color: var(--ink); }
+    .restore-day.empty { visibility: hidden; }
+    .restore-day.today { border-color: rgba(var(--accent-rgb), .45); }
+    .restore-day.has { color: var(--ink); font-weight: 700; }
+    .restore-day.has::after {
+      content: ""; position: absolute; bottom: 3px; left: 50%;
+      transform: translateX(-50%);
+      width: 3px; height: 3px; border-radius: 50%; background: var(--accent);
+    }
+    .restore-day.sel {
+      background: var(--accent-dim); color: var(--accent);
+      border-color: rgba(var(--accent-rgb), .5);
+    }
+    .restore-day.sel::after { background: var(--accent); }
+    /* v0.7.2 — numero de backups no dia + chips dos meses com backup */
+    .restore-day .rd-n {
+      position: absolute; top: 1px; right: 2px;
+      font-size: 8px; line-height: 1; font-weight: 700;
+      color: var(--accent); opacity: .9;
+    }
+    .restore-months {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      margin: -2px 0 10px;
+    }
+    .restore-months .rmonth-chip {
+      font-size: 10px; padding: 3px 7px; border-radius: 999px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--line);
+      color: var(--ink-muted); cursor: pointer; font-family: var(--font-sans);
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .restore-months .rmonth-chip b { color: var(--ink); font-weight: 700; }
+    .restore-months .rmonth-chip:hover { background: var(--accent-dim); color: var(--accent); }
+    .restore-months .rmonth-chip.on {
+      border-color: rgba(var(--accent-rgb), .5); color: var(--accent);
+      background: var(--accent-dim);
+    }
+    .restore-daygroup.nodate { opacity: .75; }
+    .backup-item .b-main {
+      display: flex; flex-direction: column; gap: 2px;
+      min-width: 0; flex: 1;
+    }
+    .backup-item .b-time {
+      font-size: 12px; color: var(--ink); font-weight: 600;
+      display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+    }
+    .backup-item .b-meta {
+      font-size: 10px; color: var(--ink-muted);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .backup-item .b-badge {
+      font-size: 9px; padding: 1px 5px; border-radius: 3px;
+      border: 1px solid var(--line); color: var(--ink-muted);
+      font-weight: 500; text-transform: uppercase; letter-spacing: .03em;
+    }
+    .backup-item .b-badge.auto { color: var(--accent); border-color: rgba(var(--accent-rgb),.35); }
+    .backup-item .b-badge.bad { color: var(--amber); border-color: rgba(232,184,75,.35); }
+    /* v0.7.1 — botao de apagar o backup (menu "Restaurar") */
+    .backup-item .b-del {
+      background: transparent; border: 1px solid var(--line); border-radius: 4px;
+      color: var(--ink-muted); font-size: 11px; line-height: 1;
+      padding: 3px 5px; cursor: pointer; margin-right: 6px;
+      transition: color .12s, border-color .12s, background .12s;
+    }
+    .backup-item .b-del:hover {
+      color: #e05a5a; border-color: rgba(224,90,90,.45);
+      background: rgba(224,90,90,.08);
+    }
+    .restore-daygroup {
+      font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+      color: var(--ink-muted); padding: 8px 12px 4px;
+      background: rgba(255,255,255,.02); border-bottom: 1px solid var(--line);
+      position: sticky; top: 0; backdrop-filter: blur(2px);
+    }
     .modal-empty { padding:20px; text-align:center; font-size:12px; color:var(--ink-muted); }
     .modal-close {
       display: block; width: 100%; padding: 8px;
@@ -759,6 +976,88 @@ def create_wrapper_html(
     .footer-oc { color:var(--ink-muted); letter-spacing:.03em; }
     .footer-oc a { color:var(--ink-muted); text-decoration:none; }
     .footer-oc a:hover { color:var(--accent); }
+
+    /* ── v0.7.0: chave liga/desliga do AUTOSAVE (canto direito inferior) ── */
+    .autosave-switch {
+      display: inline-flex; align-items: center; gap: 7px;
+      cursor: pointer; user-select: none;
+      font-size: 11px; color: var(--ink-muted);
+      letter-spacing: .03em;
+    }
+    .autosave-switch input { position:absolute; opacity:0; width:0; height:0; }
+    .autosave-track {
+      position: relative; display:inline-block;
+      width: 30px; height: 16px; flex-shrink:0;
+      background: rgba(var(--accent-rgb),.14);
+      border: 1px solid rgba(var(--accent-rgb),.28);
+      border-radius: 999px;
+      transition: background .18s, border-color .18s;
+    }
+    .autosave-knob {
+      position: absolute; top: 1px; left: 1px;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: rgba(var(--accent-rgb),.55);
+      transition: transform .18s, background .18s;
+    }
+    .autosave-switch input:checked + .autosave-track {
+      background: rgba(var(--accent-rgb),.42);
+      border-color: rgba(var(--accent-rgb),.6);
+    }
+    .autosave-switch input:checked + .autosave-track .autosave-knob {
+      transform: translateX(14px);
+      background: var(--accent);
+    }
+    .autosave-switch input:focus-visible + .autosave-track {
+      box-shadow: 0 0 0 2px rgba(var(--accent-rgb),.25);
+    }
+    .autosave-switch.on .autosave-label { color: var(--accent); }
+    .autosave-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent); display: inline-block;
+      opacity: 0; transition: opacity .2s;
+    }
+    .autosave-switch.on .autosave-dot { opacity: 1; }
+
+    /* ── v0.7.0: modal de retomada do autosave ── */
+    #autosave-overlay {
+      position: fixed; inset: 0;
+      background: var(--ov-dim);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 99999; opacity: 0; pointer-events: none;
+      transition: opacity .2s;
+    }
+    #autosave-overlay.open { opacity: 1; pointer-events: all; }
+    #autosave-modal {
+      background: var(--rail); border: 1px solid var(--line);
+      border-radius: 8px; padding: 22px; width: 420px; max-width: 92vw;
+      box-shadow: 0 24px 64px rgba(0,0,0,.6);
+    }
+    #autosave-modal .as-title {
+      font-family: "Syne", sans-serif; font-weight: 700;
+      font-size: 14px; color: var(--ink); margin: 0 0 10px;
+    }
+    #autosave-modal .as-when {
+      font-size: 11.5px; color: var(--accent); margin: 0 0 6px;
+    }
+    #autosave-modal .as-text {
+      font-size: 11.5px; color: var(--ink-muted);
+      line-height: 1.6; margin: 0 0 18px;
+    }
+    #autosave-modal .as-actions { display:flex; gap:8px; justify-content:flex-end; }
+    #autosave-modal .as-btn {
+      padding: 7px 14px; font-size: 11.5px; cursor: pointer;
+      border-radius: var(--radius); font-family: var(--font-sans);
+      border: 1px solid var(--line); background: transparent;
+      color: var(--ink-muted);
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    #autosave-modal .as-btn:hover { color: var(--ink); border-color: rgba(var(--accent-rgb),.4); }
+    #autosave-modal .as-btn.primary {
+      background: rgba(var(--accent-rgb),.16);
+      border-color: rgba(var(--accent-rgb),.45);
+      color: var(--accent);
+    }
+    #autosave-modal .as-btn.primary:hover { background: rgba(var(--accent-rgb),.26); }
 
     .btn-provider {
       display: inline-flex; align-items: center; gap: 5px;
@@ -966,7 +1265,9 @@ def create_wrapper_html(
     <button class="modal-close" onclick="openAgents(); toggleMobileMenu();">📋 <span data-i18n="agents.title">Diretrizes do Agente</span></button>
     <button class="modal-close" onclick="openMemory(); toggleMobileMenu();">🧠 <span data-i18n="memory.title">Memória UFVAI</span></button>
     <button class="modal-close" onclick="toggleTheme(); toggleMobileMenu();">◑ <span data-i18n="theme.toggle">Alternar Tema</span></button>
-    <button class="modal-close" onclick="toggleLangMenu();">🌐 <span data-i18n="languages.label">Idioma</span></button>
+    <!-- v0.6.25: item "Idioma" REMOVIDO do drawer — o seletor .lang-btn da
+         topbar continua visível no mobile (a media query ≤767px esconde
+         apenas .tb-btn), então o botão aqui era redundante. -->
   </div>
 
   <!-- Dropdown de idioma (NOVO em v0.4.1) -->
@@ -1020,6 +1321,18 @@ def create_wrapper_html(
     <span class="footer-sep"></span>
 
     <div class="footer-right">
+      <!-- v0.7.0: chave liga/desliga do AUTOSAVE (a cada 3 min, no Drive) -->
+      <label class="autosave-switch" id="autosave-switch" title="Salvar automaticamente a sessão a cada 3 minutos no Google Drive — ligado por padrão (desligue aqui se não quiser)">
+        <input type="checkbox" id="autosave-toggle" onchange="toggleAutosave(this.checked)">
+        <span class="autosave-track"><span class="autosave-knob"></span></span>
+        <span class="autosave-dot"></span>
+        <span class="autosave-label" data-i18n="autosave.title">Autosave</span>
+      </label>
+      <!-- v0.7.2: reabrir a pergunta de retomada sob demanda (a pergunta
+           automatica e oferecida UMA VEZ por aba; este botao reoferece). -->
+      <button class="btn-provider" onclick="reofferAutosaveResume()"
+              title="Retomar a última sessão salva" data-i18n-title="autosave.resume.again">↻</button>
+      <span class="footer-sep"></span>
       <button class="btn-provider" onclick="connectProvider()" title="Conectar novo provedor de IA">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
         <span data-i18n="providers.title">+ provedor</span>
@@ -1050,6 +1363,24 @@ def create_wrapper_html(
 
   <!-- v0.6.20 — tela "Ambiente desconectado" (após SIM, SAIR) — visual igual à
        tela de Termos recusados; fica visível quando o runtime é desconectado -->
+  <!-- v0.7.0 — Modal de RETOMADA: ao reabrir com autosave valido, pergunta
+       se o usuario continua do ultimo autosave (mostrando data/hora) ou
+       inicia uma nova sessao. A pergunta nao bloqueia: sem resposta,
+       abre-se uma sessao nova. -->
+  <div id="autosave-overlay" onclick="if(event.target===this)autosaveResumeNew()">
+    <div id="autosave-modal" role="dialog" aria-modal="true" aria-labelledby="autosave-title">
+      <div class="as-title" id="autosave-title">💾 <span data-i18n="autosave.resume.title">Retomar sessão</span></div>
+      <p class="as-when" id="autosave-when"></p>
+      <p class="as-text" data-i18n="autosave.resume.text">Há um salvamento automático. Deseja continuar a partir dele ou iniciar uma nova sessão?</p>
+      <div class="as-actions">
+        <button class="as-btn" onclick="autosaveResumeNew()" data-i18n="autosave.resume.new">Nova sessão</button>
+        <button class="as-btn primary" onclick="autosaveResumeContinue()" data-i18n="autosave.resume.continue">Continuar de onde parei</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- v0.6.20 — tela "Ambiente desconectado" (após SIM, SAIR) — visual igual à
+       tela de Termos recusados; fica visível quando o runtime é desconectado -->
   <div id="exit-overlay">
     <div class="t-card">
       <div class="t-brand"><b>UFV</b><em>AI</em></div>
@@ -1061,8 +1392,35 @@ def create_wrapper_html(
   </div>
 
   <div id="modal-overlay" onclick="if(event.target===this)closeModal()">
-    <div id="modal">
+    <div id="modal" class="restore-modal">
       <div class="modal-title">🔄 <span data-i18n="ui.restore">Restaurar Sessão</span></div>
+      <div class="restore-sub" id="restore-summary"></div>
+
+      <!-- v0.7.0: navegacao por mes + filtro por data -->
+      <div class="restore-toolbar">
+        <button class="rnav" onclick="restorePrevMonth()" title="Mês anterior" data-i18n-title="restore.prev">‹</button>
+        <span class="rmonth" id="restore-month-label"></span>
+        <button class="rnav" onclick="restoreNextMonth()" title="Próximo mês" data-i18n-title="restore.next">›</button>
+        <input type="date" id="restore-date" onchange="restoreSetDate(this.value)"
+               title="Filtrar por data" data-i18n-title="restore.filter" aria-label="Filtrar por data">
+        <button class="rghost" onclick="restoreClearDate()" data-i18n="restore.all_dates">Todas as datas</button>
+        <button class="rghost" onclick="restoreToday()" data-i18n="restore.today">Hoje</button>
+        <button class="rghost" onclick="restoreGoNewest()" data-i18n="restore.newest"
+                title="Ir para o backup mais recente" data-i18n-title="restore.newest">Mais recente</button>
+      </div>
+
+      <!-- v0.7.2: meses que TEM backup (chips). Sem isso o calendario
+           abria no mes atual (quase vazio) e as datas ficavam
+           "escondidas" atras das setas — a impressao de "faltaram datas". -->
+      <div class="restore-months" id="restore-months"></div>
+
+      <!-- v0.7.0: calendario (dias com backup sao marcados) -->
+      <div class="restore-cal">
+        <div class="restore-dow" id="restore-dow"></div>
+        <div class="restore-grid" id="restore-grid"></div>
+      </div>
+
+      <!-- v0.7.0: lista dos backups (somente backups de sessao) -->
       <div class="backup-list" id="backup-list">
         <div class="modal-empty" data-i18n="ui.loading">Carregando backups…</div>
       </div>
@@ -1205,7 +1563,11 @@ def create_wrapper_html(
       </div>
 
       <!-- Split view: lista (esq) + editor (dir) -->
-      <div style="flex:1;display:flex;min-height:0;">
+      <!-- v0.6.25: id no container — sem ele o CSS mobile não consegue
+           empilhar a lista sobre o editor (o pai ficava em flex ROW,
+           a sidebar com width:100% tomava a linha inteira e o pane da
+           NOTA saía da tela). -->
+      <div id="memory-body" style="flex:1;display:flex;min-height:0;">
         <!-- Coluna esquerda: busca + lista -->
         <div id="memory-sidebar" style="width:300px;border-right:1px solid var(--line);display:flex;flex-direction:column;background:rgba(0,0,0,.18);">
           <div style="padding:10px 12px;border-bottom:1px solid var(--line);">
@@ -1480,6 +1842,14 @@ def create_wrapper_html(
       // 7. Persiste
       setCookie(LANG_COOKIE, lang);
       try { localStorage.setItem(LANG_COOKIE, lang); } catch (e) {}
+      // 8. v0.7.0: redesenha o modal "Restaurar" (calendario + lista) no
+      //    novo idioma, se ele estiver aberto.
+      try {
+        const overlay = document.getElementById("modal-overlay");
+        if (overlay && overlay.classList.contains("open") && typeof renderRestore === "function") {
+          renderRestore();
+        }
+      } catch (e) {}
     }
 
     async function setLang(lang) {
@@ -1602,26 +1972,371 @@ def create_wrapper_html(
       }
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // v0.7.0 — "Restaurar": SOMENTE backups, com CALENDARIO e FILTRO
+    // por data. Antes, o modal listava todos os .json da pasta de
+    // backups (incluindo chaves e consentimentos, que nao sao backup).
+    // ─────────────────────────────────────────────────────────────────
+    let _restoreItems = [];      // backups (objetos) vindos de /api/backups
+    let _restoreDate = "";       // "YYYY-MM-DD" selecionado ("" = todas)
+    let _restoreMonth = null;    // {y, m} — mes exibido no calendario
+
+    function restoreDict() {
+      return I18N[_currentLang] || I18N["pt_BR"] || {};
+    }
+
+    function restoreLocale() {
+      return ({ pt_BR: "pt-BR", en_US: "en-US", es_ES: "es-ES",
+                fr_FR: "fr-FR", zh_CN: "zh-CN" })[_currentLang] || "pt-BR";
+    }
+
+    function restorePad(n) { return String(n).padStart(2, "0"); }
+
+    function restoreDateKey(d) {
+      return d.getFullYear() + "-" + restorePad(d.getMonth() + 1) + "-" + restorePad(d.getDate());
+    }
+
+    /** Grade do mes (semanas de 7) — 1a linha = segunda-feira. */
+    function restoreBuildGrid(year, month) {
+      const first = new Date(year, month, 1);
+      const startDow = (first.getDay() + 6) % 7;     // 0 = segunda
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const cells = [];
+      for (let i = 0; i < startDow; i++) cells.push(null);
+      for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+      while (cells.length % 7 !== 0) cells.push(null);
+      const weeks = [];
+      for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+      return weeks;
+    }
+
+    /** Quantidade de backups por data ("YYYY-MM-DD"). */
+    function restoreDayCounts(items) {
+      const counts = {};
+      (items || []).forEach(function (it) {
+        if (!it || !it.date) return;
+        counts[it.date] = (counts[it.date] || 0) + 1;
+      });
+      return counts;
+    }
+
+    /** Normaliza um item vindo da API: aceita objeto (v0.7.0) ou nome (legado).
+     *  No formato antigo (apenas o nome do arquivo) a data/hora sao lidas do
+     *  proprio nome: backup_ses_<id>_<HH-MM-SS>_<DD-MM-YYYY>.json */
+    function restoreItemFromName(name) {
+      const item = {
+        file: name, kind: "backup", session_id: "", date: "", time: "",
+        datetime: "", size: 0, size_h: "", title: "", valid: true,
+      };
+      const m = /^backup_ses_([0-9A-Za-z]{3,40})_(\\d{2})-(\\d{2})-(\\d{2})_(\\d{2})-(\\d{2})-(\\d{4})\\.json$/.exec(name);
+      if (m) {
+        item.session_id = m[1];
+        item.time = m[2] + ":" + m[3] + ":" + m[4];
+        item.date = m[7] + "-" + m[6] + "-" + m[5];
+        item.datetime = item.date + "T" + item.time;
+        return item;
+      }
+      const a = /^(?:autosave\\/)?autosave_(\\d+)\\.json$/.exec(name);
+      if (a) item.kind = "autosave";
+      return item;
+    }
+
+    /** Deriva "date"/"time" de um item que nao os traz. */
+    function restoreFillDates(it) {
+      if (!it || typeof it !== "object") return it;
+      if (!it.date) {
+        const iso = String(it.datetime || it.saved_at_iso || "");
+        const m = /^(\\d{4})-(\\d{2})-(\\d{2})/.exec(iso);
+        if (m) it.date = m[1] + "-" + m[2] + "-" + m[3];
+        else {
+          const ts = Number(it.timestamp || it.saved_at || 0);
+          if (ts > 0) {
+            const d = new Date(ts * 1000);
+            if (!isNaN(d.getTime())) it.date = restoreDateKey(d);
+          }
+        }
+      }
+      if (!it.time) {
+        const m2 = /T(\\d{2}:\\d{2}:\\d{2})/.exec(String(it.datetime || ""));
+        if (m2) it.time = m2[1];
+        else if (it.date && Number(it.timestamp || it.saved_at || 0) > 0) {
+          const d = new Date(Number(it.timestamp || it.saved_at) * 1000);
+          if (!isNaN(d.getTime())) it.time = restorePad(d.getHours()) + ":" + restorePad(d.getMinutes()) + ":" + restorePad(d.getSeconds());
+        }
+      }
+      return it;
+    }
+
+    function restoreNormalizeItems(raw) {
+      return (raw || []).map(function (it) {
+        if (typeof it === "string") return restoreFillDates(restoreItemFromName(it));
+        // v0.7.2: sem "date", o item nao entrava na contagem do calendario
+        // e sumia do filtro por data (parecia que faltavam datas).
+        return restoreFillDates(it);
+      });
+    }
+
+    /** Filtro por data (vazio = todas as datas). */
+    function restoreFilterByDate(items, date) {
+      if (!date) return (items || []).slice();
+      return (items || []).filter(function (it) {
+        if (!it) return false;
+        // v0.7.2: item sem data nao pode sumir do filtro.
+        if (!it.date) return true;
+        return it.date === date;
+      });
+    }
+
+    function restoreFormatDate(dateKey) {
+      if (!dateKey) return "—";
+      try {
+        const d = new Date(dateKey + "T00:00:00");
+        if (isNaN(d.getTime())) return dateKey;
+        return d.toLocaleDateString(restoreLocale(),
+          { day: "2-digit", month: "short", year: "numeric" });
+      } catch (e) {
+        return dateKey;
+      }
+    }
+
+    function restoreItemHtml(it, dict) {
+      const badge = it.kind === "autosave"
+        ? '<span class="b-badge auto">' + escapeHtml(dict["restore.autosave"] || "Autossave") + "</span>"
+        : "";
+      const bad = (it.valid === false)
+        ? '<span class="b-badge bad">' + escapeHtml(dict["restore.invalid"] || "corrompido") + "</span>"
+        : "";
+      const title = it.title || it.session_id || it.file;
+      // v0.7.1 — botao de APAGAR o backup (com confirmacao no backend).
+      // O nome vai em data-file (nao em JS inline) para nao quebrar as
+      // aspas; o onclick para a propagacao para nao disparar o restaurar.
+      const delLabel = escapeHtml(dict["restore.delete"] || "apagar");
+      return `<div class="backup-item" onclick="doRestore('${escapeHtml(it.file)}')">` +
+        '<div class="b-main">' +
+          '<span class="b-time">' + escapeHtml(it.time || "") + badge + bad + "</span>" +
+          '<span class="b-meta">' + escapeHtml(title) +
+            (it.size_h ? " · " + escapeHtml(it.size_h) : "") + "</span>" +
+        "</div>" +
+        '<button class="b-del" type="button" data-file="' + escapeHtml(it.file) + '"' +
+          ' title="' + delLabel + '" aria-label="' + delLabel + '"' +
+          ' onclick="event.stopPropagation(); doDeleteBackup(this.dataset.file)">🗑</button>' +
+        '<span class="restore-lbl">' + escapeHtml(dict["ui.restore"] || "restaurar") + "</span>" +
+      "</div>";
+    }
+
+    /** Desenha calendario + lista conforme o filtro atual. */
+    function renderRestore() {
+      const dict = restoreDict();
+      const grid = document.getElementById("restore-grid");
+      const dow = document.getElementById("restore-dow");
+      const label = document.getElementById("restore-month-label");
+      const list = document.getElementById("backup-list");
+      const summary = document.getElementById("restore-summary");
+      const dateInput = document.getElementById("restore-date");
+      if (!grid || !list) return;
+
+      if (!_restoreMonth) {
+        const now = new Date();
+        _restoreMonth = { y: now.getFullYear(), m: now.getMonth() };
+      }
+      if (dateInput && dateInput.value !== _restoreDate) dateInput.value = _restoreDate;
+
+      const counts = restoreDayCounts(_restoreItems);
+
+      // cabecalho: dias da semana (i18n)
+      if (dow) {
+        let html = "";
+        for (let i = 0; i < 7; i++) html += "<div>" + escapeHtml(dict["restore.dow." + i] || "") + "</div>";
+        dow.innerHTML = html;
+      }
+
+      // rotulo do mes
+      if (label) {
+        try {
+          label.textContent = new Date(_restoreMonth.y, _restoreMonth.m, 1)
+            .toLocaleDateString(restoreLocale(), { year: "numeric", month: "long" });
+        } catch (e) {
+          label.textContent = _restoreMonth.y + "-" + restorePad(_restoreMonth.m + 1);
+        }
+      }
+
+      // v0.7.2 — chips dos meses que TEM backup (clica para navegar).
+      // Sem isso, o calendario abre no mes atual (quase vazio) e o
+      // usuario conclui que "faltaram datas".
+      const monthsEl = document.getElementById("restore-months");
+      if (monthsEl) {
+        const byMonth = {};
+        (_restoreItems || []).forEach(function (it) {
+          if (!it || !it.date) return;
+          const mk = String(it.date).slice(0, 7);
+          byMonth[mk] = (byMonth[mk] || 0) + 1;
+        });
+        const mkeys = Object.keys(byMonth).sort().reverse();
+        if (!mkeys.length) {
+          monthsEl.innerHTML = "";
+        } else {
+          monthsEl.innerHTML = mkeys.map(function (mk) {
+            const parts = mk.split("-");
+            const y = Number(parts[0]), mi = Number(parts[1]) - 1;
+            let label = mk;
+            try {
+              label = new Date(y, mi, 1)
+                .toLocaleDateString(restoreLocale(), { year: "2-digit", month: "short" });
+            } catch (e) { label = mk; }
+            const cur = (_restoreMonth.y === y && _restoreMonth.m === mi);
+            const tip = (dict["restore.month_tip"] || "{n} backups em {m}")
+              .replace("{n}", byMonth[mk]).replace("{m}", label);
+            return '<button type="button" class="rmonth-chip' + (cur ? " on" : "") + '"' +
+              ' onclick="restoreGoMonth(' + y + "," + mi + ')"' +
+              ' title="' + escapeHtml(tip) + '">' + escapeHtml(label) +
+              " <b>" + byMonth[mk] + "</b></button>";
+          }).join("");
+        }
+      }
+
+      // grade do calendario
+      const weeks = restoreBuildGrid(_restoreMonth.y, _restoreMonth.m);
+      const todayKey = restoreDateKey(new Date());
+      const prefix = _restoreMonth.y + "-" + restorePad(_restoreMonth.m + 1) + "-";
+      grid.innerHTML = weeks.map(function (week) {
+        return week.map(function (day) {
+          if (!day) return '<div class="restore-day empty"></div>';
+          const key = prefix + restorePad(day);
+          const n = counts[key] || 0;
+          const cls = ["restore-day"];
+          if (n) cls.push("has");
+          if (key === todayKey) cls.push("today");
+          if (key === _restoreDate) cls.push("sel");
+          // v0.7.2: tooltip correto (antes era "3)") + numero de backups.
+          const tip = n ? ' title="' + escapeHtml((dict["restore.day_tip"] || "{n} backups").replace("{n}", n)) + '"' : "";
+          return `<div class="${cls.join(" ")}" onclick="restorePickDate('${key}')"` + tip +
+                 ">" + day + (n ? '<span class="rd-n">' + n + "</span>" : "") + "</div>";
+        }).join("");
+      }).join("");
+
+      // resumo
+      if (summary) {
+        const total = _restoreItems.length;
+        const shown = restoreFilterByDate(_restoreItems, _restoreDate).length;
+        summary.textContent = _restoreDate
+          ? (dict["restore.summary_filtered"] || "{shown} de {total} backups")
+              .replace("{shown}", shown).replace("{total}", total)
+          : (dict["restore.count"] || "{total} backups").replace("{total}", total);
+      }
+
+      // lista
+      const filtered = restoreFilterByDate(_restoreItems, _restoreDate);
+      if (!_restoreItems.length) {
+        list.innerHTML = '<div class="modal-empty">' +
+          escapeHtml(dict["restore.empty"] || "Nenhum backup encontrado.") + "</div>";
+        return;
+      }
+      if (!filtered.length) {
+        // v0.7.2: estado vazio ACCIONAVEL — oferece "Todas as datas"
+        // (antes ficava um beco sem saida: "Nenhum backup nesta data").
+        list.innerHTML = '<div class="modal-empty">' +
+          escapeHtml(dict["restore.empty_date"] || "Nenhum backup nesta data.") +
+          ' <button class="rghost" onclick="restoreClearDate()">' +
+          escapeHtml(dict["restore.all_dates"] || "Todas as datas") + "</button></div>";
+        return;
+      }
+      const byDate = {};
+      filtered.forEach(function (it) {
+        const key = it.date || "__nodate__";
+        (byDate[key] = byDate[key] || []).push(it);
+      });
+      let html = "";
+      // v0.7.2: datas em ordem decrescente; "sem data" sempre por ultimo.
+      Object.keys(byDate).sort(function (a, b) {
+        if (a === "__nodate__") return 1;
+        if (b === "__nodate__") return -1;
+        return a < b ? 1 : (a > b ? -1 : 0);
+      }).forEach(function (date) {
+        const noDate = (date === "__nodate__");
+        html += '<div class="restore-daygroup' + (noDate ? " nodate" : "") + '">' +
+          escapeHtml(noDate ? (dict["restore.nodate"] || "sem data") : restoreFormatDate(date)) + "</div>";
+        byDate[date].forEach(function (it) { html += restoreItemHtml(it, dict); });
+      });
+      list.innerHTML = html;
+    }
+
+    function restorePickDate(key) {
+      _restoreDate = (_restoreDate === key) ? "" : key;   // clique de novo = desmarcar
+      if (_restoreDate) {
+        const parts = _restoreDate.split("-");
+        _restoreMonth = { y: parseInt(parts[0], 10), m: parseInt(parts[1], 10) - 1 };
+      }
+      renderRestore();
+    }
+
+    function restoreSetDate(value) {
+      _restoreDate = value || "";
+      if (_restoreDate) {
+        const parts = _restoreDate.split("-");
+        _restoreMonth = { y: parseInt(parts[0], 10), m: parseInt(parts[1], 10) - 1 };
+      }
+      renderRestore();
+    }
+
+    function restoreClearDate() {
+      _restoreDate = "";
+      renderRestore();
+    }
+
+    function restoreToday() {
+      const now = new Date();
+      _restoreDate = restoreDateKey(now);
+      _restoreMonth = { y: now.getFullYear(), m: now.getMonth() };
+      renderRestore();
+    }
+
+    function restoreShiftMonth(delta) {
+      if (!_restoreMonth) { const now = new Date(); _restoreMonth = { y: now.getFullYear(), m: now.getMonth() }; }
+      const d = new Date(_restoreMonth.y, _restoreMonth.m + delta, 1);
+      _restoreMonth = { y: d.getFullYear(), m: d.getMonth() };
+      renderRestore();
+    }
+
+    function restorePrevMonth() { restoreShiftMonth(-1); }
+    function restoreNextMonth() { restoreShiftMonth(1); }
+
+    /** v0.7.2 — vai para um mes especifico (chips de meses com backup). */
+    function restoreGoMonth(y, m) {
+      _restoreMonth = { y: Number(y), m: Number(m) };
+      renderRestore();
+    }
+
+    /** v0.7.2 — vai para o mes do backup mais recente (sem filtrar data). */
+    function restoreGoNewest() {
+      if (!_restoreItems.length) return;
+      const newest = _restoreItems[0];
+      const parts = String(newest.date || "").split("-");
+      if (parts.length === 3) {
+        _restoreMonth = { y: parseInt(parts[0], 10), m: parseInt(parts[1], 10) - 1 };
+      }
+      _restoreDate = "";
+      renderRestore();
+    }
+
     async function openRestore() {
       document.getElementById("modal-overlay").classList.add("open");
       const list = document.getElementById("backup-list");
-      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const dict = restoreDict();
       list.innerHTML = '<div class="modal-empty">' + (dict["ui.loading"] || "Carregando…") + '</div>';
       try {
         const r = await fetch(BASE + "/api/backups");
         const d = await r.json();
-        if (!d.backups || d.backups.length === 0) {
-          list.innerHTML = '<div class="modal-empty">Nenhum backup encontrado no Drive.</div>';
-          return;
+        _restoreItems = restoreNormalizeItems(d && d.backups);
+        // abre no mes do backup mais recente (ou hoje, se nao houver)
+        if (_restoreItems.length) {
+          const newest = _restoreItems[0];
+          const parts = String(newest.date || "").split("-");
+          if (parts.length === 3) _restoreMonth = { y: parseInt(parts[0], 10), m: parseInt(parts[1], 10) - 1 };
         }
-        list.innerHTML = d.backups.map(f => `
-          <div class="backup-item" onclick="doRestore('${f}')">
-            <span>${f}</span>
-            <span class="restore-lbl">${dict["ui.restore"] || "restaurar"}</span>
-          </div>
-        `).join("");
+        renderRestore();
       } catch(e) {
-        list.innerHTML = '<div class="modal-empty">Erro ao carregar backups.</div>';
+        list.innerHTML = '<div class="modal-empty">' +
+          escapeHtml(dict["restore.error"] || "Erro ao carregar os backups.") + "</div>";
       }
     }
 
@@ -1698,11 +2413,20 @@ def create_wrapper_html(
     }
 
     async function doRestore(file) {
-      const dict = I18N[_currentLang] || I18N["pt_BR"];
+      const dict = restoreDict();
+      // v0.7.0: a confirmacao mostra data/hora do backup (o que o usuario
+      // ve no calendario), e nao o nome cru do arquivo.
+      let when = file;
+      try {
+        const item = (_restoreItems || []).find(function (it) { return it.file === file; });
+        if (item) when = restoreFormatDate(item.date) + " " + (item.time || "");
+      } catch (e) {}
       // 🔔 CORREÇÃO v0.5.1.8: confirma antes de restaurar backup
-      pesquisaiConfirm((dict["ui.restore"] || "Restaurar") + " " + file + "?", async function() {
+      const question = (dict["restore.confirm"] || "Restaurar o backup de {when}?")
+        .replace("{when}", when);
+      pesquisaiConfirm(question, async function() {
         closeModal();
-        toast("⏳ Importando " + file + "…", "info");
+        toast("⏳ " + ((dict["restore.restoring"] || "Restaurando {when}…").replace("{when}", when)), "info");
         try {
           const r = await fetch(BASE + "/api/restore", {
             method: "POST",
@@ -1728,6 +2452,57 @@ def create_wrapper_html(
           toast("❌ Falha: " + e.message, "err");
         }
       });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // v0.7.1 — APAGAR backup/autosave pelo menu "Restaurar".
+    // Confirmacao OBRIGATORIA (dialogo do app + "confirm": true no
+    // backend); depois de apagar, a lista e' recarregada.
+    // ═══════════════════════════════════════════════════════════
+    async function doDeleteBackup(file) {
+      if (!file) return;
+      const dict = restoreDict();
+      // data/hora do item (o que o usuario ve no calendario)
+      let when = file;
+      try {
+        const item = (_restoreItems || []).find(function (it) { return it.file === file; });
+        if (item) when = restoreFormatDate(item.date) + " " + (item.time || "");
+      } catch (e) {}
+      const question = (dict["restore.delete_confirm"] ||
+        "Apagar o backup de {when}? Esta ação não pode ser desfeita.")
+        .replace("{when}", when);
+      // a confirmacao do app e' OBRIGATORIA; o backend exige "confirm": true
+      pesquisaiConfirm(question, async function() {
+        toast("🗑 " + ((dict["restore.deleting"] || "Apagando {when}…")
+          .replace("{when}", when)), "info");
+        try {
+          const r = await fetch(BASE + "/api/backup/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ file: file, confirm: true })
+          });
+          const d = await r.json();
+          if (d && d.ok) {
+            toast("✅ " + (dict["restore.deleted"] || "Backup apagado."), "ok");
+            await refreshRestoreList();
+          } else {
+            toast("❌ " + ((d && d.error) || (dict["restore.delete_failed"] ||
+              "Falha ao apagar o backup.")), "err");
+          }
+        } catch (e) {
+          toast("❌ " + e.message, "err");
+        }
+      });
+    }
+
+    /** Recarrega a lista de backups (usada apos apagar um). */
+    async function refreshRestoreList() {
+      try {
+        const r = await fetch(BASE + "/api/backups");
+        const d = await r.json();
+        _restoreItems = restoreNormalizeItems(d && d.backups);
+        renderRestore();
+      } catch (e) { /* silencioso: a lista fica como estava */ }
     }
 
     const PROVIDERS = [
@@ -2215,6 +2990,10 @@ def create_wrapper_html(
         });
         const d = await r.json();
         if (r.ok) {
+          // v0.7.2: um restore feito pelo menu tambem conta como
+          // "retomada ja oferecida" — senao a pergunta de retomada
+          // reapareceria depois do reload (virando loop).
+          markAutosaveResumeOffered();
           // Invalida cache para que a próxima abertura mostre a sessão atual
           _sessionsCache = { data: null, ts: 0 };
           toast("✅ Sessão " + sessionId + " restaurada! Recarregando página…", "ok");
@@ -3516,11 +4295,246 @@ def create_wrapper_html(
       }
     });
 
+    // ══════════════════════════════════════════════════════════
+    // v0.7.0 — AUTOSAVE: chave liga/desliga, timer e pergunta de
+    // retomada (com data/hora, no idioma do usuário).
+    // v0.7.3: o intervalo caiu de 3 min para 1 min.
+    // ══════════════════════════════════════════════════════════
+    const AUTOSAVE_INTERVAL_MS = 60000;       // v0.7.3: 1 minuto
+    const AUTOSAVE_KEY = "ufvai_autosave_enabled";
+    let _autosaveTimer = null;
+    let _autosaveBusy = false;
+    let _autosaveLatest = null;               // autosave valido mais recente
+    let _autosaveList = [];                   // v0.7.1: todos os autosaves validos (fallback)
+
+    function autosaveDict() {
+      return I18N[_currentLang] || I18N["pt_BR"];
+    }
+
+    function autosaveEnabled() {
+      // v0.7.0 — LIGADO POR PADRAO. O autosave só fica desligado se o
+      // usuario desligar explicitamente (chave "0" no localStorage).
+      // Ausencia de preferencia => ligado.
+      try {
+        const saved = localStorage.getItem(AUTOSAVE_KEY);
+        return !(saved === "0" || saved === "false");
+      } catch (e) { return true; }
+    }
+
+    function setAutosaveUI(on) {
+      const box = document.getElementById("autosave-toggle");
+      const sw = document.getElementById("autosave-switch");
+      if (box) box.checked = !!on;
+      if (sw) sw.classList.toggle("on", !!on);
+    }
+
+    function toggleAutosave(on) {
+      try { localStorage.setItem(AUTOSAVE_KEY, on ? "1" : "0"); } catch (e) {}
+      setAutosaveUI(on);
+      if (on) {
+        startAutosaveTimer();
+        // Grava um autosave logo ao ligar (não espera o intervalo)
+        autosaveTick(true);
+      } else {
+        stopAutosaveTimer();
+        toast(autosaveDict()["autosave.off_msg"] || "Autosave desligado", "info");
+      }
+    }
+
+    function startAutosaveTimer() {
+      stopAutosaveTimer();
+      _autosaveTimer = setInterval(() => autosaveTick(false), AUTOSAVE_INTERVAL_MS);
+    }
+
+    function stopAutosaveTimer() {
+      if (_autosaveTimer) { clearInterval(_autosaveTimer); _autosaveTimer = null; }
+    }
+
+    async function autosaveTick(silent) {
+      if (_autosaveBusy) return;
+      if (!autosaveEnabled() && !silent) return;
+      _autosaveBusy = true;
+      try {
+        const r = await fetch(BASE + "/api/autosave", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({})
+        });
+        const d = await r.json();
+        if (d && d.ok) {
+          _autosaveLatest = d;
+          if (!silent) {
+            // v0.7.1: quando o conteudo e' identico ao do ultimo autosave,
+            // o backend NAO grava outro arquivo (3 slots = 3 versoes
+            // distintas). A interface diz isso explicitamente para o
+            // usuario nao achar que o autosave falhou.
+            if (d.skipped) {
+              toast((autosaveDict()["autosave.unchanged"] ||
+                "Sem novidades — o autosave mais recente já é o atual."), "info");
+            } else {
+              toast((autosaveDict()["autosave.saved"] || "Sessão salva no Drive"), "ok");
+            }
+          }
+        } else if (!silent) {
+          toast("❌ " + ((d && d.error) || "Falha no autosave"), "err");
+        }
+      } catch (e) {
+        if (!silent) toast("❌ " + e.message, "err");
+      } finally {
+        _autosaveBusy = false;
+      }
+    }
+
+    // ── v0.7.3 — a pergunta de retomada: UMA VEZ na entrada, sem loop ──
+    // BUG (v0.7.1): "Continuar de onde parei" fazia location.reload()
+    // -> a página recarregava -> checkAutosaveResume() oferecia a
+    // pergunta DE NOVO -> o usuário clicava de novo -> LOOP INFINITO.
+    // BUG (v0.7.2): a flag "oferecida" ficava no sessionStorage da aba
+    // para sempre -> QUALQUER recarga posterior (mesmo um F5 do autor)
+    // nunca mais perguntava -> o autor entrou e a pergunta NAO
+    // apareceu ("deve pedir uma vez sem loop").
+    // v0.7.3 — estado em sessionStorage:
+    //   "restored" -> pula a carga seguinte (o reload do restore) e
+    //                 CONSOME o estado (a proxima entrada pergunta);
+    //   "new"      -> o usuário escolheu "Nova sessão": não pergunta
+    //                 de novo nesta aba;
+    //   (vazio)    -> entrada normal: PERGUNTA (uma vez).
+    // O menu "Restaurar" (calendário) continua disponível sempre.
+    const AUTOSAVE_RESUME_STATE = "ufvai_autosave_resume_state";
+
+    function autosaveResumeState() {
+      try { return sessionStorage.getItem(AUTOSAVE_RESUME_STATE) || ""; }
+      catch (e) { return ""; }
+    }
+
+    function setAutosaveResumeState(value) {
+      try {
+        if (value) sessionStorage.setItem(AUTOSAVE_RESUME_STATE, value);
+        else sessionStorage.removeItem(AUTOSAVE_RESUME_STATE);
+      } catch (e) {}
+    }
+
+    /** v0.7.3 — reabrir a pergunta de retomada sob demanda (botão ↻). */
+    async function reofferAutosaveResume() {
+      setAutosaveResumeState("");
+      await checkAutosaveResume();
+    }
+
+    /** Mostra a pergunta de retomada (data/hora do último autosave). */
+    function showAutosaveResume(item) {
+      const overlay = document.getElementById("autosave-overlay");
+      const when = document.getElementById("autosave-when");
+      if (!overlay) return;
+      // v0.7.3: a oferta NAO marca nada — quem decide se a proxima
+      // entrada pergunta e' a resposta do usuario (restored/new) ou o
+      // fim da aba. Marcar na oferta impedia a pergunta de voltar
+      // (bug v0.7.2: "não perguntou quando entrei").
+      if (when) {
+        const stamp = item.saved_at_local || item.saved_at_iso || "";
+        when.textContent = (autosaveDict()["autosave.resume.when"] || "Autosave de") + " " + stamp;
+      }
+      overlay.classList.add("open");
+    }
+
+    function closeAutosaveResume() {
+      const overlay = document.getElementById("autosave-overlay");
+      if (overlay) overlay.classList.remove("open");
+    }
+
+    /** Continuar do último autosave: restaura o arquivo no motor.
+     *  v0.7.1: tenta o mais recente e, se falhar, o anterior (até 3) —
+     *  os 3 últimos ficam como fallback. O nome vai prefixado com
+     *  "autosave/" (é o formato que o /api/restore reconhece). */
+    async function autosaveResumeContinue() {
+      closeAutosaveResume();
+      const list = (_autosaveList && _autosaveList.length)
+        ? _autosaveList
+        : (_autosaveLatest ? [_autosaveLatest] : []);
+      if (!list.length) {
+        toast("❌ " + (autosaveDict()["autosave.resume.none"] || "Nenhum autosave válido"), "err");
+        return;
+      }
+      toast(autosaveDict()["autosave.resume.restoring"] || "Restaurando o último autosave…", "info");
+      let lastError = "";
+      for (const item of list.slice(0, 3)) {
+        const raw = String((item && item.file) || "");
+        if (!raw) continue;
+        const file = raw.indexOf("autosave/") === 0 ? raw : ("autosave/" + raw);
+        try {
+          const r = await fetch(BASE + "/api/restore", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ file: file })
+          });
+          const d = await r.json();
+          if (d && d.ok) {
+            // v0.7.3: marca "restored" — o reload seguinte NAO
+            // reoferece a pergunta; o estado e consumido no load, de
+            // modo que a PROXIMA entrada volta a perguntar.
+            setAutosaveResumeState("restored");
+            toast("✅ " + (autosaveDict()["autosave.resume.done"] || "Sessão restaurada"), "ok");
+            setTimeout(() => location.reload(), 3500);
+            return;
+          }
+          lastError = (d && d.error) || "Falha ao restaurar";
+        } catch (e) {
+          lastError = e.message;
+        }
+      }
+      toast("❌ " + lastError, "err");
+    }
+
+    /** Iniciar uma nova sessão: descarta a pergunta e segue. */
+    function autosaveResumeNew() {
+      closeAutosaveResume();
+      // v0.7.3: o usuário respondeu "Nova sessão" — não perguntar de
+      // novo nesta aba.
+      setAutosaveResumeState("new");
+    }
+
+    /** Na abertura: se houver autosave válido, pergunta. Não bloqueia. */
+    async function checkAutosaveResume() {
+      // v0.7.3: maquina de estados (ver bloco acima).
+      const state = autosaveResumeState();
+      if (state === "restored") {
+        // consome: pula ESTA carga (o reload do restore) e volta a
+        // perguntar na proxima entrada.
+        setAutosaveResumeState("");
+        return;
+      }
+      if (state === "new") return;   // o usuário já escolheu "Nova sessão"
+      try {
+        const r = await fetch(BASE + "/api/autosave");
+        const d = await r.json();
+        if (d && d.latest) {
+          _autosaveLatest = d.latest;
+          // v0.7.1: guarda a lista completa (fallback: mais recente → anterior)
+          _autosaveList = (d.autosaves && d.autosaves.length) ? d.autosaves : [d.latest];
+          showAutosaveResume(d.latest);
+          // Sem resposta em 20s -> nova sessão (a pergunta não bloqueia)
+          setTimeout(() => closeAutosaveResume(), 20000);
+        }
+      } catch (e) { /* silencioso: sem autosave, segue normal */ }
+    }
+
     // ── Inicialização ────────────────────────────────────────
     window.addEventListener("load", () => {
       // 1. Aplica idioma (síncrono, sem flash)
       applyLang(_currentLang);
       buildLangMenu();
+      // 1.1 v0.7.0/v0.7.3: chave do autosave + timer de 1 min + pergunta de retomada
+      setAutosaveUI(autosaveEnabled());
+      if (autosaveEnabled()) startAutosaveTimer();
+      setTimeout(() => checkAutosaveResume(), 2500);
+      // Ao sair da aba, tenta gravar o estado (sendBeacon, não bloqueia)
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden" && autosaveEnabled() && !_autosaveBusy) {
+          try {
+            const payload = new Blob([JSON.stringify({})], { type: "application/json" });
+            navigator.sendBeacon(BASE + "/api/autosave", payload);
+          } catch (e) {}
+        }
+      });
       // v0.6.15: sincroniza prompt inicial com idioma detectado do navegador
       // Se backend ainda está em pt_BR (bug pré-0.6.15) e frontend detectou en/es/fr/zh, reinicia ttyd automaticamente
       try {
@@ -4094,6 +5108,44 @@ def create_wrapper_html(
             "ui.drive": "Drive", "ui.close": "Fechar", "ui.cancel": "Cancelar",
             "ui.loading": "Carregando…", "ui.status_active": "agente ativo",
             "ui.exporting": "Exportando sessão…",
+            "autosave.title": "Autosave", "autosave.saved": "Sessão salva no Drive",
+            "autosave.unchanged": "Sem novidades — o autosave mais recente já é o atual.",
+            "autosave.off_msg": "Autosave desligado",
+            "autosave.resume.title": "Retomar sessão",
+            "autosave.resume.text": "Há um salvamento automático. Deseja continuar a partir dele ou iniciar uma nova sessão?",
+            "autosave.resume.when": "Autosave de",
+            "autosave.resume.continue": "Continuar de onde parei",
+            "autosave.resume.new": "Nova sessão",
+            "autosave.resume.restoring": "Restaurando o último autosave…",
+            "autosave.resume.done": "Sessão restaurada",
+            "autosave.resume.none": "Nenhum autosave válido",
+            "restore.count": "{total} backups",
+            "restore.summary_filtered": "{shown} de {total} backups",
+            "restore.all_dates": "Todas as datas",
+            "restore.today": "Hoje",
+            "restore.prev": "Mês anterior",
+            "restore.next": "Próximo mês",
+            "restore.filter": "Filtrar por data",
+            "restore.dow.0": "S", "restore.dow.1": "T", "restore.dow.2": "Q",
+            "restore.dow.3": "Q", "restore.dow.4": "S", "restore.dow.5": "S",
+            "restore.dow.6": "D",
+            "restore.empty": "Nenhum backup encontrado no Drive.",
+            "restore.empty_date": "Nenhum backup nesta data.",
+            "restore.error": "Erro ao carregar os backups.",
+            "restore.autosave": "Autossave",
+            "restore.day_tip": "{n} backups",
+            "restore.month_tip": "{n} backups em {m}",
+            "restore.nodate": "sem data",
+            "restore.newest": "Mais recente",
+            "autosave.resume.again": "Retomar",
+            "restore.invalid": "corrompido",
+            "restore.confirm": "Restaurar o backup de {when}?",
+            "restore.restoring": "Restaurando {when}…",
+            "restore.delete": "apagar",
+            "restore.delete_confirm": "Apagar o backup de {when}? Esta ação não pode ser desfeita.",
+            "restore.deleting": "Apagando {when}…",
+            "restore.deleted": "Backup apagado.",
+            "restore.delete_failed": "Falha ao apagar o backup.",
             "dashboard.title": "Dashboard de Saúde",
             "providers.title": "Conectar Provedor de IA",
             "providers.select": "Selecione o provedor para configurar a API key:",
@@ -4198,6 +5250,44 @@ def create_wrapper_html(
             "ui.drive": "Drive", "ui.close": "Close", "ui.cancel": "Cancel",
             "ui.loading": "Loading…", "ui.status_active": "agent active",
             "ui.exporting": "Exporting session…",
+            "autosave.title": "Autosave", "autosave.saved": "Session saved to Drive",
+            "autosave.unchanged": "No changes — the latest autosave is already up to date.",
+            "autosave.off_msg": "Autosave off",
+            "autosave.resume.title": "Resume session",
+            "autosave.resume.text": "There is an automatic save. Do you want to continue from it or start a new session?",
+            "autosave.resume.when": "Autosave from",
+            "autosave.resume.continue": "Continue where I left off",
+            "autosave.resume.new": "New session",
+            "autosave.resume.restoring": "Restoring the last autosave…",
+            "autosave.resume.done": "Session restored",
+            "autosave.resume.none": "No valid autosave",
+            "restore.count": "{total} backups",
+            "restore.summary_filtered": "{shown} of {total} backups",
+            "restore.all_dates": "All dates",
+            "restore.today": "Today",
+            "restore.prev": "Previous month",
+            "restore.next": "Next month",
+            "restore.filter": "Filter by date",
+            "restore.dow.0": "M", "restore.dow.1": "T", "restore.dow.2": "W",
+            "restore.dow.3": "T", "restore.dow.4": "F", "restore.dow.5": "S",
+            "restore.dow.6": "S",
+            "restore.empty": "No backup found in Drive.",
+            "restore.empty_date": "No backup on this date.",
+            "restore.error": "Error loading the backups.",
+            "restore.autosave": "Autosave",
+            "restore.day_tip": "{n} backups",
+            "restore.month_tip": "{n} backups in {m}",
+            "restore.nodate": "no date",
+            "restore.newest": "Newest",
+            "autosave.resume.again": "Resume",
+            "restore.invalid": "corrupted",
+            "restore.confirm": "Restore the backup from {when}?",
+            "restore.restoring": "Restoring {when}…",
+            "restore.delete": "delete",
+            "restore.delete_confirm": "Delete the backup from {when}? This action cannot be undone.",
+            "restore.deleting": "Deleting {when}…",
+            "restore.deleted": "Backup deleted.",
+            "restore.delete_failed": "Failed to delete the backup.",
             "dashboard.title": "Health Dashboard",
             "providers.title": "Connect AI Provider",
             "providers.select": "Select the provider to configure the API key:",
@@ -4302,6 +5392,44 @@ def create_wrapper_html(
             "ui.drive": "Drive", "ui.close": "Cerrar", "ui.cancel": "Cancelar",
             "ui.loading": "Cargando…", "ui.status_active": "agente activo",
             "ui.exporting": "Exportando sesión…",
+            "autosave.title": "Autoguardado", "autosave.saved": "Sesión guardada en Drive",
+            "autosave.unchanged": "Sin novedades — el autoguardado más reciente ya es el actual.",
+            "autosave.off_msg": "Autoguardado desactivado",
+            "autosave.resume.title": "Reanudar sesión",
+            "autosave.resume.text": "Hay un guardado automático. ¿Desea continuar desde él o iniciar una sesión nueva?",
+            "autosave.resume.when": "Autoguardado del",
+            "autosave.resume.continue": "Continuar donde lo dejé",
+            "autosave.resume.new": "Sesión nueva",
+            "autosave.resume.restoring": "Restaurando el último autoguardado…",
+            "autosave.resume.done": "Sesión restaurada",
+            "autosave.resume.none": "Ningún autoguardado válido",
+            "restore.count": "{total} copias",
+            "restore.summary_filtered": "{shown} de {total} copias",
+            "restore.all_dates": "Todas las fechas",
+            "restore.today": "Hoy",
+            "restore.prev": "Mes anterior",
+            "restore.next": "Mes siguiente",
+            "restore.filter": "Filtrar por fecha",
+            "restore.dow.0": "L", "restore.dow.1": "M", "restore.dow.2": "X",
+            "restore.dow.3": "J", "restore.dow.4": "V", "restore.dow.5": "S",
+            "restore.dow.6": "D",
+            "restore.empty": "No se encontró ninguna copia en Drive.",
+            "restore.empty_date": "No hay copias en esta fecha.",
+            "restore.error": "Error al cargar las copias.",
+            "restore.autosave": "Autoguardado",
+            "restore.day_tip": "{n} respaldos",
+            "restore.month_tip": "{n} respaldos en {m}",
+            "restore.nodate": "sin fecha",
+            "restore.newest": "Más reciente",
+            "autosave.resume.again": "Reanudar",
+            "restore.invalid": "corrupto",
+            "restore.confirm": "¿Restaurar la copia del {when}?",
+            "restore.restoring": "Restaurando {when}…",
+            "restore.delete": "borrar",
+            "restore.delete_confirm": "¿Borrar la copia del {when}? Esta acción no se puede deshacer.",
+            "restore.deleting": "Borrando {when}…",
+            "restore.deleted": "Copia borrada.",
+            "restore.delete_failed": "No se pudo borrar la copia.",
             "dashboard.title": "Panel de Salud",
             "providers.title": "Conectar Proveedor de IA",
             "providers.select": "Seleccione el proveedor para configurar la API key:",
@@ -4406,6 +5534,44 @@ def create_wrapper_html(
             "ui.drive": "Drive", "ui.close": "Fermer", "ui.cancel": "Annuler",
             "ui.loading": "Chargement…", "ui.status_active": "agent actif",
             "ui.exporting": "Exportation de la session…",
+            "autosave.title": "Sauvegarde auto", "autosave.saved": "Session enregistrée sur Drive",
+            "autosave.unchanged": "Aucune nouveauté — la sauvegarde auto la plus récente est déjà à jour.",
+            "autosave.off_msg": "Sauvegarde auto désactivée",
+            "autosave.resume.title": "Reprendre la session",
+            "autosave.resume.text": "Une sauvegarde automatique existe. Voulez-vous continuer à partir d’elle ou démarrer une nouvelle session ?",
+            "autosave.resume.when": "Sauvegarde auto du",
+            "autosave.resume.continue": "Continuer où j’en étais",
+            "autosave.resume.new": "Nouvelle session",
+            "autosave.resume.restoring": "Restauration de la dernière sauvegarde auto…",
+            "autosave.resume.done": "Session restaurée",
+            "autosave.resume.none": "Aucune sauvegarde auto valide",
+            "restore.count": "{total} sauvegardes",
+            "restore.summary_filtered": "{shown} sur {total} sauvegardes",
+            "restore.all_dates": "Toutes les dates",
+            "restore.today": "Aujourd'hui",
+            "restore.prev": "Mois précédent",
+            "restore.next": "Mois suivant",
+            "restore.filter": "Filtrer par date",
+            "restore.dow.0": "L", "restore.dow.1": "M", "restore.dow.2": "M",
+            "restore.dow.3": "J", "restore.dow.4": "V", "restore.dow.5": "S",
+            "restore.dow.6": "D",
+            "restore.empty": "Aucune sauvegarde trouvée dans Drive.",
+            "restore.empty_date": "Aucune sauvegarde à cette date.",
+            "restore.error": "Erreur lors du chargement des sauvegardes.",
+            "restore.autosave": "Sauvegarde auto",
+            "restore.day_tip": "{n} sauvegardes",
+            "restore.month_tip": "{n} sauvegardes en {m}",
+            "restore.nodate": "sans date",
+            "restore.newest": "Plus récent",
+            "autosave.resume.again": "Reprendre",
+            "restore.invalid": "corrompu",
+            "restore.confirm": "Restaurer la sauvegarde du {when} ?",
+            "restore.restoring": "Restauration de {when}…",
+            "restore.delete": "supprimer",
+            "restore.delete_confirm": "Supprimer la sauvegarde du {when} ? Cette action est irréversible.",
+            "restore.deleting": "Suppression de {when}…",
+            "restore.deleted": "Sauvegarde supprimée.",
+            "restore.delete_failed": "Échec de la suppression de la sauvegarde.",
             "dashboard.title": "Tableau de bord de santé",
             "providers.title": "Connecter un fournisseur d'IA",
             "providers.select": "Sélectionnez le fournisseur pour configurer la clé API:",
@@ -4510,6 +5676,44 @@ def create_wrapper_html(
             "ui.drive": "云端硬盘", "ui.close": "关闭", "ui.cancel": "取消",
             "ui.loading": "加载中…", "ui.status_active": "智能体运行中",
             "ui.exporting": "正在导出会话…",
+            "autosave.title": "自动保存", "autosave.saved": "会话已保存到 Drive",
+            "autosave.unchanged": "没有新内容 —— 最近一次自动保存已是最新。",
+            "autosave.off_msg": "已关闭自动保存",
+            "autosave.resume.title": "恢复会话",
+            "autosave.resume.text": "存在一个自动保存。要从它继续，还是开始新会话？",
+            "autosave.resume.when": "自动保存于",
+            "autosave.resume.continue": "继续上次进度",
+            "autosave.resume.new": "新建会话",
+            "autosave.resume.restoring": "正在恢复最近的自动保存…",
+            "autosave.resume.done": "会话已恢复",
+            "autosave.resume.none": "没有有效的自动保存",
+            "restore.count": "{total} 个备份",
+            "restore.summary_filtered": "{shown}/{total} 个备份",
+            "restore.all_dates": "全部日期",
+            "restore.today": "今天",
+            "restore.prev": "上个月",
+            "restore.next": "下个月",
+            "restore.filter": "按日期筛选",
+            "restore.dow.0": "一", "restore.dow.1": "二", "restore.dow.2": "三",
+            "restore.dow.3": "四", "restore.dow.4": "五", "restore.dow.5": "六",
+            "restore.dow.6": "日",
+            "restore.empty": "Drive 中未找到备份。",
+            "restore.empty_date": "该日期没有备份。",
+            "restore.error": "加载备份时出错。",
+            "restore.autosave": "自动保存",
+            "restore.day_tip": "{n} 个备份",
+            "restore.month_tip": "{m} 有 {n} 个备份",
+            "restore.nodate": "无日期",
+            "restore.newest": "最新",
+            "autosave.resume.again": "继续",
+            "restore.invalid": "已损坏",
+            "restore.confirm": "恢复 {when} 的备份？",
+            "restore.restoring": "正在恢复 {when}…",
+            "restore.delete": "删除",
+            "restore.delete_confirm": "删除 {when} 的备份？此操作无法撤销。",
+            "restore.deleting": "正在删除 {when}…",
+            "restore.deleted": "备份已删除。",
+            "restore.delete_failed": "删除备份失败。",
             "dashboard.title": "健康状态面板",
             "providers.title": "连接 AI 提供商",
             "providers.select": "选择要配置 API key 的提供商：",
