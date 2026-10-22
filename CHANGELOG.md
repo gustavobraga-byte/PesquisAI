@@ -1,46 +1,126 @@
-## [0.6.24] — 2026-10-18 — 🈯 Comandos `/` e frases de abertura da TUI em português · 🌍 4 idiomas no mesmo plugin
-
-- **Comandos barra da TUI em PT-BR/es/fr/zh (plugin `ufvai-pt`, autoral):** os 37 comandos nativos do motor (`/new`, `/undo`, `/themes`, `/sessions`, `/help`, `/models`…) passam a responder por slug e título no idioma do usuário — `session.new` → `/novo`, `session.undo` → `/desfazer`, `themes` → `/temas`. O plugin usa o **mesmo `id`** do comando nativo e copia o objeto original (`...rest`), preservando `palette`, `suggested` e os atalhos (`ctrl+x n/l/u`); `run: () => false` deixa o comando nativo executar. Catálogo gerado em `~/.config/opencode/tui/ufvai-pt/` (`package.json` + `locales.json` + `tui.ts`) por `install_pt_plugin()` e habilitado em `cli.json` por `merge_cli_plugins()` — idempotente e sem duplicar entradas.
-- **Comando `/idioma`** (aliases `language`, `langue`, `lang`): troca o idioma ao vivo, grava `~/.config/opencode/ufvai-language.json` e mantém TUI e frases do prompt no mesmo idioma.
-- **Frases iniciais da nova sessão em pt-BR:** placeholder **"O que buscar…"**, **"Execute algo… "** e os 3 exemplos viram tarefas científicas ("Compare grupos com teste t", "Revise a literatura e valide as fontes", "Valide as fontes"). São textos **internos ao binário** do motor (bun bytecode, UTF-8 e UTF-16) e não há chave de configuração nem hook de plugin: `pesquisai/tui_prompt.py` faz substituição **byte a byte com o MESMO comprimento** (as sobras ficam com espaço à direita), gravação atômica (`os.replace`), backup único `opencode.orig-ufvai`, verificação pós-patch (`opencode --version`) e restauração automática em caso de falha. Idempotente.
-- **Idioma resolvido em um só lugar** (`run_fast._resolve_prompt_locale`): escolha do `/idioma` → `UFVAI_LANG`/`PESQUISAI_LOCALE` → língua do navegador (i18n da v0.6.23, via novo `opencode_i18n.browser_locale()`) → `LANG`/`LC_ALL` → **pt-BR**. `tui_pt.detect_locale()` também aceita `PESQUISAI_LOCALE`.
-- **2 comandos de prompt novos em PT:** `/iniciar` (equivalente a `/init`) e `/revisar-codigo` (equivalente a `/review`).
-- **Coexistência com a v0.6.23:** o plugin `opencode-i18n-v2` continua responsável por **títulos/descrições da paleta** (`~/.config/opencode/i18n/`, `opencode.json.plugins`); o `ufvai-pt` cuida dos **nomes/slugs dos comandos e das frases de abertura** (`cli.json.plugins`). Os dois convivem: listas e arquivos distintos.
-- **Testes:** `tests/test_comandos_pt.py` + `tests/test_prompt_texts.py` (**27 casos**: tamanhos por codificação, patch de binário sintético, idempotência, troca de idioma, volta ao inglês, falha segura, detecção de locale) e `tests/test_version_sync.py` exigindo a versão nos 4 arquivos.
-- **Validação de campo (18/10/2026, runtime Colab):** TUI nova exibindo "O que buscar…" + "Revise a literatura e valide as fontes", lista `/` em PT, paleta `ctrl+p` no grupo "Sessão", `ctrl+x n` abrindo nova sessão, `plugins=13` sem erro no log do motor; `cli.json`/`opencode.json` válidos contra os schemas oficiais.
-- **Pendência:** os arquivos desta release precisam ser enviados ao repositório que o boot clona (`versaoteste.git`) — sem isso, o próximo reinício do Colab volta ao estado anterior.
-
-### [0.6.24] — ajuste 18/10/2026 (SEM bump) — 🧹 Menu sem duplicação, idioma sincronizado e rodapé em PT
-
-- **Plugin `opencode-i18n-v2` REMOVIDO:** ele criava camadas espelho para os MESMOS ids de comando do `ufvai-pt` (comandos dobrados na paleta `ctrl+p`) e injetava comandos com título em chinês (`界面语言`, `/i18n`). Agora `opencode_config.strip_i18n_plugin()` tira qualquer entrada `opencode-i18n*` de `plugins` (preservando os demais) e `cleanup_i18n_leftovers()` apaga `~/.config/opencode/i18n/` e os estados antigos. Removidos `pesquisai/opencode_i18n.py`, `pesquisai/assets/i18n/` e `tests/test_i18n_locale.py`; novo `tests/test_sem_i18n.py`.
-- **Trocar idioma na interface agora troca no terminal:** `launch_app._sync_terminal_locale()` roda no `POST /api/lang` e, ANTES de reiniciar o ttyd, grava `~/.config/opencode/ufvai-language.json` e reaplica `tui_prompt.patch_prompt_texts()` — ao recarregar a página, o terminal volta no idioma escolhido.
-- **Rodapé traduzido:** os rótulos `agents`/`commands` do rodapé (atalhos `shift+tab`/`ctrl+p`) são literais da **tabela de strings internada** do bytecode; `tui_prompt.FOOTER_TEXTS` os troca com o mesmo comprimento (`agente`/`comandos` em pt-BR/es; `cmds` em fr; `代理`/`命令` em zh; restaura em en). O plugin `ufvai-pt` passou a resolver o nome do método do keymap dinamicamente (`keymap["commands"] ?? keymap["comandos"]`), pois o patch renomeia a propriedade do host.
-- **Traduções do menu fiéis ao inglês nativo:** `help.show` slug `atalhos` → **`ajuda`** (aliases `atalhos`/`ajudar`/`help`); `session.terminal` → "Novo terminal"; `prompt.skills` → "Habilidades"; descrições corrigidas nos 4 idiomas.
-- **Menu de idioma da UI web:** item **中文（简体）** removido (4 idiomas, alegando *"paridade com `index.html`"* — **justificativa incorreta**: o site mantém 5 idiomas; removido por engano e **restaurado no ajuste seguinte**); nomes traduzidos pelo idioma corrente (`languages.<code>`), com os blocos de tradução corrigidos e completos — em inglês: Portuguese (Brazil) / English (United States) / Spanish (Spain) / French (France).
-- **Testes:** `test_prompt_texts.py` (16) + `test_comandos_pt.py` (14) + `test_sem_i18n.py` (8) = **38 casos**, com patch verificado no binário real (`changes=2`, `missing=[]`) e rodapé conferido via `tmux capture-pane`.
-
-### [0.6.24] — ajuste 18/10/2026 (SEM bump) — 🇨🇳 中文（简体） de volta ao seletor da interface + consistência das diretrizes
-
-- **Correção do ajuste anterior:** a remoção do item **中文（简体）** foi justificada por *"paridade com `index.html`"* — **a justificativa está errada**. Verificado: o site `outputs-ufvai-site-v2/index.html` (17/10, 10:59) e `tutorial.html` **mantêm 5 idiomas** (`data-lang="pt|en|es|fr|zh"` + rótulo **中文**). A remoção criou **divergência site ↔ app**, não paridade — e deixou o chinês inalcançável pela interface, já que o front valida `if (ql && LANGS[ql])` e `LANGS` só tinha 4 códigos.
-- **Item restaurado:** `SUPPORTED_LANGUAGES` (`pesquisai/launch_app_responsive_v041.py`) volta a **5 idiomas** — `pt_BR`, `en_US`, `es_ES`, `fr_FR` e **`zh_CN`** (`name` "中文（简体）", `flag` 🇨🇳, `short` **ZH**). O backend nunca deixou de aceitar `zh_CN` (`_LANG_MAP`, `POST /api/lang`, cadeia de fallback `zh_CN → en_US → pt_BR`), e `i18n/translations/zh_CN.json`, `i18n_inline["zh_CN"]` e o plugin de TUI `ufvai-pt` (5 idiomas) já estavam prontos.
-- **Rótulos do menu:** `languages.zh_CN` adicionado aos 5 blocos inline — pt "Chinês (simplificado)" · en "Chinese (Simplified)" · es "Chino (simplificado)" · fr "Chinois (simplifié)" · zh "中文（简体）". O bloco `zh_CN` recebeu também `languages.pt_BR/en_US/es_ES/fr_FR` (simetria: antes, com a interface em chinês, os nomes vinham do `name` nativo).
-- **Comentários/docstrings:** `4 idiomas` → `5 idiomas` em `launch_app_responsive_v041.py` (docstring do `create_wrapper_html`) e `launch_app.py` (bloco do patch v0.4.1).
-- **Diretrizes espelhadas no Drive:** `PesquisAI/agents/` recebeu `AGENTS.zh.md` + `README.md` e foi realinhado com o pacote — os 4 arquivos existentes eram **pré-rebrand** (v0.5.1.8, "PesquisAI", 10/07). Cópia antiga preservada em `PesquisAI/backups/agents-mirror-20261018-antigo/`; `md5sum` do espelho = `md5sum` de `UFVAI-v0.6.24/agents/`.
-- **`i18n/README.md`:** lista de idiomas suportados corrigida (era `pt_BR (padrão), en_US, es_ES`; agora os 5).
-- **Validação de campo [executada]:** antes do patch, `create_wrapper_html(...)` **reproduziu o HTML servido byte a byte** (0 linha de diff com os mesmos `terminal_url`/`drive_url`/`session_token` — prova de que a regeneração é segura); depois do patch, o diff do HTML ficou restrito a **2 linhas de 3940** (`const LANGS` e `const I18N`), com o resto **byte-idêntico** e os 5 blocos de idioma contendo `languages.zh_CN`. `py_compile` OK; nenhum teste travar o número de idiomas (`tests/test_sair_shutdown.py` já iterava sobre `zh_CN`).
-- **Pendência (inalterada):** subir ao repositório que o boot clona (`versaoteste.git`) — sem credencial GitHub no ambiente, o próximo reinício do Colab volta ao estado do repositório.
-
-## [0.6.23] — 2026-10-17 — 🌐 i18n do TUI em PT-BR · 🧭 Detecção de idioma (navegador → env → pt-BR)
-
-- **Plugin `opencode-i18n-v2`** (`huahai0202/opencode-i18n`, MIT): localiza títulos/descrições da paleta de comandos e os slash commands do TUI do OpenCode V2. Instalado via `merge_opencode_config` → chave `plugins` do `opencode.json`.
-- **Locale `pt-BR` completo (autoral PesquisAI):** 190 comandos (títulos + descrições), 19 grupos, 49 slash commands empacotados em `pesquisai/assets/i18n/pt-BR.json` e implantados em `~/.config/opencode/i18n/locales/`. O nome do comando digitado continua em inglês conforme a mecânica do plugin; os nomes nativos só serão renomeáveis quando o hook sanitizado do issue [#45490](https://github.com/anomalyco/opencode/issues/45490) for aceito (ou o i18n nativo do [#37216](https://github.com/anomalyco/opencode/issues/37216) sair).
-- **Detecção de idioma** (`pesquisai/opencode_i18n.detect_locale`): `PESQUISAI_LOCALE` → língua do **navegador** (`Accept-Language` capturado em `do_GET`/`do_POST` da UI web e gravado em `~/.local/state/opencode/pesquisai-browser-locale.json`) → `LANG`/`LC_ALL` → **fallback pt-BR** (BR-first). Inglês detectado = localização desligada (o original já é inglês).
-- **Estado:** `~/.local/state/opencode/i18n-state.json` (formato v1 do plugin) gravado com `enabled` e `locale` detectados.
-- **Fail-open:** qualquer falha de i18n nunca impede o boot; a interface simplesmente fica em inglês. Locale do usuário **não é sobrescrito** se já existir.
-- **Sync de versão:** `pyproject.toml` (0.6.17→0.6.23) e `Dockerfile` (0.6.20→0.6.23) realinhados.
-- **Testes:** `tests/test_i18n_locale.py` (9 casos) — cobre detecção, deploy idempotente, estado, merge do plugin e fail-open.
-
 # Changelog — PesquisAI
+
+## [0.7.3] — 2026-10-22 — 📦 O pacote `pesquisai` instalado no ambiente · ⏱️ Autosave a cada 1 minuto · 🗂️ Fallback das 3 últimas interações · 🔄 Retomada uma vez na entrada
+
+### ⏱️ Intervalo do autosave: 3 minutos → **1 minuto**
+- `AUTOSAVE_INTERVAL_MS` no frontend: `180000` → `60000`.
+
+### 🗂️ Fallback: o backup da sessão anterior não é mais destruído
+- **Diagnóstico (verificado nos arquivos do Drive):** os 3 slots do autosave misturavam
+  **duas conversas** e o `autosave_3.json` ficava **mais novo** que o `autosave_1.json`.
+  Causa: o motor **re-gera o `id` da sessão a cada reinício do terminal** — a mesma
+  conversa aparece com `info.time.created` igual e `info.id` diferente.
+- **Correção 1 — chave estável:** `content_digest()` passa a usar `info.time.created`
+  (fallback `info.id`) → a mesma conversa **não** vira "versão distinta" quando o id muda
+  (o sintoma de "3 cópias do mesmo arquivo").
+- **Correção 2 — histórico das 3 últimas interações:** `preserve_autosave_history()` copia
+  o **último autosave da interação que terminou** para os slots `autosave_4..6`
+  (no máximo 3, rotação, mtime original preservado). O autosave de agora **não** destrói
+  o backup da sessão anterior; `list_autosaves()` devolve os 6 (vivos + preservados) com
+  a marca `history: true/false`, e o fallback da retomada alcança as conversas anteriores.
+- **Correção 3 — a sessão certa:** `POST /api/autosave` escolhe, nesta ordem, o
+  `session_id` enviado → a sessão do **terminal** (lida do `ps`: `opencode -s "<id>"`) →
+  a sessão **mais recentemente atualizada** do motor. Antes usava `sessions[0]`, que nem
+  sempre era a conversa do usuário.
+
+### 🔄 A retomada volta a ser perguntada **na entrada** (uma vez, sem loop)
+- **Bug da v0.7.2:** a flag "pergunta já oferecida" vivia no `sessionStorage` da aba e era
+  gravada **no momento da oferta** → qualquer recarga posterior (inclusive um F5) nunca mais
+  perguntava → *"não pediu para restaurar o último autosave quando entrei"*.
+- **Correção (máquina de estados em `sessionStorage`):** vazio → **pergunta** (entrada
+  normal) · `"restored"` → **não pergunta** e é **consumido** no load (pula só o reload do
+  restore) · `"new"` → o autor escolheu "Nova sessão" → não pergunta de novo nesta aba.
+  A **oferta não grava mais nada**.
+
+### 📦 O pacote `pesquisai` passa a ser INSTALADO no ambiente (API do autopilot)
+
+**Relato de um novo usuário (Colab):** *"o pacote python `pesquisai` (api autopilot) não está
+instalado no ambiente"*. Verificado no ambiente: `pip show pesquisai` → **"Package(s) not
+found"** e `from pesquisai.obsidian.autopilot import recall` a partir de um diretório
+**neutro** → **`ModuleNotFoundError: No module named 'pesquisai'`**.
+
+**Três causas:**
+1. **A célula de boot nunca instalava o pacote** — apenas `sys.path.insert(0, WORK_DIR)`. O
+   import só funcionava **dentro** da pasta do repo; o **terminal (e o agente) rodam em outro
+   processo, com outro CWD** → a **"Minha memória" não salvava nada**, sem erro visível.
+2. **A distribuição chamava-se `pesquisai-additions`** → `pip show pesquisai` não encontrava
+   (o nome `pesquisai` está **livre** no PyPI).
+3. **`install-offline.sh` engolia a falha** (`pip install ... 2>/dev/null || true`).
+
+**Correções:**
+- **`pyproject.toml`**: `name = "pesquisai"` (igual ao nome de importação) · `pyyaml>=6.0`
+  como dependência **base** (o frontmatter da memória é parseado com PyYAML).
+- **Célula de boot (`PesquisAI.ipynb`)**: após o clone, `pip install -e` (sem dependências →
+  com dependências → `--user --break-system-packages`) e **verificação real** — importa
+  `pesquisai.obsidian.autopilot` a partir de um **CWD neutro** (`/`), exatamente como o
+  agente usa a API. O painel de boot mostra o passo e o resultado.
+- **`install-offline.sh`**: instalação **sem** esconder o erro + verificação da API.
+- **`scripts/install.sh`**: `pip install -e ".[colab]"` → `".[obsidian]"` (o extra `colab`
+  não existia).
+
+### 🧪 Testes — 205 verificações verdes
+- `tests/js/test_v073_autosave_policy.js` (**novo**) 21/21 · `tests/test_autosave_history_v073.py`
+  (**novo**) 13/13 · `tests/js/test_v072_resume_once.js` 39/39 (seções 1, 2 e 4 atualizadas
+  para o contrato novo) · `tests/js/test_autosave_ui.js` 27/27 ·
+  `tests/js/test_restore_calendar.js` 47/47 · `tests/test_restore_backups.py` 26/26
+  (2 testes ajustados: a listagem inclui o histórico) · `tests/test_session_restore.py` 22/22 · `tests/test_instalacao_pacote.py` (**novo**) 10/10 (pacote instalado, nome da distribuição, boot cell, instaladores).
+
+## [0.7.2] — 2026-10-22 — 🔄 Retomada do autosave uma única vez por aba + 📅 Calendário do "Restaurar" corrigido
+
+### 🔄 Laço da retomada do autosave (o "restore" recarregava tudo)
+- **Sintoma:** com autosave disponível, ao clicar em **"Continuar de onde parei"**: o terminal recarregava (`location.reload()`) → a tela de confirmação da retomada **voltava** → o clique no "Continuar" repetia o ciclo.
+- **Causa-raiz:** `checkAutosaveResume()` é chamado ~2,5 s depois de cada carregamento de página e reoferecia a pergunta sempre que houvesse autosave válido, sem nenhuma guarda de idempotência.
+- **Fix (frontend `pesquisai/launch_app_responsive_v041.py`):** flag `ufvai_autosave_resume_offered` em `sessionStorage` — sobrevive ao reload da **mesma** aba (o caso do laço) e morre ao fechar a aba. Marcada em `showAutosaveResume()`, `autosaveResumeContinue()` e `_doRestoreSession()`; `checkAutosaveResume()` retorna **antes de qualquer `fetch`** se a flag existir. **Escape hatch:** botão **↻** no rodapé (`reofferAutosaveResume()`); o menu **🔄 Restaurar** segue sempre disponível.
+
+### 📅 Calendário do "Restaurar" (datas faltando / erradas)
+- **Diagnóstico com os dados reais do Drive:** 44 backups em 20 datas (26/05 → 22/10/2026), concentrados em jun/2026 (24) e jul/2026 (10) — meses que o calendário não sinalizava, o que produzia a impressão de datas faltando.
+- **Fix:** chips clicáveis dos meses que **têm** backup (+ contagem) · contagem de backups em cada dia · tooltip `3 backups` (era `3)`) · data deduzida de `datetime`/`timestamp` · item sem data vai para o grupo **"sem data"** (nunca some do filtro) · estado vazio acionável ("Todas as datas") · botão **"Mais recente"** (`restoreGoNewest()`).
+- **Verificado e NÃO é bug:** o alinhamento dos dias da semana está correto (grade e cabeçalho começam na segunda).
+
+### 🧪 Testes — 161 verificações verdes
+- `tests/js/test_v072_resume_once.js` (**novo**) 39/39 · `tests/js/test_autosave_ui.js` 27/27 · `tests/js/test_restore_calendar.js` 47/47 · `tests/test_restore_backups.py` 26/26 · `tests/test_session_restore.py` 22/22.
+- **Correção de teste pré-existente:** `test_restore_backups.py::test_ordenacao_decrescente_por_data` dependia da **data do dia** (mtime "atual" dos autosaves) e passou a falhar ao virar o dia (22/10) → *fixture* com mtime fixo em 20/10/2026 12:00.
+
+### 📚 Documentação sincronizada em 0.7.2
+- `AGENTS.md` + `agents/AGENTS.{en,es,fr,pt,zh}.md` (frontmatter `version: 0.7.2`).
+- `MANUAL.md` (cabeçalho **v0.7.2 · Outubro 2026**, ficha de catalogação, citação ABNT, BibTeX, §5.4/§5.5, §12) e `README.md` (badge, novidades, histórico 0.7.x, citação, BibTeX).
+- `pyproject.toml` (`version = "0.7.2"`), `Dockerfile` (label OCI), `install-offline.sh` (`VERSION="0.7.2"`), `PesquisAI.ipynb` (painel de boot e citação ABNT).
+- `CHANGELOG.md` (este arquivo) + `LEIA-ME-v0.7.2.md`.
+
+## [0.7.1] — 2026-10-22 — 🔧 Retomada do autosave corrigida na entrada + 💾 autosave sem duplicata + 🗑 botão de apagar backup
+
+### 🔧 A retomada na entrada não restaurava (o botão do menu funcionava)
+- **Causa-raiz:** `list_autosaves()` devolvia o nome **sem** o prefixo `autosave/` (enquanto `list_backups()` traz o prefixo) → o `/api/restore` recusava com **400** "Este arquivo não é um backup de sessão".
+- **Fix:** `list_autosaves` passa a devolver `autosave/<nome>` (+ campo `name`) e `_resolve_restore_path` aceita o nome **com ou sem** prefixo — recusa do que não é backup e bloqueio de *path traversal* mantidos.
+
+### 💾 Autosave sem duplicata
+- `content_digest()` (sha256 de id + mensagens, ignorando `info.time.updated/viewed`) impede gravar cópia idêntica → os 3 slots são **3 versões distintas** (fallback preservado). A interface avisa "sem novidades" (`autosave.unchanged`).
+
+### 🗑 Botão de apagar backup
+- `POST /api/backup/delete` com `confirm: true` **obrigatório** (mesma validação de caminho do `/api/restore`) + botão 🗑 por item no menu "Restaurar", com confirmação e recarga da lista · i18n em **5 idiomas**.
+
+### 🔁 Fallback na retomada
+- Se o autosave mais recente falhar, tenta o anterior (até 3).
+
+### 🧪 Testes
+- `test_restore_backups.py` 26/26 · `test_session_restore.py` 22/22 · `tests/js/test_autosave_ui.js` 27/27 · `tests/js/test_restore_calendar.js` 47/47.
+
+## [0.7.0] — 2026-10-21 — 🗓️ "Restaurar" só backups com calendário + ⏱️ autosave a cada 3 min + 🏷️ marca UFVAI na tela de nova sessão
+
+### 🗓️ Menu "Restaurar" reconstruído
+- `GET /api/backups` devolve **somente backups** (42 itens = 39 backups + 3 autosaves; `keys_store.json`, `keys.json`, `aakeys.json` e `ufvai_consentimento*.json` ficam de fora) com data/hora/tamanho/título/integridade e 19 datas.
+- `POST /api/restore` valida estritamente (`backup_*.json` | `autosave_<n>.json`) → **400** para `keys_store.json` e para `../keys_store.json`.
+- Interface com **calendário mensal**, **filtro por data** (`input date` + clique no dia), navegação de mês e lista agrupada por dia, com selos *Autossave* / *corrompido* · i18n em 5 idiomas.
+
+### ⏱️ Autosave corrigido e ligado por padrão
+- **Causa-raiz:** `NameError: name 'method' is not defined` no branch `/api/autosave` do `do_POST` (a variável nunca existiu nesse método) → toda gravação morria com "Empty reply from server"; o `GET /api/autosave` estava dentro do `do_POST` → **404**.
+- **Fix:** listagem movida para o `do_GET` · **rotação invertida** (rotaciona **antes** de gravar → o slot 1 volta a ser o mais recente) · `autosaveEnabled()` **ligado por padrão** (só desliga se o autor desativar) · rede de segurança nos handlers (exceção → HTTP 500 JSON com a causa).
+
+### 🏷️ Identidade e interface
+- Marca **UFVAI** na tela de nova sessão (logo redesenhado + sugestões do prompt com uso UFVAI/agêntico, via patch cirúrgico de mesmo comprimento no motor) · 🇨🇳 Chinês também troca o terminal · 🎨 Manual e Diretrizes no tema claro · 📱 "Idioma" fora do sanduíche e nota da Memória visível no responsivo.
+
+### 🧪 Testes
+- `test_restore_backups.py` 19/19 · `test_session_restore.py` 22/22 · `tests/js/test_restore_calendar.js` 40/40 (sobre o HTML **renderizado**) · `tests/js/test_autosave_ui.js` 23/23 (reescrito — o antigo stubava o `fetch` e nunca exercitava o endpoint real) · `node --check` nos 7 `<script>` do HTML servido 7/7.
 
 ## [0.6.21] — 2026-10-13 — 🔧 Migração do motor para a **OpenCode V2** · 🍪 Aviso de cookies de terceiros · 🫀 Keep-alive por célula bloqueante
 
