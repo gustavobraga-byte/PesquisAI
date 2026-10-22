@@ -63,10 +63,10 @@
     "toggle": "切换主题"
   },
   "languages": {
-    "pt_BR": "葡萄牙语（巴西）",
-    "en_US": "英语（美国）",
-    "es_ES": "西班牙语（西班牙）",
-    "fr_FR": "法语（法国）",
+    "pt_BR": "Português (Brasil)",
+    "en_US": "English (United States)",
+    "es_ES": "Español (España)",
+    "fr_FR": "Français (France)",
     "zh_CN": "中文（简体）"
   },
   "agents": {

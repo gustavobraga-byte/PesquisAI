@@ -64,10 +64,9 @@
   },
   "languages": {
     "pt_BR": "Português (Brasil)",
-    "en_US": "Inglês (Estados Unidos)",
-    "es_ES": "Espanhol (Espanha)",
-    "fr_FR": "Francês (França)",
-    "zh_CN": "Chinês (simplificado)"
+    "en_US": "English (United States)",
+    "es_ES": "Español (España)",
+    "zh_CN": "Português (Brasil)"
   },
   "agents": {
     "rules_title": "Regras Absolutas",

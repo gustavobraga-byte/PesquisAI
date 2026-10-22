@@ -66,8 +66,7 @@
     "pt_BR": "Portuguese (Brazil)",
     "en_US": "English (United States)",
     "es_ES": "Spanish (Spain)",
-    "fr_FR": "French (France)",
-    "zh_CN": "Chinese (Simplified)"
+    "zh_CN": "English (US)"
   },
   "agents": {
     "rules_title": "Absolute Rules",
