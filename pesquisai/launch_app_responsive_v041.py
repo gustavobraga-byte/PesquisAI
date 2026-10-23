@@ -4537,15 +4537,48 @@ def create_wrapper_html(
       });
       // v0.6.15: sincroniza prompt inicial com idioma detectado do navegador
       // Se backend ainda está em pt_BR (bug pré-0.6.15) e frontend detectou en/es/fr/zh, reinicia ttyd automaticamente
+      //
+      // Correção 23/10/2026: a sincronização NÃO pode rodar por cima das
+      // telas de abertura (Termos / "Bem-vindo de volta") nem repetir a
+      // cada recarga. Antes:
+      //   • cada recarga chamava setLang() → /api/lang (reinicia o ttyd) →
+      //     location.reload() → a tela de abertura aparecia de novo (o
+      //     usuário via "duas vezes" ou "várias vezes");
+      //   • a guarda vivia só em sessionStorage — em navegador/iframe que
+      //     bloqueia sessionStorage ela não existia.
+      // Agora: guarda dupla (sessionStorage + cookie) e espera as telas de
+      // abertura fecharem antes de reiniciar o terminal.
       try {
         fetch(BASE + "/api/lang").then(r=>r.json()).then(d=>{
-          const backendLang = d.lang;
-          if(backendLang && backendLang !== _currentLang && LANGS[_currentLang]) {
-            if(!sessionStorage.getItem("ufvai_lang_synced")) {
-              sessionStorage.setItem("ufvai_lang_synced", "1");
-              setLang(_currentLang);
-            }
-          }
+          const backendLang = d && d.lang;
+          if (!backendLang || backendLang === _currentLang) return;
+          if (!LANGS[_currentLang]) return;
+          let synced = "";
+          try { synced = sessionStorage.getItem("ufvai_lang_synced") || ""; } catch (e) {}
+          if (!synced) synced = getCookie("ufvai_lang_synced") || "";
+          if (synced === _currentLang) return;
+          if (window._ufvaiLangSyncPending) return;
+          window._ufvaiLangSyncPending = true;
+          let tries = 0;
+          const _overlayOpen = () => {
+            const t = document.getElementById("terms-overlay");
+            const w = document.getElementById("welcome-overlay");
+            const a = document.getElementById("autosave-overlay");
+            return (!!t && t.style.display !== "none" && t.style.display !== "") ||
+                   (!!w && w.style.display === "flex") ||
+                   (!!a && a.classList.contains("open"));
+          };
+          const timer = setInterval(() => {
+            tries++;
+            const blocked = _overlayOpen();
+            if (blocked && tries < 40) return;   // espera (máx. ~36 s)
+            clearInterval(timer);
+            window._ufvaiLangSyncPending = false;
+            if (blocked) return;                 // telas abertas: não reinicia
+            try { sessionStorage.setItem("ufvai_lang_synced", _currentLang); } catch (e) {}
+            setCookie("ufvai_lang_synced", _currentLang);
+            setLang(_currentLang);
+          }, 900);
         }).catch(()=>{});
       } catch(e){}
       // 2. Carrega tema
@@ -4872,6 +4905,13 @@ def create_wrapper_html(
         fetch("/api/access",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)}).catch(function(){});
       }catch(e){}
     }
+    var _shown=false;      // 23/10/2026: abertura (Termos OU "Bem-vindo") UMA vez
+    function _openTerms(){
+      if(_shown) return;   // já houve uma abertura nesta carga
+      _shown=true;
+      ov.style.display="flex";
+      _updateBtn();
+    }
     function _showErr(msg){
       if(!err){
         err=document.createElement("div");
@@ -4962,6 +5002,15 @@ def create_wrapper_html(
       var wEmail=document.getElementById("w-email");
       function _showWelcome(email, name){
         if(!wov) return false;
+        // Correção 23/10/2026: a tela "Bem-vindo de volta" aparece UMA vez
+        // por aba. Antes ela voltava a cada recarga — e a sincronização de
+        // idioma recarrega a página — então o usuário via a mesma tela
+        // duas (ou várias) vezes na mesma entrada.
+        try{
+          if(sessionStorage.getItem("ufvai_welcome_seen")==="1") return false;
+        }catch(e){
+          if(document.cookie.indexOf("ufvai_welcome_seen=1")!==-1) return false;
+        }
         try{
           var txt="";
           if(name && email) txt=name + " — " + email;
@@ -4971,6 +5020,10 @@ def create_wrapper_html(
           if(wEmail) wEmail.textContent=txt;
         }catch(e){}
         wov.style.display="flex";
+        try{ sessionStorage.setItem("ufvai_welcome_seen","1"); }catch(e){}
+        // fallback (sessionStorage bloqueado): cookie de sessão — some ao
+        // fechar o navegador, então a saudação volta na próxima visita.
+        try{ document.cookie="ufvai_welcome_seen=1; path=/; SameSite=Lax"; }catch(e){}
         return true;
       }
       function _hideWelcome(){
@@ -5003,6 +5056,7 @@ def create_wrapper_html(
           }catch(e){}
           if(an && typeof profAnalytics!=="undefined"){ an.checked=!!profAnalytics; }
           if(chk){ chk.checked=true; }
+          _shown=true;               /* 23/10/2026: abertura deliberada */
           ov.style.display="flex";
           _updateBtn();
           try{ if(nm && !nm.value) setTimeout(function(){ nm.focus(); },260);
@@ -5026,15 +5080,19 @@ def create_wrapper_html(
           // v0.6.16: heartbeat APENAS no clique "Continuar" (não automático ao exibir o welcome)
           return;
         }
+        // 23/10/2026: este navegador já aceitou a versão atual dos Termos —
+        // não reabre a tela se o perfil do servidor estiver ausente/atrasado
+        // (Drive off-line, POST interrompido). Antes, a tela voltava a cada
+        // recarga e o usuário via o aceite "duas vezes".
+        if(localStorage.getItem("ufvai_terms_version")===_TV){ return; }
         // Sessão anterior (versão antiga dos Termos): pré-preenche nome+e-mail e só confirma
         if(profName && nm && !nm.value){ nm.value=profName; }
         if(prof.email && em && !em.value){ em.value=prof.email; }
         if(an && typeof prof.analytics!=="undefined"){ an.checked=!!prof.analytics; }
         if(chk){ chk.checked=true; }
-        ov.style.display="flex";
-        _updateBtn();
-      }).catch(function(){ ov.style.display="flex"; _updateBtn(); });
-    }catch(e){ ov.style.display="flex"; _updateBtn(); }
+        _openTerms();
+      }).catch(function(){ _openTerms(); });
+    }catch(e){ _openTerms(); }
   }catch(e){}
 })();
 </script>

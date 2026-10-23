@@ -3206,11 +3206,31 @@ def start_wrapper_server():
                     return
 
                 # 2. Preparar o payload (validacao + conversao v1->v2 + ids novos)
+                #
+                # Correcao 23/10/2026 (sem bump): o id importado precisa
+                # nascer no formato NATIVO do motor (`ses_` + 12 hex + 14
+                # base62). O gateway do free tier do OpenCode valida o
+                # cabecalho `x-opencode-session` (issue #49433): um id fora do
+                # padrao recebe HTTP 403 "OpenCode's free tier can only be
+                # used from within OpenCode" — e a sessao restaurada nao anda
+                # com modelos gratuitos (uma sessao NOVA funciona, porque o
+                # proprio motor cria o id). Antes, a retomada gerava
+                # `ses_` + 16 hex e quebrava TODA sessao restaurada.
+                _id_samples: list[str] = []
+                try:
+                    _id_samples = [
+                        str(_s.get("id") or "")
+                        for _s in _session_restore.list_sessions(
+                            _opencode_bin or "opencode", env=_env)
+                    ]
+                except Exception as _exc:  # best-effort: sem amostras, padrao oficial
+                    logger.warning("Restore: sem amostras de id nativas (%s)", _exc)
                 try:
                     payload, src_format = _session_restore.prepare_import_payload(
                         tmp_restore,
                         project_id=str(body.get("project_id", "") or ""),
                         fallback_directory=str(body.get("directory", "") or ""),
+                        id_samples=_id_samples,
                     )
                 except _session_restore.SessionError as exc:
                     self._json(400, {"error": str(exc)})
@@ -3232,7 +3252,52 @@ def start_wrapper_server():
 
                 parse_error = ""
                 import_stdout = f"Imported session: {session_id}"
-                
+                # Correcao 23/10/2026: se o id importado nao seguir o formato
+                # nativo, o free tier respondera 403 na 1a mensagem. Nao
+                # bloqueia (o backup ja foi importado), mas deixa o rastro.
+                try:
+                    _native_shape = _session_restore.id_shape(_id_samples, "ses_")
+                    if (_native_shape and session_id
+                            and (len(session_id) - len("ses_")) != _native_shape[0]):
+                        logger.warning(
+                            "Sessao restaurada com id fora do formato nativo "
+                            "(%s, %d chars; nativo=%d) — modelos gratuitos "
+                            "podem falhar com FreeTierError.",
+                            session_id, len(session_id) - len("ses_"),
+                            _native_shape[0],
+                        )
+                except Exception:
+                    pass
+
+                # 2.1 Correcao 23/10/2026 (sem bump): AJUSTAR AO CONTEXTO.
+                # Os autosaves reais tem ~300 mil tokens; os modelos free do
+                # OpenCode Zen tem 200 mil de contexto. Ao abrir a sessao
+                # importada o motor ve o contexto estourado e dispara a
+                # compactacao AUTOMATICA — caminho que o gateway do free
+                # tier recusa ("OpenCode's free tier can only be used from
+                # within OpenCode"). Era o `✗ Compaction` de TODA sessao
+                # restaurada, enquanto uma sessao nova funcionava.
+                # Compactacao MANUAL (nao bloqueada) ou, em ultimo caso,
+                # reimportar aparado.
+                fit_info: dict = {}
+                try:
+                    fit_info = _session_restore.fit_to_context(
+                        _opencode_bin or "opencode", session_id, payload, env=_env,
+                    )
+                    new_session_id = str(fit_info.get("session_id") or "")
+                    if new_session_id and new_session_id != session_id:
+                        session_id = new_session_id
+                    if fit_info.get("action") not in ("none", None):
+                        logger.info(
+                            "Restore: sessao ajustada ao contexto (%s, %s→%s tokens, "
+                            "orcamento %s)", fit_info.get("action"),
+                            fit_info.get("tokens_before"), fit_info.get("tokens_after"),
+                            fit_info.get("budget"),
+                        )
+                except Exception as fit_err:  # fail-open: o import ja esta valido
+                    logger.warning("Restore: ajuste ao contexto falhou: %s", fit_err)
+                    fit_info = {"action": "error", "error": str(fit_err)[:200]}
+
                 # 3. v0.5.1.6 — REINICIAR ttyd com `opencode -s <session_id>`
                 # Bug antigo: importava a sessão mas o ttyd continuava com --prompt,
                 # então location.reload() mostrava a conversa ATUAL, não a importada.
@@ -3280,6 +3345,7 @@ def start_wrapper_server():
                     "ok": True,
                     "file": fname,
                     "session_id": session_id,
+                    "fit": fit_info,
                     "parse_error": parse_error,
                     "import_stdout": import_stdout,
                     "source_format": src_format,

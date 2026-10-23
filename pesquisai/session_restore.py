@@ -37,9 +37,11 @@ import os
 import re
 import secrets
 import shutil
+import string
 import subprocess
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from collections import Counter
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 __all__ = [
     "SessionError",
@@ -54,6 +56,8 @@ __all__ = [
     "sanitize_v2",
     "prepare_import_payload",
     "import_session",
+    "id_shape",
+    "mint_id_like",
     "AUTOSAVE_SLOTS",
     "autosave_paths",
     "rotate_autosave",
@@ -84,12 +88,151 @@ def _run(cmd: List[str], env: Optional[Dict[str, str]] = None,
         raise SessionError(str(exc)) from exc
 
 
-def _new_session_id() -> str:
-    return "ses_" + secrets.token_hex(8)
+def _new_session_id(samples: Optional[Iterable[str]] = None) -> str:
+    """Novo id de sessao **no formato nativo do motor** (correcao 23/10/2026).
+
+    O id precisa ter o formato que o motor usa, porque o gateway do
+    *free tier* do OpenCode valida o cabecalho `x-opencode-session`
+    (issue #49433): `ses_` + 12 hex (componente de tempo) + 14 base62.
+    Ids fora desse padrao recebem **HTTP 403 FreeTierError** —
+    "OpenCode's free tier can only be used from within OpenCode" — e a
+    conversa restaurada morre na primeira mensagem (ou na compactacao),
+    enquanto uma sessao NOVA funciona (o proprio motor a cria).
+
+    Antes desta correcao o id era `ses_` + 16 hex (`token_hex(8)`), o que
+    fazia **toda sessao restaurada** falhar com modelos gratuitos. O
+    formato agora e **inferido** dos ids nativos vivos (`samples`, do mais
+    novo para o mais antigo) — nunca presumido; sem amostras, usa o padrao
+    oficial (12 hex + 14 base62).
+    """
+    return mint_id_like("ses_", samples, fallback_hex=8)
 
 
-def _new_message_id() -> str:
-    return "msg_" + secrets.token_hex(12)
+def _new_message_id(samples: Optional[Iterable[str]] = None) -> str:
+    """Novo id de mensagem no formato nativo (ver `_new_session_id`)."""
+    return mint_id_like("msg_", samples, fallback_hex=12)
+
+
+#: Alfabetos dos ids do motor. O formato oficial (opencode `Identifier`) e
+#: ``<prefixo>_`` + 12 hex (tempo) + 14 base62; o motor opencode-go usa o
+#: mesmo formato. Nao presumimos: `id_shape()` infere a partir dos ids vivos.
+_HEX_CHARS = frozenset("0123456789abcdef")
+_B62_CHARS = string.ascii_letters + string.digits
+_DEFAULT_TAIL_PATTERN = "h" * 12 + "b" * 14
+
+#: Formato NATIVO do id de sessao do motor (medido nos ids vivos):
+#: ``ses_`` + 12 caracteres hex + 14 caracteres base62.
+#:
+#: **E o formato que o gateway do free tier aceita.** Reproduzido em
+#: 23/10/2026: uma sessao importada com id no formato legado
+#: (``ses_`` + 16 hex — o que a retomada gerava ate a v0.7.3) e recusada
+#: por QUALQUER modelo free do OpenCode Zen com
+#: "OpenCode's free tier can only be used from within OpenCode"; com o id
+#: nativo (26 caracteres) a mesma sessao responde normalmente.
+NATIVE_ID_RE = re.compile(r"^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$")
+LEGACY_ID_RE = re.compile(r"^ses_[0-9a-f]{16}$")
+
+
+def is_native_id(value: str) -> bool:
+    """True quando o id tem o formato nativo do motor (aceito pelo free tier)."""
+    return bool(NATIVE_ID_RE.match(str(value or "")))
+
+
+def native_ids(samples: Optional[Iterable[str]], prefix: str = "ses_") -> List[str]:
+    """Filtra apenas os ids NATIVOS (ignora os legados gerados pela retomada).
+
+    `prefix` permite o mesmo formato para `msg_` (o motor usa o mesmo
+    `Identifier` para mensagens).
+    """
+    rx = NATIVE_ID_RE if prefix == "ses_" else re.compile(
+        r"^%s[0-9a-f]{12}[0-9A-Za-z]{14}$" % re.escape(prefix))
+    return [s for s in (samples or [])
+            if isinstance(s, str) and rx.match(s)]
+
+
+def id_shape(samples: Optional[Iterable[str]], prefix: str = "ses_",
+             ) -> Optional[Tuple[int, str, str]]:
+    """Formato dos ids: `(tamanho, padrao, amostra)`.
+
+    `padrao` e uma string de `h` (hex) e `b` (base62) por posicao — p.ex.
+    ``"hhhhhhhhhhhhbbbbbbbbbbbbbb"`` (12 hex + 14 base62). A amostra
+    devolvida e a primeira (mais recente) com o tamanho majoritario, e
+    serve de molde para o componente de tempo.
+
+    Devolve ``None`` quando nao ha amostra utilizavel.
+
+    **23/10/2026 — correcao:** so ids **nativos** devem ser copiados. Um
+    id legado (`ses_` + 16 hex) reintroduz o bug do free tier; ids
+    antigos nao podem servir de molde.
+    """
+    tails = [
+        value[len(prefix):]
+        for value in (samples or [])
+        if isinstance(value, str) and value.startswith(prefix)
+        and len(value) > len(prefix)
+    ]
+    if not tails:
+        return None
+    length = Counter(len(t) for t in tails).most_common(1)[0][0]
+    same = [t for t in tails if len(t) == length]
+    pattern = []
+    for pos in range(length):
+        chars = {t[pos] for t in same}
+        pattern.append("h" if chars <= _HEX_CHARS else "b")
+    return length, "".join(pattern), same[0]
+
+
+def mint_id_like(prefix: str, samples: Optional[Iterable[str]] = None,
+                 fallback_hex: int = 8,
+                 taken: Optional[Iterable[str]] = None) -> str:
+    """Gera um id novo **no formato nativo do motor**.
+
+    - Com amostras NATIVAS: copia os 12 primeiros caracteres (o componente
+      de tempo — que o gateway usa para checar plausibilidade) da amostra
+      mais recente e sorteia os 14 restantes no alfabeto base62.
+    - Sem amostra nativa: monta o formato oficial (12 hex + 14 base62).
+    - `taken`: ids que nao podem ser repetidos (garante unicidade).
+
+    **Nunca** devolve o formato legado (`ses_` + 16 hex): ids assim sao
+    recusados pelo gateway do free tier (ver `NATIVE_ID_RE`).
+    """
+    native = native_ids(samples, prefix)
+    if native:
+        template = native[0][len(prefix):]
+        length = len(template)
+        hex_part = template[:12] if length >= 12 else template
+        tail_len = max(0, length - len(hex_part))
+        for _ in range(8):
+            chars = list(hex_part) + [
+                secrets.choice(_B62_CHARS) for _ in range(tail_len)
+            ]
+            candidate = prefix + "".join(chars)
+            if not taken or candidate not in set(taken):
+                return candidate
+        # colisao com um id ja usado: sorteia so a parte aleatoria
+        chars = list(hex_part) + [secrets.choice(_B62_CHARS) for _ in range(tail_len)]
+        return prefix + "".join(chars)
+
+    # Sem referencia nativa: formato oficial do OpenCode (12 hex + 14 base62).
+    tail = secrets.token_hex(6) + "".join(
+        secrets.choice(_B62_CHARS) for _ in _DEFAULT_TAIL_PATTERN[12:]
+    )
+    return _unique(prefix + tail, prefix, taken, fallback_hex)
+
+
+def _plausible_hex12() -> str:
+    """12 hex com aparencia de tempo (ms nos bits altos), como o motor."""
+    return format((int(time.time() * 1000) << 12) & 0xFFFFFFFFFFFF, "012x")
+
+
+def _unique(candidate: str, prefix: str, taken: Optional[Iterable[str]],
+            fallback_hex: int) -> str:
+    if not taken:
+        return candidate
+    used = set(taken)
+    while candidate in used:
+        candidate = prefix + secrets.token_hex(fallback_hex)
+    return candidate
 
 
 def _now_ms() -> int:
@@ -527,7 +670,8 @@ _IMPORTABLE_INFO_KEYS = (
 
 
 def sanitize_v2(payload: Dict[str, Any], project_id: str = "",
-                fallback_directory: str = "") -> Dict[str, Any]:
+                fallback_directory: str = "",
+                id_samples: Optional[Iterable[str]] = None) -> Dict[str, Any]:
     """Remove o que o import do motor v2 rejeita e renova os ids.
 
     - `info`: mantem apenas as chaves aceitas (remove `outcome`, `slug`,
@@ -537,8 +681,15 @@ def sanitize_v2(payload: Dict[str, Any], project_id: str = "",
       `model-switched`, que o import nao aceita → HTTP 500).
     - ids: `info.id` e o id de cada mensagem sao renovados — sem isso o
       import colide com as linhas ja existentes na base (HTTP 500).
+
+    `id_samples` (23/10/2026): ids de sessoes **nativas** do motor em
+    execucao (do mais novo para o mais antigo). O id novo imita esse
+    formato — obrigatorio para o free tier do OpenCode, que valida o
+    cabecalho `x-opencode-session` (issue #49433). Sem amostras, usa o
+    padrao oficial (12 hex + 14 base62).
     """
     out: Dict[str, Any] = {}
+    samples = [s for s in (id_samples or []) if isinstance(s, str)]
 
     old_info = dict(payload.get("info") or {})
     new_info: Dict[str, Any] = {}
@@ -552,8 +703,12 @@ def sanitize_v2(payload: Dict[str, Any], project_id: str = "",
         directory = old_info.get("directory") or fallback_directory
         if directory:
             new_info["location"] = {"directory": directory}
-    new_info["id"] = _new_session_id()
+    new_info["id"] = _new_session_id(samples)
     out["info"] = new_info
+
+    # Ids de mensagem: mesmo formato do id de sessao recem-criado (o motor
+    # usa o mesmo `Identifier` para `msg_`). A amostra e o proprio id novo.
+    msg_samples = [new_info["id"].replace("ses_", "msg_", 1)] + samples
 
     messages: List[Dict[str, Any]] = []
     for msg in (payload.get("messages") or []):
@@ -563,7 +718,7 @@ def sanitize_v2(payload: Dict[str, Any], project_id: str = "",
         if mtype not in _IMPORTABLE_MESSAGE_TYPES:
             continue
         new_msg = dict(msg)
-        new_msg["id"] = _new_message_id()
+        new_msg["id"] = _new_message_id(msg_samples)
         if mtype == "user":
             new_msg.setdefault("files", [])
             new_msg.setdefault("agents", [])
@@ -577,11 +732,16 @@ def sanitize_v2(payload: Dict[str, Any], project_id: str = "",
 
 
 def prepare_import_payload(path: str, project_id: str = "",
-                            fallback_directory: str = "") -> Tuple[Dict[str, Any], str]:
+                            fallback_directory: str = "",
+                            id_samples: Optional[Iterable[str]] = None,
+                            ) -> Tuple[Dict[str, Any], str]:
     """Le um backup e devolve (payload pronto para o import, formato de origem).
 
     Levanta `SessionError` quando o arquivo nao pode ser lido ou tem JSON
     invalido (caso dos backups truncados pelo FUSE do Drive).
+
+    `id_samples` — ids das sessoes nativas vivas, para o id importado nascer
+    no formato do motor (ver `sanitize_v2`).
     """
     try:
         with open(path, "r", encoding="utf-8") as fh:
@@ -612,7 +772,8 @@ def prepare_import_payload(path: str, project_id: str = "",
     else:
         raise SessionError("Esquema de sessao desconhecido — o backup nao e compativel.")
 
-    return sanitize_v2(payload, project_id, fallback_directory), fmt
+    return sanitize_v2(payload, project_id, fallback_directory,
+                       id_samples=id_samples), fmt
 
 
 def import_session(binary: str, payload: Dict[str, Any],
@@ -643,6 +804,217 @@ def import_session(binary: str, payload: Dict[str, Any],
             os.unlink(tmp)
         except OSError:
             pass
+
+
+# ── ajuste ao contexto do modelo (correcao 23/10/2026) ───────────────────
+
+#: Orcamento de contexto (em tokens) que TODA sessao restaurada deve caber.
+#:
+#: Por que existe: os autosaves reais do UFVAI tem ~1,1 MB (≈300 mil
+#: tokens). Os modelos *free* do OpenCode Zen tem 200 mil de contexto
+#: (`deepseek-v4.1-flash-free`, `glm-5.3-flash-free`, ...). Ao abrir a
+#: sessao restaurada o motor ve o contexto estourado e dispara a
+#: **compactacao automatica** antes de responder — e esse caminho
+#: interno e' recusado pelo gateway do free tier com
+#: "OpenCode's free tier can only be used from within OpenCode"
+#: (issues #49587, #49592, #49433). Resultado: QUALQUER sessao restaurada
+#: falha com modelo gratuito, enquanto uma sessao NOVA funciona (contexto
+#: vazio, sem compactacao).
+#:
+#: A compactacao MANUAL (`POST /api/session/<id>/compact`) nao passa por
+#: esse caminho e funciona — por isso ela e' a primeira tentativa aqui.
+FREE_TIER_SAFE_TOKENS = 130_000
+
+#: Fracao do contexto do modelo usada como orcamento. So se compacta
+#: quando a sessao restaurada **nao cabe** no modelo — ou seja, quando o
+#: motor teria de compactar sozinho (caminho automatico, que e' o que o
+#: gateway do free tier recusa). Com folga para o system prompt, as
+#: ferramentas e a proxima resposta.
+CONTEXT_BUDGET_RATIO = 0.85
+
+
+def estimate_tokens(payload: Dict[str, Any]) -> int:
+    """Estimativa de tokens do payload (heuristica ~3,5 caracteres/token).
+
+    Soma o JSON de cada mensagem (texto, ferramentas, resultados). Nao
+    precisa ser exato: serve para decidir se a sessao cabe no contexto do
+    modelo antes de o motor tentar compactar.
+    """
+    total = 0
+    for msg in (payload.get("messages") or []):
+        try:
+            total += len(json.dumps(msg, ensure_ascii=False))
+        except (TypeError, ValueError):
+            continue
+    return int(total / 3.5)
+
+
+def model_context_limit(binary: str, model: Dict[str, Any],
+                        env: Optional[Dict[str, str]] = None) -> int:
+    """Contexto (em tokens) do modelo da sessao; 0 quando desconhecido."""
+    pid = str((model or {}).get("providerID") or "")
+    mid = str((model or {}).get("id") or "")
+    if not pid or not mid:
+        return 0
+    try:
+        r = _run([binary, "api", "get", "/api/model"], env=env, timeout=60)
+        data = json.loads(r.stdout or "[]")
+    except (SessionError, ValueError, OSError):
+        return 0
+    items = data.get("data") if isinstance(data, dict) else data
+    for item in (items or []):
+        if not isinstance(item, dict):
+            continue
+        if item.get("providerID") == pid and item.get("id") == mid:
+            try:
+                return int((item.get("limit") or {}).get("context") or 0)
+            except (TypeError, ValueError):
+                return 0
+    return 0
+
+
+def context_budget(binary: str, model: Dict[str, Any],
+                   env: Optional[Dict[str, str]] = None) -> int:
+    """Orcamento seguro para a sessao restaurada.
+
+    `min(55% do contexto do modelo, FREE_TIER_SAFE_TOKENS)`. Sem contexto
+    conhecido, usa o teto dos modelos gratuitos. O teto fixo garante que a
+    sessao continue funcionando se o usuario trocar para um modelo free de
+    200 mil tokens depois de restaurar.
+    """
+    limit = model_context_limit(binary, model, env)
+    if limit <= 0:
+        # Modelo desconhecido: usa o menor contexto comum dos modelos
+        # gratuitos (200 mil) como referencia.
+        return FREE_TIER_SAFE_TOKENS
+    return int(limit * CONTEXT_BUDGET_RATIO)
+
+
+def trim_payload(payload: Dict[str, Any], budget: int) -> Tuple[Dict[str, Any], int]:
+    """Apara as mensagens MAIS ANTIGAS ate o payload caber em `budget`.
+
+    Devolve `(payload_novo, quantas_mensagens_foram_descartadas)`. Mantem
+    sempre a ultima mensagem do usuario (o contexto imediato da conversa).
+    """
+    messages = list(payload.get("messages") or [])
+    if not messages or budget <= 0:
+        return dict(payload), 0
+    kept: List[Dict[str, Any]] = []
+    used = 0
+    for msg in reversed(messages):
+        try:
+            size = int(len(json.dumps(msg, ensure_ascii=False)) / 3.5) + 1
+        except (TypeError, ValueError):
+            size = 1
+        if kept and used + size > budget:
+            break
+        kept.append(msg)
+        used += size
+    kept.reverse()
+    dropped = len(messages) - len(kept)
+    out = dict(payload)
+    out["messages"] = kept
+    return out, dropped
+
+
+def _compaction_status(binary: str, session_id: str,
+                       env: Optional[Dict[str, str]] = None) -> str:
+    """Status da compactacao MAIS RECENTE da sessao ("", "running", ...)."""
+    try:
+        r = _run([binary, "api", "get", f"/api/session/{session_id}/message"],
+                 env=env, timeout=60)
+        data = json.loads(r.stdout or "{}")
+    except (SessionError, ValueError, OSError):
+        return ""
+    items = data.get("data") if isinstance(data, dict) else data
+    for msg in (items or []):
+        if isinstance(msg, dict) and msg.get("type") == "compaction":
+            return str(msg.get("status") or "running")
+    return ""
+
+
+def compact_session(binary: str, session_id: str,
+                    env: Optional[Dict[str, str]] = None,
+                    wait_s: int = 120) -> bool:
+    """Roda a compactacao MANUAL da sessao e espera terminar.
+
+    A compactacao manual nao sofre o bloqueio do free tier (o caminho
+    automatico e' que e' recusado). Devolve True quando o motor reporta
+    `completed`.
+    """
+    try:
+        r = _run([binary, "api", "post", f"/api/session/{session_id}/compact",
+                  "-d", "{}"], env=env, timeout=90)
+    except SessionError:
+        return False
+    if r.returncode != 0:
+        return False
+    deadline = time.time() + max(10, wait_s)
+    while time.time() < deadline:
+        status = _compaction_status(binary, session_id, env)
+        if status == "completed":
+            return True
+        if status == "failed":
+            return False
+        time.sleep(3)
+    return False
+
+
+def delete_session(binary: str, session_id: str,
+                   env: Optional[Dict[str, str]] = None) -> bool:
+    """Apaga uma sessao (best-effort) — usada ao descartar um import aparado."""
+    try:
+        r = _run([binary, "session", "delete", session_id], env=env, timeout=60)
+        return r.returncode == 0
+    except SessionError:
+        return False
+
+
+def fit_to_context(binary: str, session_id: str, payload: Dict[str, Any],
+                   env: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    """Faz a sessao restaurada CABER no contexto dos modelos gratuitos.
+
+    Ordem: (1) nada a fazer, se ja cabe; (2) compactacao MANUAL (preserva
+    um resumo da conversa); (3) reimportar o payload aparado (ultimas
+    mensagens que cabem) e apagar o import grande.
+
+    Sem isso, o motor dispara a compactacao AUTOMATICA ao abrir a sessao —
+    caminho que o gateway do free tier recusa — e o usuario ve
+    `✗ Compaction · OpenCode's free tier can only be used from within
+    OpenCode` em qualquer sessao restaurada.
+    """
+    model = dict(payload.get("info") or {}).get("model") or {}
+    budget = context_budget(binary, model, env)
+    before = estimate_tokens(payload)
+    result: Dict[str, Any] = {
+        "session_id": session_id,
+        "action": "none",
+        "tokens_before": before,
+        "budget": budget,
+    }
+    if budget <= 0 or before <= budget:
+        return result
+
+    if compact_session(binary, session_id, env):
+        result["action"] = "compacted"
+        result["tokens_after"] = 0  # o motor nao informa o novo total aqui
+        return result
+
+    trimmed, dropped = trim_payload(payload, budget)
+    try:
+        new_id = import_session(binary, trimmed, env)
+    except SessionError as exc:
+        result["action"] = "failed"
+        result["error"] = str(exc)[:200]
+        return result
+    delete_session(binary, session_id, env)
+    result.update({
+        "session_id": new_id,
+        "action": "trimmed",
+        "messages_dropped": dropped,
+        "tokens_after": estimate_tokens(trimmed),
+    })
+    return result
 
 
 # ── autosave (v0.7.0) ────────────────────────────────────────────────────
