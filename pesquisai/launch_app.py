@@ -2473,8 +2473,13 @@ def start_wrapper_server():
                 # frontend só precisa fazer o POST quando há divergência OU
                 # saudação a semear (sem isso, sessão nova com o mesmo idioma
                 # do servidor ficaria sem a mensagem padrão).
+                _prefs_lang = _read_prefs() or {}
                 self._json(200, {
                     "lang": _current_lang,
+                    # v0.7.5+ (sem bump): "user" = escolha explícita no menu;
+                    # "browser"/"auto" = detecção. O frontend usa isso para
+                    # não deixar um cookie antigo vencer o navegador.
+                    "lang_source": str(_prefs_lang.get("lang_source") or "auto"),
                     "greeting": get_greeting(_current_lang),
                     "greeting_pending": _greeting_pending(_current_ttyd_session),
                 })
@@ -4120,7 +4125,22 @@ def start_wrapper_server():
                 if isinstance(_restart, str):
                     _restart = _restart.strip().lower() not in ("0", "false", "off", "no", "")
                 if not _restart:
-                    _set_lang_only(full_lang, source="browser")
+                    _source = str(body.get("source") or "browser").strip().lower()
+                    if _source not in ("user", "browser", "auto"):
+                        _source = "browser"
+                    # v0.7.5+ (sem bump): dica do NAVEGADOR não sobrescreve
+                    # escolha EXPLÍCITA do usuário (lang_source=user).
+                    _prefs_now = _read_prefs() or {}
+                    if (_source == "browser"
+                            and str(_prefs_now.get("lang_source") or "") == "user"
+                            and _prefs_now.get("lang")):
+                        self._json(200, {
+                            "ok": True, "lang": _current_lang, "changed": False,
+                            "restarted": False, "ignored": True,
+                            "greeting_seeded": False,
+                        })
+                        return
+                    _set_lang_only(full_lang, source=_source)
                     seeded = _consume_greeting(_current_ttyd_session, full_lang)
                     self._json(200, {
                         "ok": True,

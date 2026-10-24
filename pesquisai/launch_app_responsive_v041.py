@@ -1786,6 +1786,11 @@ def create_wrapper_html(
     const LANGS = {__LANGS_JSON__};
     const I18N = {__I18N_JSON__};
     const LANG_COOKIE = "pesquisai_lang";
+    // v0.7.5+ (sem bump): separa "escolhi no menu" de "foi detectado".
+    // Sem isso, um cookie en_US gravado por uma adoção automática antiga
+    // vencia o navegador — a interface abria em inglês com o navegador em
+    // português.
+    const LANG_SRC_COOKIE = "pesquisai_lang_src";
     const THEME_COOKIE = "pesquisai_theme";
     const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 ano
 
@@ -1857,33 +1862,49 @@ def create_wrapper_html(
       return m ? decodeURIComponent(m[2]) : null;
     }
 
-    // ── Detecção de idioma (URL > cookie > navegador > padrão) ─
+    // ── Detecção de idioma (URL > escolha do usuário > navegador > resto) ─
+    // v0.7.5+ (sem bump): o cookie só manda se o usuário escolheu no menu
+    // (LANG_SRC_COOKIE=user). Cookie automático (adoção antiga do backend em
+    // inglês) NÃO vence mais o navigator.language.
+    function browserLang() {
+      const list = (navigator.languages && navigator.languages.length)
+        ? navigator.languages
+        : [navigator.language || ""];
+      for (let i = 0; i < list.length; i++) {
+        const l = String(list[i] || "").toLowerCase();
+        if (l.startsWith("pt")) return "pt_BR";
+        if (l.startsWith("en")) return "en_US";
+        if (l.startsWith("es")) return "es_ES";
+        if (l.startsWith("fr")) return "fr_FR";
+        // v0.7.5: zh_CN é suportado desde a v0.6.25. Antes, um navegador em
+        // chinês era forçado para en_US — o frontend e o backend divergiam
+        // a cada entrada e o "sync" de idioma reiniciava o terminal.
+        if (l.startsWith("zh")) return "zh_CN";
+      }
+      return "";
+    }
+
     function getCurrentLang() {
-      // 1. Query param ?lang=xx_XX (forçar via link)
+      // 1. Query param ?lang=xx_XX (forçar via link) = escolha explícita
       const url = new URL(location.href);
       const ql = url.searchParams.get("lang");
       if (ql && LANGS[ql]) {
         setCookie(LANG_COOKIE, ql);
+        setCookie(LANG_SRC_COOKIE, "user");
         return ql;
       }
-      // 2. Cookie persistido
+      // 2. Cookie de escolha EXPLÍCITA do usuário
       const ck = getCookie(LANG_COOKIE);
+      if (getCookie(LANG_SRC_COOKIE) === "user" && ck && LANGS[ck]) return ck;
+      // 3. Navegador (fonte da detecção automática)
+      const nav = browserLang();
+      if (nav) return nav;
+      // 4. Cookie/localStorage gravados automaticamente (fallback)
       if (ck && LANGS[ck]) return ck;
-      // 3. localStorage (fallback)
       try {
         const ls = localStorage.getItem(LANG_COOKIE);
         if (ls && LANGS[ls]) return ls;
       } catch (e) {}
-      // 4. navigator.language (navegador)
-      const nav = (navigator.language || "pt-BR").toLowerCase();
-      if (nav.startsWith("pt")) return "pt_BR";
-      if (nav.startsWith("en")) return "en_US";
-      if (nav.startsWith("es")) return "es_ES";
-      if (nav.startsWith("fr")) return "fr_FR";
-      // v0.7.5: zh_CN é suportado desde a v0.6.25. Antes, um navegador em
-      // chinês era forçado para en_US — o frontend e o backend divergiam
-      // a cada entrada e o "sync" de idioma reiniciava o terminal.
-      if (nav.startsWith("zh")) return "zh_CN";
       // 5. Padrão
       return "pt_BR";
     }
@@ -1947,8 +1968,15 @@ def create_wrapper_html(
       if (!LANGS[lang]) lang = "pt_BR";
       // v0.7.5: escolher o idioma que já está ativo não reinicia nada
       // (antes: matava o ttyd e criava outra sessão sem necessidade).
-      if (lang === _currentLang) { closeLangMenu(); return; }
+      if (lang === _currentLang) {
+        // ainda assim marca como escolha explícita (cookie antigo/auto)
+        setCookie(LANG_COOKIE, lang);
+        setCookie(LANG_SRC_COOKIE, "user");
+        closeLangMenu();
+        return;
+      }
       setCookie(LANG_COOKIE, lang);
+      setCookie(LANG_SRC_COOKIE, "user");
       const dict = I18N[lang] || I18N["pt_BR"];
       toast("🌐 " + (dict["languages.switched_to"] || lang), "info");
       closeLangMenu();
@@ -4720,6 +4748,13 @@ def create_wrapper_html(
           // v0.7.5+: o POST também é necessário quando a saudação da sessão
           // nova ainda não foi semeada — mesmo que o idioma coincida.
           const pending = !!(d && d.greeting_pending);
+          // v0.7.5+ (sem bump): escolha EXPLÍCITA do usuário (lang_source=user)
+          // vale em qualquer navegador — o cookie local não a sobrescreve.
+          if (d.lang_source === "user" && LANGS[backendLang] && backendLang !== _currentLang) {
+            setCookie(LANG_COOKIE, backendLang);
+            setCookie(LANG_SRC_COOKIE, "user");
+            applyLang(backendLang);
+          }
           if (backendLang === _currentLang && !pending) return;
           if (!LANGS[_currentLang]) return;
           const syncVal = UFVAI_BOOT_ID + "|" + _currentLang;
@@ -4731,7 +4766,7 @@ def create_wrapper_html(
           fetch(BASE + "/api/lang", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lang: _currentLang, restart: false })
+            body: JSON.stringify({ lang: _currentLang, restart: false, source: "browser" })
           }).then(r => r.ok ? r.json() : null).then(res => {
             if (!res || !res.ok) return;
             try { sessionStorage.setItem("ufvai_lang_synced", syncVal); } catch (e) {}
