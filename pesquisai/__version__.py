@@ -425,13 +425,13 @@ Histórico de versões:
 """
 
 # ── Versão semântica (SemVer) ──────────────────────────────────
-__version__: str = "0.7.3"
+__version__: str = "0.7.5"
 __brand__: str = "UFVAI"
 __brand_tagline__: str = "Pesquisa científica com integridade."
 
 # ── Metadados do release ───────────────────────────────────────
 __release_date__: str = "2026-10-22"
-__codename__: str = "Retomada do autosave uma unica vez + calendario do Restaurar corrigido + pacote pesquisai instalado"
+__codename__: str = "Telas de abertura e retomada uma unica vez por sessao (marca em 3 camadas)"
 
 # ── Identidade do projeto ──────────────────────────────────────
 __author__: str = "Gustavo Bastos Braga"

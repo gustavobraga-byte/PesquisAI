@@ -63,8 +63,19 @@ from .opencode_utils import (
     is_opencode_v2,
 )
 from .security import load_encrypted_keys, save_encrypted_keys, sanitize_command
-from .run_fast import ensure_ufvai_agent, preflight_ufvai_session, seed_ufvai_greeting
+from .run_fast import (
+    ensure_ufvai_agent,
+    preflight_ufvai_session,
+    preflight_ufvai_session_info,
+    remember_preflight_session,
+    reset_preflight_cache,
+    seed_ufvai_greeting,
+)
 from . import session_restore as _session_restore
+
+
+_LAST_AGENT_ENSURE: float = 0.0
+_AGENT_ENSURE_TTL_S: float = 30.0
 
 
 def _ensure_ufvai_agent_before_spawn(where: str = "terminal") -> None:
@@ -79,7 +90,16 @@ def _ensure_ufvai_agent_before_spawn(where: str = "terminal") -> None:
 
     Best-effort: JAMAIS impede o terminal de abrir — um terminal atrasado é
     pior que um aviso no log; a garantia roda de novo no próximo reinício.
+
+    v0.7.5 (correção 23/10/2026 — SEM bump): memoização curta (30 s). A
+    abertura normal chama esta função 2–3 vezes em poucos segundos
+    (start_ttyd → troca de idioma → restore); regravar AGENTS.md (~30 KB) e
+    opencode.json a cada chamada atrasava o terminal sem mudar nada.
     """
+    global _LAST_AGENT_ENSURE
+    now = time.monotonic()
+    if (now - _LAST_AGENT_ENSURE) < _AGENT_ENSURE_TTL_S:
+        return
     try:
         ok = ensure_ufvai_agent()
     except Exception as exc:  # noqa: BLE001 — spawn do terminal não pode falhar por isso
@@ -90,6 +110,33 @@ def _ensure_ufvai_agent_before_spawn(where: str = "terminal") -> None:
             "ensure_ufvai_agent NÃO gravou opencode.json (%s) — o motor pode "
             "iniciar com o agente `build` até o próximo reinício.", where,
         )
+        return
+    _LAST_AGENT_ENSURE = now
+
+
+def _set_lang_only(lang: str) -> None:
+    """Persiste o idioma SEM reiniciar o terminal (v0.7.5).
+
+    Usado quando o navegador discorda do idioma detectado no boot. Antes,
+    o frontend chamava o POST /api/lang normal, que matava o ttyd, criava
+    OUTRA sessão e recarregava a página só para trocar a saudação.
+    """
+    global _current_lang
+    _current_lang = lang
+    _persist_lang(lang)
+    _sync_terminal_locale(lang)
+
+
+def _remember_ttyd_session(session_id: str | None) -> None:
+    """Registra a sessão que o terminal passou a exibir (restore/comando).
+
+    Um reinício posterior (idioma/chave/keepalive) reabre ESTA conversa.
+    """
+    global _current_ttyd_session
+    sid = str(session_id or "").strip()
+    _current_ttyd_session = sid or None
+    if sid:
+        remember_preflight_session(sid)
 
 
 def _safe_isoformat(v):
@@ -149,6 +196,11 @@ _RATE: dict[str, list[float]] = {}
 # v0.6.5: handle do ttyd atual — permite matar a ÁRVORE do terminal
 # (ttyd + bash + opencode) por grupo de processo, sem pkill -f global.
 _TTYD_PROC: "subprocess.Popen | None" = None
+# v0.7.5 (correção 23/10/2026 — SEM bump): sessão que o terminal está
+# exibindo AGORA. Um reinício do ttyd (idioma/chave/keepalive) reabre esta
+# mesma sessão em vez de pré-criar outra — era o que fazia o UFVAI abrir
+# DUAS sessões na mesma entrada.
+_current_ttyd_session: str | None = None
 
 
 
@@ -329,6 +381,12 @@ def kill_previous():
         timeout=5,
     )
     _tmux_kill_session()  # boot começa de sessão limpa (a sessão tmux não morre com o ttyd)
+    # v0.7.5: um BOOT novo começa com sessão NOVA. Sem isso, reexecutar a
+    # célula de lançamento no mesmo kernel reabriria a conversa anterior
+    # (o cache de preflight é por processo).
+    global _current_ttyd_session
+    _current_ttyd_session = None
+    reset_preflight_cache()
     subprocess.run(
         ["pkill", "-f", f"python3.*{WRAPPER_PORT}"],
         capture_output=True,
@@ -1163,12 +1221,19 @@ def _tmux_kill_session() -> None:
         pass
 
 
-def _build_ttyd_cmd(lang: str | None = None):
+def _build_ttyd_cmd(lang: str | None = None, session_id: str | None = None,
+                    seed_greeting: bool = True):
     """v0.6.5: constrói (args, env) do ttyd com saudação no idioma pedido.
 
     Extraído de start_ttyd para permitir retry determinístico em
     restart_ttyd_with_lang/_ensure_terminal_ready.
+
+    v0.7.5 (correção 23/10/2026 — SEM bump): ``session_id`` permite REABRIR a
+    conversa atual num reinício (idioma/chave/keepalive) em vez de pré-criar
+    uma segunda sessão. ``seed_greeting=False`` evita repetir a saudação numa
+    sessão que já existe.
     """
+    global _current_ttyd_session
     opencode_bin, env = resolve_opencode()
 
     # Resolve idioma (param > env > _current_lang > detecção do sistema)
@@ -1203,24 +1268,37 @@ def _build_ttyd_cmd(lang: str | None = None):
         _DRIVE_PATH = os.path.join(os.environ.get("HOME", "/"), "PesquisAI")
     project_dir = _DRIVE_PATH if _DRIVE_PATH and os.path.isdir(_DRIVE_PATH) else os.getcwd()
 
-    session_id: str | None = None
-    try:
-        session_id = preflight_ufvai_session(cwd=project_dir)
-    except Exception as exc:  # noqa: BLE001
-        logger.debug("preflight_ufvai_session falhou inesperadamente: %s", exc)
-    if session_id:
-        # Envia a saudação em background para não bloquear o spawn do TUI.
-        # Sem isso, o opencode run espera ~6s e adia a aparição do terminal.
+    session_id = str(session_id or "").strip() or None
+    created = False
+    if not session_id:
         try:
-            subprocess.Popen(
-                [opencode_bin, "run", "--session", str(session_id), greeting],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                cwd=project_dir, env=env, start_new_session=True,
-            )
-        except Exception:  # noqa: BLE001
-            logger.debug("seed assíncrono da saudação não iniciado (ttyd continua)")
+            session_id, created = preflight_ufvai_session_info(cwd=project_dir)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("preflight_ufvai_session falhou inesperadamente: %s", exc)
+            session_id, created = None, False
+    if session_id:
+        # A saudação só é semeada em sessão NOVA: repeti-la a cada
+        # reinício (troca de idioma/chave) enchia a conversa de "Olá".
+        if created and seed_greeting:
+            # Envia a saudação em background para não bloquear o spawn do TUI.
+            # Sem isso, o opencode run espera ~6s e adia a aparição do terminal.
+            # v0.7.5: 1,2 s de atraso — o processo Node da saudação competia
+            # com o do TUI no mesmo núcleo logo após o spawn. A TUI já abre
+            # com a saudação a caminho.
+            def _seed_greeting_bg() -> None:
+                try:
+                    subprocess.Popen(
+                        [opencode_bin, "run", "--session", str(session_id), greeting],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        cwd=project_dir, env=env, start_new_session=True,
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.debug("seed assíncrono da saudação não iniciado (ttyd continua)")
+            threading.Timer(1.2, _seed_greeting_bg).start()
+        _current_ttyd_session = str(session_id)
         bash_cmd = f"cd \"{project_dir}\" && {opencode_bin} --session \"{session_id}\" {_yolo} ; exec bash"
     else:
+        _current_ttyd_session = None
         bash_cmd = f"cd \"{project_dir}\" && {opencode_bin} --prompt \"{safe_prompt}\" {_yolo} ; exec bash"
 
     # v0.4.2.5: construir args com --index (touch handlers)
@@ -1247,10 +1325,14 @@ def start_ttyd(lang: str | None = None):
     """
     print(f"\n{next_joke('economia')}")
     _ensure_ufvai_agent_before_spawn("start_ttyd")
-    ttyd_args, env, full_lang = _build_ttyd_cmd(lang)
+    ttyd_args, env, full_lang = _build_ttyd_cmd(
+        lang, session_id=_current_ttyd_session)
     _spawn_ttyd(ttyd_args, env)
     print(f"🚀 Terminal iniciado (idioma: {full_lang}, touch: {'ON' if '--index' in ttyd_args else 'OFF'}).")
-    time.sleep(0.8)
+    # v0.7.5: espera ATIVA (curta) em vez de sleep fixo de 0,8 s. A UI já
+    # abre em seguida e faz polling em /api/ttyd_ready; quando o ttyd sobe
+    # rápido, o boot ganha quase 1 s.
+    _wait_port_open(TERMINAL_PORT, timeout_s=0.8)
 
 
 def _sync_terminal_locale(full_lang: str) -> bool:
@@ -1309,7 +1391,10 @@ def restart_ttyd_with_lang(lang: str) -> bool:
         _ensure_ufvai_agent_before_spawn("restart_ttyd_with_lang")
 
         def _spawn():
-            ttyd_args, env, _full = _build_ttyd_cmd(lang)
+            # v0.7.5: reabre a sessão que o terminal já estava exibindo.
+            # Antes, o preflight criava OUTRA sessão a cada troca de idioma.
+            ttyd_args, env, _full = _build_ttyd_cmd(
+                lang, session_id=_current_ttyd_session)
             _spawn_ttyd(ttyd_args, env)
 
         ready = _ensure_terminal_ready(_spawn, timeout_s=18.0)
@@ -1503,6 +1588,21 @@ _BACKUPS_CACHE: dict = {"ts": 0.0, "items": None}
 _BACKUPS_CACHE_TTL = 45.0  # s
 
 
+def _warm_autosave_lists(directory: str) -> None:
+    """Aquece as listagens de autosave em segundo plano (v0.7.5+).
+
+    A pergunta de retomada aparece ~1 s depois de a pagina carregar. Sem
+    este aquecimento, a PRIMEIRA chamada de `/api/autosave` relia e
+    reparseava ~20 MB de JSON no Drive (1,0 s; 6 ms com cache) e a
+    pergunta chegava atrasada.
+    """
+    try:
+        _session_restore.list_autosaves(directory)
+        _session_restore.list_session_autosaves(directory)
+    except Exception:  # noqa: BLE001 — aquecimento nunca derruba o boot
+        pass
+
+
 def _list_backups_cached(directory: str | None = None,
                          autosave_dir: str | None = None,
                          force: bool = False) -> list:
@@ -1554,6 +1654,16 @@ def _resolve_restore_path(fname_raw: str, backup_dir: str,
     raw = (fname_raw or "").strip()
     if not raw:
         return None, "Nome de arquivo inválido."
+    # v0.7.4: autosave POR SESSAO — `autosave/sessions/<id>.json`
+    # (uma pasta abaixo, com nome validado; sem traversal).
+    if raw.startswith("autosave/sessions/"):
+        sub = raw[len("autosave/sessions/"):]
+        if not re.fullmatch(r"[A-Za-z0-9_-]+\.json", sub or ""):
+            return None, "Arquivo de autosave inválido."
+        path = os.path.join(autosave_dir, "sessions", sub)
+        if not os.path.exists(path):
+            return None, f"Arquivo não encontrado: {sub}"
+        return path, ""
     is_autosave = raw.startswith("autosave/")
     fname = raw[len("autosave/"):] if is_autosave else raw
     if (fname.startswith(".") or ".." in fname or "/" in fname or "\\" in fname
@@ -1577,6 +1687,18 @@ def _resolve_restore_path(fname_raw: str, backup_dir: str,
     if not os.path.exists(path):
         return None, f"Arquivo não encontrado: {fname}"
     return path, ""
+
+
+def _project_dir() -> str:
+    """Pasta do projeto (onde as conversas do autor vivem).
+
+    As conversas de outros diretorios (por exemplo `/root`, onde o motor
+    cria as sessoes de preflight) nao entram no autosave por sessao.
+    """
+    try:
+        return os.getcwd()
+    except OSError:
+        return ""
 
 
 def _ttyd_session_id() -> str:
@@ -1777,6 +1899,13 @@ def start_wrapper_server():
     # v0.7.0: pasta dos autosaves (3 ultimos, rotacionados)
     AUTOSAVE_DIR = os.path.join(DRIVE_BACKUP_DIR, "autosave")
     os.makedirs(AUTOSAVE_DIR, exist_ok=True)
+    # v0.7.5+: aquece a listagem em segundo plano (a pergunta de retomada
+    # nao pode esperar a leitura de ~20 MB do Drive).
+    try:
+        threading.Thread(target=_warm_autosave_lists, args=(AUTOSAVE_DIR,),
+                         daemon=True, name="ufvai-autosave-warm").start()
+    except Exception:  # noqa: BLE001
+        pass
     print(f"📁 Backup dir: {DRIVE_BACKUP_DIR}")
     print(f"💾 Autosave dir: {AUTOSAVE_DIR}")
     
@@ -1955,6 +2084,11 @@ def start_wrapper_server():
                 self.send_header("X-Content-Type-Options", "nosniff")
                 self.send_header("Referrer-Policy", "no-referrer")
                 self.send_header("X-Frame-Options", "SAMEORIGIN")
+                # v0.7.5: o HTML carrega o JS das telas de abertura — NUNCA
+                # deixar o navegador reusar uma versão antiga em cache
+                # (era o que mantinha o comportamento velho após a correção).
+                self.send_header("Cache-Control", "no-store, max-age=0")
+                self.send_header("Pragma", "no-cache")
                 self.send_header("Content-Length", str(len(content)))
                 self.end_headers()
                 self.wfile.write(content)
@@ -1997,8 +2131,11 @@ def start_wrapper_server():
                 # v0.6.5: status do terminal para o splash de carregamento da UI.
                 # O frontend faz polling aqui antes de apontar o iframe — assim
                 # o usuário nunca vê ERR_CONNECTION_REFUSED dentro do terminal.
+                # v0.7.5: timeout curto (0,25 s). O polling é frequente e a
+                # porta local responde na hora; 1,2 s por requisição segurava
+                # o splash quando o ttyd ainda estava subindo.
                 try:
-                    ready = _wait_port_open(TERMINAL_PORT, timeout_s=1.2)
+                    ready = _wait_port_open(TERMINAL_PORT, timeout_s=0.25)
                 except Exception:
                     ready = False
                 self._json(200, {"ready": bool(ready), "port": TERMINAL_PORT})
@@ -2012,9 +2149,18 @@ def start_wrapper_server():
                 except Exception as exc:
                     logger.warning("Falha ao listar autosaves: %s", exc)
                     items = []
+                # v0.7.4: um autosave POR CONVERSA (quando ha varias sessoes
+                # abertas, o autosave antigo so guardava uma).
+                try:
+                    per_session = _session_restore.list_session_autosaves(AUTOSAVE_DIR)
+                except Exception as exc:
+                    logger.warning("Falha ao listar autosaves por sessao: %s", exc)
+                    per_session = []
                 self._json(200, {
                     "autosaves": items,
                     "latest": items[0] if items else None,
+                    "sessions": per_session,
+                    "sessions_count": len(per_session),
                     "dir": AUTOSAVE_DIR,
                 })
                 return
@@ -2027,6 +2173,16 @@ def start_wrapper_server():
                 # consentimentos), que nao sao backups e nao podem ser
                 # restaurados.
                 items = _list_backups_cached(DRIVE_BACKUP_DIR, AUTOSAVE_DIR)
+                # v0.7.4: as conversas salvas individualmente entram na lista
+                # do modal "Restaurar" (cada uma pode ser restaurada).
+                try:
+                    _per_session = _session_restore.list_session_autosaves(AUTOSAVE_DIR)
+                except Exception:
+                    _per_session = []
+                _known = {item.get("file") for item in items}
+                for _item in _per_session:
+                    if _item.get("file") not in _known:
+                        items.append(_item)
                 dates = sorted({item["date"] for item in items}, reverse=True)
                 self._json(200, {
                     "backups": items,
@@ -3033,6 +3189,17 @@ def start_wrapper_server():
                                   "(veja logs/ttyd.log). Tente novamente."),
                     })
                     return
+                # v0.7.5: registra a sessão aberta por `opencode -s <id>` para
+                # que trocar idioma/chave depois não abra outra conversa.
+                try:
+                    _sess = re.search(r"(?:^|\s)(?:-s|--session)\s+[\"']?(ses_[A-Za-z0-9]+)", cmd)
+                    if _sess:
+                        _remember_ttyd_session(_sess.group(1))
+                    else:
+                        _remember_ttyd_session(None)
+                        reset_preflight_cache()
+                except Exception:
+                    pass
                 self._json(200, {"ok": True})
                 return
             
@@ -3216,15 +3383,18 @@ def start_wrapper_server():
                 # com modelos gratuitos (uma sessao NOVA funciona, porque o
                 # proprio motor cria o id). Antes, a retomada gerava
                 # `ses_` + 16 hex e quebrava TODA sessao restaurada.
-                _id_samples: list[str] = []
+                #
+                # Ajuste 23/10/2026 (sem bump) — VELOCIDADE: as amostras de
+                # id vem de cache em processo (antes: um `opencode session
+                # list` a cada restore).
+                _t0 = time.time()
+                _timings: dict = {}
                 try:
-                    _id_samples = [
-                        str(_s.get("id") or "")
-                        for _s in _session_restore.list_sessions(
-                            _opencode_bin or "opencode", env=_env)
-                    ]
+                    _id_samples = _session_restore.native_id_samples_cached(
+                        _opencode_bin or "opencode", env=_env)
                 except Exception as _exc:  # best-effort: sem amostras, padrao oficial
                     logger.warning("Restore: sem amostras de id nativas (%s)", _exc)
+                    _id_samples = []
                 try:
                     payload, src_format = _session_restore.prepare_import_payload(
                         tmp_restore,
@@ -3235,8 +3405,35 @@ def start_wrapper_server():
                 except _session_restore.SessionError as exc:
                     self._json(400, {"error": str(exc)})
                     return
+                _timings["prepare_ms"] = int((time.time() - _t0) * 1000)
+
+                # 2.0 Ajuste 23/10/2026 (sem bump) — PLANEJAR ANTES DE IMPORTAR.
+                # Antes: importava o payload INTEIRO (os autosaves reais tem
+                # 9,5 MB / ~2,6 milhoes de tokens), esperava a compactacao
+                # manual (ate 120 s) e, se ela falhasse, importava de novo o
+                # aparado. Agora:
+                #   - cabe no orcamento ......... importa direto;
+                #   - ate 25% acima ............. importa e compacta (rapido);
+                #   - muito acima ............... APARA e importa UMA vez.
+                _t_plan = time.time()
+                try:
+                    payload, plan = _session_restore.prepare_payload_for_restore(
+                        payload, _opencode_bin or "opencode", env=_env)
+                except Exception as _plan_err:  # fail-open: importa inteiro
+                    logger.warning("Restore: plano de contexto falhou: %s", _plan_err)
+                    plan = {"action": "none"}
+                _timings["plan_ms"] = int((time.time() - _t_plan) * 1000)
+                fit_info: dict = dict(plan)
+                if plan.get("action") == "trimmed":
+                    logger.info(
+                        "Restore: payload aparado ANTES do import "
+                        "(%s→%s tokens, %s mensagens descartadas, orcamento %s)",
+                        plan.get("tokens_before"), plan.get("tokens_after"),
+                        plan.get("messages_dropped"), plan.get("budget"),
+                    )
 
                 # 3. Importar (ids renovados evitam a colisao que dava HTTP 500)
+                _t_imp = time.time()
                 try:
                     session_id = _session_restore.import_session(
                         _opencode_bin or "opencode", payload, env=_env, timeout=180,
@@ -3249,6 +3446,7 @@ def start_wrapper_server():
                         )
                     })
                     return
+                _timings["import_ms"] = int((time.time() - _t_imp) * 1000)
 
                 parse_error = ""
                 import_stdout = f"Imported session: {session_id}"
@@ -3279,24 +3477,35 @@ def start_wrapper_server():
                 # restaurada, enquanto uma sessao nova funcionava.
                 # Compactacao MANUAL (nao bloqueada) ou, em ultimo caso,
                 # reimportar aparado.
-                fit_info: dict = {}
-                try:
-                    fit_info = _session_restore.fit_to_context(
-                        _opencode_bin or "opencode", session_id, payload, env=_env,
-                    )
-                    new_session_id = str(fit_info.get("session_id") or "")
-                    if new_session_id and new_session_id != session_id:
-                        session_id = new_session_id
-                    if fit_info.get("action") not in ("none", None):
-                        logger.info(
-                            "Restore: sessao ajustada ao contexto (%s, %s→%s tokens, "
-                            "orcamento %s)", fit_info.get("action"),
-                            fit_info.get("tokens_before"), fit_info.get("tokens_after"),
-                            fit_info.get("budget"),
-                        )
-                except Exception as fit_err:  # fail-open: o import ja esta valido
-                    logger.warning("Restore: ajuste ao contexto falhou: %s", fit_err)
-                    fit_info = {"action": "error", "error": str(fit_err)[:200]}
+                if plan.get("action") == "compact":
+                    _t_fit = time.time()
+                    try:
+                        if _session_restore.compact_session(
+                                _opencode_bin or "opencode", session_id, env=_env):
+                            fit_info["action"] = "compacted"
+                            fit_info["tokens_after"] = 0  # o motor nao informa
+                        else:
+                            # Compactacao nao terminou em 30 s: aparar e
+                            # reimportar e' mais rapido do que esperar.
+                            trimmed, dropped = _session_restore.trim_payload(
+                                payload, int(fit_info.get("budget") or 0))
+                            new_id = _session_restore.import_session(
+                                _opencode_bin or "opencode", trimmed, env=_env,
+                                timeout=180)
+                            _session_restore.delete_session(
+                                _opencode_bin or "opencode", session_id, env=_env)
+                            fit_info.update({
+                                "session_id": new_id,
+                                "action": "trimmed",
+                                "messages_dropped": dropped,
+                                "tokens_after": _session_restore.estimate_tokens(trimmed),
+                            })
+                            session_id = new_id
+                    except Exception as fit_err:  # fail-open: o import ja esta valido
+                        logger.warning("Restore: ajuste ao contexto falhou: %s", fit_err)
+                        fit_info["action"] = "error"
+                        fit_info["error"] = str(fit_err)[:200]
+                    _timings["fit_ms"] = int((time.time() - _t_fit) * 1000)
 
                 # 3. v0.5.1.6 — REINICIAR ttyd com `opencode -s <session_id>`
                 # Bug antigo: importava a sessão mas o ttyd continuava com --prompt,
@@ -3306,6 +3515,7 @@ def start_wrapper_server():
                 ttyd_restarted = False
                 ttyd_restart_error = ""
                 if session_id:
+                    _t_ttyd = time.time()
                     try:
                         _stop_terminal()
 
@@ -3326,6 +3536,10 @@ def start_wrapper_server():
 
                         ttyd_restarted = _ensure_terminal_ready(_spawn, timeout_s=18.0)
                         if ttyd_restarted:
+                            # v0.7.5: o terminal agora exibe a sessão importada.
+                            # Fixa-a para que um reinício posterior (idioma/chave)
+                            # reabra ESTA conversa, não a anterior.
+                            _remember_ttyd_session(session_id)
                             print(f"🔄 ttyd reiniciado com sessão {session_id}")
                         else:
                             ttyd_restart_error = (
@@ -3335,10 +3549,19 @@ def start_wrapper_server():
                     except Exception as restart_err:
                         ttyd_restart_error = str(restart_err)[:200]
                         logger.error("Falha ao reiniciar ttyd com sessão %s: %s", session_id, restart_err)
+                    _timings["ttyd_ms"] = int((time.time() - _t_ttyd) * 1000)
 
                 # 4. Respond
                 try:
                     _tel_event("session_restored", {})
+                except Exception:
+                    pass
+                _timings["total_ms"] = int((time.time() - _t0) * 1000)
+                try:
+                    logger.info(
+                        "Restore concluido em %sms (%s) — %s",
+                        _timings["total_ms"], fname, _timings,
+                    )
                 except Exception:
                     pass
                 self._json(200, {
@@ -3351,6 +3574,8 @@ def start_wrapper_server():
                     "source_format": src_format,
                     "ttyd_restarted": ttyd_restarted,
                     "ttyd_restart_error": ttyd_restart_error,
+                    "timings": _timings,
+                    "elapsed_ms": _timings["total_ms"],
                     "message": (
                         "Sessão importada e ttyd reiniciado com opencode -s "
                         + session_id if ttyd_restarted else
@@ -3450,12 +3675,38 @@ def start_wrapper_server():
                         "traceback": traceback.format_exc()[-800:],
                     })
                     return
+                # v0.7.4: SALVA TODAS AS CONVERSAS — com varias sessoes
+                # abertas, o autosave antigo guardava SO a do terminal (a
+                # conversa "que está ativa"). Agora cada conversa viva que
+                # tenha conteudo novo recebe o seu proprio arquivo em
+                # `backups/autosave/sessions/<id>.json`, e todas entram na
+                # lista do modal "Restaurar".
+                per_session: dict = {"ok": True, "saved": [], "skipped": [],
+                                     "failed": [], "total": 0, "scope": "active"}
+                # v0.7.4: por PADRAO salva SO a sessao ativa (e so quando ela
+                # muda). O botao "Todas as conversas" no rodape liga o modo
+                # completo (um arquivo por sessao).
+                _want_all = bool(body.get("all_sessions") or body.get("all"))
+                if _want_all:
+                    try:
+                        _sessions_all = _session_restore.list_sessions(
+                            _opencode_bin or "opencode", env=_env,
+                        )
+                        per_session = _session_restore.save_all_sessions(
+                            _opencode_bin or "opencode", _sessions_all,
+                            AUTOSAVE_DIR, env=_env,
+                            project_dir=_project_dir(),
+                        )
+                        per_session["scope"] = "all"
+                    except Exception as exc:
+                        logger.warning("Autosave por sessao falhou: %s", exc)
+                        per_session = {"ok": False, "error": str(exc)[:200]}
                 try:
                     _tel_event("autosave_created", {})
                 except Exception:
                     pass
                 _invalidate_backups_cache()  # autosave novo no Drive
-                self._json(200, {"ok": True, **info})
+                self._json(200, {"ok": True, **info, "sessions_saved": per_session})
                 return
 
             if p == "/api/theme":
@@ -3488,6 +3739,39 @@ def start_wrapper_server():
                     return
                 short = lang_in.split("_")[0].lower() if "_" in lang_in else lang_in.lower()
                 full_lang = _LANG_MAP.get(short, lang_in if lang_in in _LANG_MAP.values() else "pt_BR")
+                changed = (full_lang != _current_lang)
+
+                # v0.7.5 (correção 23/10/2026 — SEM bump): ``restart=False``
+                # é a ADOÇÃO SILENCIOSA do idioma do navegador. O backend sobe
+                # antes do navegador e detecta o idioma pelo locale do
+                # servidor (no Colab, en_US); antes, a divergência fazia o
+                # frontend chamar este endpoint e o ttyd era MORTO e recriado
+                # (2ª sessão) + location.reload() — perdendo a conversa e,
+                # às vezes, a pergunta de retomada. Aqui só persistimos.
+                _restart = body.get("restart", True)
+                if isinstance(_restart, str):
+                    _restart = _restart.strip().lower() not in ("0", "false", "off", "no", "")
+                if not _restart:
+                    _set_lang_only(full_lang)
+                    self._json(200, {
+                        "ok": True,
+                        "lang": full_lang,
+                        "changed": changed,
+                        "restarted": False,
+                    })
+                    return
+
+                # Nada mudou e o terminal está vivo: resposta imediata, sem
+                # reiniciar (antes, um POST redundante criava outra sessão).
+                if not changed and _wait_port_open(TERMINAL_PORT, timeout_s=0.3):
+                    self._json(200, {
+                        "ok": True,
+                        "lang": full_lang,
+                        "changed": False,
+                        "restarted": False,
+                    })
+                    return
+
                 ok = restart_ttyd_with_lang(full_lang)
                 if ok:
                     try:
@@ -3497,6 +3781,8 @@ def start_wrapper_server():
                     self._json(200, {
                         "ok": True,
                         "lang": full_lang,
+                        "changed": changed,
+                        "restarted": True,
                         "greeting": get_greeting(full_lang),
                         "message": f"ttyd reiniciado com saudação em {full_lang}",
                     })

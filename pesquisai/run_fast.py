@@ -26,6 +26,7 @@ Uso:
 import os
 import shutil
 import subprocess
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
@@ -680,6 +681,118 @@ Existe uma pasta persistente de skills personalizadas em:
     return False
 
 
+_PREFLIGHT_CACHE: dict[str, dict] = {}
+_PREFLIGHT_LOCK = threading.Lock()
+_PREFLIGHT_TTL_S = 900.0
+
+
+def _preflight_key(cwd: Optional[str] = None) -> str:
+    try:
+        return os.path.abspath(cwd or os.getcwd())
+    except Exception:  # noqa: BLE001
+        return str(cwd or "")
+
+
+def reset_preflight_cache() -> None:
+    """Esquece a sessão pré-criada (usado quando o terminal é trocado à força)."""
+    with _PREFLIGHT_LOCK:
+        _PREFLIGHT_CACHE.clear()
+
+
+def remember_preflight_session(session_id: str, cwd: Optional[str] = None) -> None:
+    """Registra a sessão que o terminal está usando agora.
+
+    Chamado após um restore/import (ou um ``opencode -s <id>``) para que um
+    reinício posterior (troca de idioma, chave, keepalive) reabra a MESMA
+    conversa em vez de criar outra sessão.
+    """
+    sid = str(session_id or "").strip()
+    if not sid.startswith("ses_"):
+        return
+    with _PREFLIGHT_LOCK:
+        _PREFLIGHT_CACHE[_preflight_key(cwd)] = {"id": sid, "ts": time.monotonic()}
+
+
+def preflight_ufvai_session_info(
+    cwd: Optional[str] = None,
+    timeout_s: float = 10.0,
+    reuse_s: float = _PREFLIGHT_TTL_S,
+) -> tuple[Optional[str], bool]:
+    """Como :func:`preflight_ufvai_session`, mas informa se a sessão é NOVA.
+
+    v0.7.5 (correção 23/10/2026 — SEM bump): a sessão pré-criada é reaproveitada
+    dentro da MESMA execução do UFVAI (TTL de 15 min). Antes, cada reinício do
+    ttyd (troca de idioma, troca de chave, keepalive) chamava o POST de criação
+    de novo e o motor acumulava duas sessões — a antiga (com a conversa) e uma
+    nova (vazia), que era a que o usuário via.
+
+    Returns:
+        ``(session_id, created)``: ``created`` é True somente quando a sessão
+        foi criada agora (e a saudação ainda precisa ser semeada).
+    """
+    import json as _json
+
+    key = _preflight_key(cwd)
+    now = time.monotonic()
+    with _PREFLIGHT_LOCK:
+        hit = _PREFLIGHT_CACHE.get(key)
+    if hit and (now - float(hit.get("ts") or 0)) <= reuse_s:
+        return str(hit.get("id")), False
+
+    try:
+        opencode_bin = find_opencode()
+    except FileNotFoundError:
+        logger.debug("preflight_ufvai_session: opencode não encontrado")
+        return None, False
+
+    payload = _json.dumps({
+        "agent": AGENT_NAME,
+        "title": "Terminal PesquisAI (UFVAI)",
+    })
+
+    def _api(arguments: list[str]) -> dict:
+        result = subprocess.run(
+            [opencode_bin, "api", *arguments],
+            capture_output=True, text=True, timeout=max(1.5, timeout_s / 2),
+            cwd=cwd or os.getcwd(),
+        )
+        raw = result.stdout.strip()
+        start = raw.find("{")
+        if start < 0:
+            raise ValueError(f"resposta sem JSON: {raw[:120]!r}")
+        parsed = _json.loads(raw[start:])
+        if not isinstance(parsed, dict):
+            raise ValueError("resposta não é um objeto JSON")
+        return parsed
+
+    try:
+        created = _api(["post", "/api/session", "--data", payload])
+        data = created.get("data") or {}
+        session_id = (data.get("id") or "").strip()
+        if not session_id.startswith("ses_"):
+            logger.debug("preflight_ufvai_session: id inválido no POST (%r)", session_id[:40])
+            return None, False
+        # Validação fail-closed: a sessão SÓ vale se nasceu presa ao UFVAI.
+        # v0.7.5: se o próprio POST já devolve ``agent``, não gasta um segundo
+        # processo Node com o GET (boot ~1 s mais curto no caminho feliz).
+        agent = data.get("agent")
+        if agent is None:
+            fetched = _api(["get", f"/api/session/{session_id}"])
+            agent = (fetched.get("data") or {}).get("agent")
+        if agent != AGENT_NAME:
+            logger.debug(
+                "preflight_ufvai_session: sessão criada com agent=%r (≠ %r) — descartando",
+                agent, AGENT_NAME,
+            )
+            return None, False
+        with _PREFLIGHT_LOCK:
+            _PREFLIGHT_CACHE[key] = {"id": session_id, "ts": time.monotonic()}
+        return session_id, True
+    except (subprocess.TimeoutExpired, ValueError, KeyError, OSError) as exc:
+        logger.debug("preflight_ufvai_session indisponível (%s) — seguindo sem --session", exc)
+        return None, False
+
+
 def preflight_ufvai_session(
     cwd: Optional[str] = None,
     timeout_s: float = 10.0,
@@ -721,55 +834,10 @@ def preflight_ufvai_session(
         timeout_s: limite de tempo total para POST + GET (best-effort).
 
     Returns:
-        ID (`ses_*`) da sessão criada e validada, ou None em qualquer falha.
+        ID (`ses_*`) da sessão criada/reaproveitada, ou None em qualquer falha.
     """
-    import json as _json
-
-    try:
-        opencode_bin = find_opencode()
-    except FileNotFoundError:
-        logger.debug("preflight_ufvai_session: opencode não encontrado")
-        return None
-
-    payload = _json.dumps({
-        "agent": AGENT_NAME,
-        "title": "Terminal PesquisAI (UFVAI)",
-    })
-
-    def _api(arguments: list[str]) -> dict:
-        result = subprocess.run(
-            [opencode_bin, "api", *arguments],
-            capture_output=True, text=True, timeout=timeout_s / 2,
-            cwd=cwd or os.getcwd(),
-        )
-        raw = result.stdout.strip()
-        start = raw.find("{")
-        if start < 0:
-            raise ValueError(f"resposta sem JSON: {raw[:120]!r}")
-        parsed = _json.loads(raw[start:])
-        if not isinstance(parsed, dict):
-            raise ValueError("resposta não é um objeto JSON")
-        return parsed
-
-    try:
-        created = _api(["post", "/api/session", "--data", payload])
-        session_id = ((created.get("data") or {}).get("id") or "").strip()
-        if not session_id.startswith("ses_"):
-            logger.debug("preflight_ufvai_session: id inválido no POST (%r)", session_id[:40])
-            return None
-        # Validação fail-closed: a sessão SÓ vale se nasceu presa ao UFVAI.
-        fetched = _api(["get", f"/api/session/{session_id}"])
-        agent = (fetched.get("data") or {}).get("agent")
-        if agent != AGENT_NAME:
-            logger.debug(
-                "preflight_ufvai_session: sessão criada com agent=%r (≠ %r) — descartando",
-                agent, AGENT_NAME,
-            )
-            return None
-        return session_id
-    except (subprocess.TimeoutExpired, ValueError, KeyError, OSError) as exc:
-        logger.debug("preflight_ufvai_session indisponível (%s) — seguindo sem --session", exc)
-        return None
+    session_id, _created = preflight_ufvai_session_info(cwd=cwd, timeout_s=timeout_s)
+    return session_id
 
 
 def _setup_theme_and_agent() -> None:

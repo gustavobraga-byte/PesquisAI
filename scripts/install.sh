@@ -34,7 +34,7 @@ echo "[1/2] Instalando pacote..."
 if command -v uv &> /dev/null; then
   uv sync
 else
-  pip install -e ".[colab]"
+  pip install -e ".[obsidian]"
 fi
 
 echo ""
