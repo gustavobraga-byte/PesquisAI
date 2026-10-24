@@ -3,6 +3,7 @@ import subprocess
 import time
 import threading
 import json
+import gzip
 import hashlib
 import shutil
 import traceback
@@ -114,16 +115,20 @@ def _ensure_ufvai_agent_before_spawn(where: str = "terminal") -> None:
     _LAST_AGENT_ENSURE = now
 
 
-def _set_lang_only(lang: str) -> None:
+def _set_lang_only(lang: str, source: str = "browser") -> None:
     """Persiste o idioma SEM reiniciar o terminal (v0.7.5).
 
     Usado quando o navegador discorda do idioma detectado no boot. Antes,
     o frontend chamava o POST /api/lang normal, que matava o ttyd, criava
     OUTRA sessão e recarregava a página só para trocar a saudação.
+
+    ``source="browser"`` grava a escolha no Drive: na próxima execução do
+    Colab o boot já começa no idioma certo (antes, /root/.config sumia e
+    tudo voltava para o inglês do locale do servidor).
     """
     global _current_lang
     _current_lang = lang
-    _persist_lang(lang)
+    _persist_lang(lang, source=source)
     _sync_terminal_locale(lang)
 
 
@@ -201,6 +206,20 @@ _TTYD_PROC: "subprocess.Popen | None" = None
 # mesma sessão em vez de pré-criar outra — era o que fazia o UFVAI abrir
 # DUAS sessões na mesma entrada.
 _current_ttyd_session: str | None = None
+
+# v0.7.5+ (sem bump): saudação pendente por sessão. A mensagem padrão é
+# semeada quando o CLIENTE informa o idioma (POST /api/lang), e não mais no
+# spawn do ttyd — o servidor não sabe o idioma do navegador.
+_PENDING_GREETING: dict[str, bool] = {}
+_GREETING_LOCK = threading.Lock()
+
+# v0.7.5+ (sem bump): auto-cura do terminal. O ttyd pode morrer (SIGKILL de
+# uma execução anterior) e a porta 8000 fica fechada — a interface mostrava o
+# splash "Iniciando terminal…" para sempre. Aqui ele é religado ANEXANDO à
+# sessão tmux existente (`tmux new -A`), então a conversa continua a mesma.
+_LAST_TTYD_REVIVE: float = 0.0
+_TTYD_REVIVE_LOCK = threading.Lock()
+_TTYD_REVIVE_MIN_S: float = 5.0
 
 
 
@@ -459,6 +478,41 @@ OrigWebSocket.prototype.send=function(data){
   return origSend.call(this,data);
 };
 
+// ====== AUTO-RECONNECT (v0.7.5+, sem bump) ======
+// O cliente do ttyd só reconecta sozinho quando o close code != 1000; num
+// reinício do servidor (troca de idioma, restore, auto-cura) ele fica em
+// "Press ⏎ to Reconnect" / "Reconnecting..." esperando o usuário. Aqui:
+// 1) Enter sintético no xterm (dispara o reconnect nativo);
+// 2) se em ~10 s ainda não voltou E o servidor responde /health, recarrega
+//    o iframe (último recurso) — sem laço quando o ttyd está realmente fora.
+var _reconnectTries=0, _lastReconnectTry=0, _reloads=0;
+setInterval(function(){
+  var s=capturedSocket;
+  if(!s)return;
+  if(s.readyState===1){_reconnectTries=0;return}
+  var now=Date.now();
+  if(now-_lastReconnectTry<2500)return;
+  _lastReconnectTry=now;
+  _reconnectTries++;
+  var ta=document.querySelector('.xterm-helper-textarea');
+  if(ta){
+    try{ta.focus()}catch(e){}
+    try{
+      ta.dispatchEvent(new KeyboardEvent('keydown',{
+        key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true,cancelable:true
+      }));
+    }catch(e){}
+  }
+  if(_reconnectTries>=4&&_reloads<3){
+    _reconnectTries=0;
+    try{
+      fetch('/health',{cache:'no-store'}).then(function(r){
+        if(r&&r.ok){_reloads++;window.location.reload()}
+      }).catch(function(){});
+    }catch(e){}
+  }
+},2500);
+
 // --- Acessar window.term ---
 function findTerminal(){
   if(term)return term;
@@ -665,13 +719,26 @@ def _prepare_ttyd_touch_index(env: dict) -> str | None:
     if _TTYD_TOUCH_INDEX_PATH and os.path.exists(_TTYD_TOUCH_INDEX_PATH):
         return _TTYD_TOUCH_INDEX_PATH
 
+    import socket as _socket
     import urllib.request as _urllib
+
+    # v0.7.5+ (sem bump): o ttyd temporário usa uma PORTA LIVRE. Antes ele
+    # subia na TERMINAL_PORT — se o ttyd real já estivesse no ar, o dummy
+    # não conseguia o bind e, no fim, um `pkill -9 -x ttyd` matava o ttyd
+    # REAL (era uma das causas do "Reconnect": qualquer chamada que
+    # regenerasse o index derrubava o terminal do usuário).
+    _s = _socket.socket()
+    try:
+        _s.bind(("127.0.0.1", 0))
+        _tmp_port = _s.getsockname()[1]
+    finally:
+        _s.close()
 
     # 1. Iniciar ttyd temporário com comando dummy
     #    v0.6.5: nova sessão de processos + log em arquivo
     print("📱 Preparando HTML do ttyd com touch handlers...")
     tmp_proc = subprocess.Popen(
-        ["ttyd", "-p", str(TERMINAL_PORT), "echo", "pesquisai_touch_tmp"],
+        ["ttyd", "-p", str(_tmp_port), "echo", "pesquisai_touch_tmp"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env,
         start_new_session=True,
     )
@@ -680,7 +747,7 @@ def _prepare_ttyd_touch_index(env: dict) -> str | None:
     # 2. Buscar HTML padrão do ttyd
     html_content: str | None = None
     try:
-        url = f"http://localhost:{TERMINAL_PORT}/"
+        url = f"http://localhost:{_tmp_port}/"
         req = _urllib.Request(url, headers={"User-Agent": "PesquisAI-Touch-Setup"})
         html_content = _urllib.urlopen(req, timeout=5).read().decode("utf-8")
     except Exception as e:
@@ -702,7 +769,9 @@ def _prepare_ttyd_touch_index(env: dict) -> str | None:
             pass
     except Exception:
         pass
-    subprocess.run(["pkill", "-9", "-x", "ttyd"], capture_output=True, timeout=3)
+    # v0.7.5+ (sem bump): NUNCA `pkill -9 -x ttyd` aqui. O temporário já foi
+    # encerrado acima (terminate + killpg); um pkill global mataria o ttyd
+    # real e derrubaria a sessão do usuário (sintoma "Reconnect").
     time.sleep(0.5)
 
     if not html_content:
@@ -842,29 +911,100 @@ def _detect_system_lang() -> str:
     return "pt_BR"
 
 
-def _persist_lang(lang: str) -> None:
-    """Persiste o idioma atual em ~/.config/pesquisai_lang."""
+def _prefs_path() -> str:
+    """Arquivo de preferências que SOBREVIVE a reinícios do Colab.
+
+    ``~/.config`` some quando o ambiente é reiniciado; o Drive não. Era por
+    isso que, a cada execução nova, o backend voltava a detectar o idioma
+    pelo locale do servidor (``en_US`` no Colab) e a saudação inicial saía
+    em inglês, mesmo com o navegador do usuário em português.
+    """
+    drive = "/content/drive/My Drive/PesquisAI"
+    base = drive if os.path.isdir(drive) else os.path.join(os.path.expanduser("~"), "PesquisAI")
+    return os.path.join(base, "config", "prefs.json")
+
+
+def _read_prefs() -> dict:
+    """Lê ``config/prefs.json`` (best-effort; devolve ``{}`` se não existir)."""
+    try:
+        import json as _json
+        with open(_prefs_path(), "r", encoding="utf-8") as fh:
+            data = _json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _write_prefs(**patch) -> None:
+    """Funde ``patch`` no prefs.json de forma atômica (tmp + replace)."""
+    try:
+        import json as _json
+        path = _prefs_path()
+        data = _read_prefs()
+        data.update(patch)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            _json.dump(data, fh, ensure_ascii=False, indent=2)
+        os.replace(tmp, path)
+    except Exception as exc:  # noqa: BLE001 — preferência nunca derruba o boot
+        try:
+            logger.debug("prefs: não foi possível gravar (%s)", exc)
+        except Exception:
+            pass
+
+
+def _persist_lang(lang: str, source: str = "user") -> None:
+    """Persiste o idioma no cookie local e, se for escolha do usuário, no Drive.
+
+    ``source``:
+      - ``"user"``    — o usuário clicou no seletor; vale para sempre;
+      - ``"browser"`` — adoção silenciosa do idioma do navegador; vale para as
+        próximas execuções (é a melhor pista de idioma que existe no boot);
+      - ``"auto"``    — detecção do sistema; grava só no arquivo local, jamais
+        no Drive (senão o ``en_US`` do Colab viraria "escolha do usuário").
+    """
     try:
         os.makedirs(os.path.dirname(_LANG_COOKIE_FILE), exist_ok=True)
         with open(_LANG_COOKIE_FILE, "w", encoding="utf-8") as f:
             f.write(lang)
     except Exception:
         pass
+    if source in ("user", "browser"):
+        _write_prefs(lang=lang, lang_source=source)
 
 
 def _ensure_lang_initialized() -> str:
     """v0.6.15: garante que _current_lang esteja resolvido ANTES do 1º ttyd.
 
-    Ordem: cookie file (≈ escolha explícita do usuário) > PESQUISAI_LANG env
-    > detecção do sistema (_detect_system_lang). Persiste o resultado para
-    tornar a próxima execução determinística. Idempotente — pode ser chamada
-    em launch() e em start_wrapper_server() sem efeitos colaterais.
+    Ordem: PESQUISAI_LANG (explícito) > prefs do Drive (escolha do usuário /
+    idioma do navegador, sobrevive ao reinício do Colab) > cookie local >
+    detecção do sistema. Persiste o resultado para tornar a próxima execução
+    determinística. Idempotente — pode ser chamada em launch() e em
+    start_wrapper_server() sem efeitos colaterais.
     """
     global _current_lang
     # Se já está válido, respeita (evita re-detectar após escolha do usuário)
     if _current_lang and _current_lang in _LANG_MAP.values():
         return _current_lang
     try:
+        if os.environ.get("PESQUISAI_LANG"):
+            env_lang = str(os.environ["PESQUISAI_LANG"]).strip()
+            short = env_lang.split("_")[0].lower()
+            _current_lang = _LANG_MAP.get(short, env_lang if env_lang in _LANG_MAP.values() else "pt_BR")
+            _persist_lang(_current_lang)
+            return _current_lang
+        # v0.7.5+: idioma escolhido na interface (ou adotado do navegador)
+        # gravado no Drive — o /root/.config não sobrevive ao reinício.
+        pref_lang = str((_read_prefs() or {}).get("lang") or "").strip()
+        if pref_lang:
+            short = pref_lang.split("_")[0].lower()
+            pref_full = _LANG_MAP.get(short, pref_lang if pref_lang in _LANG_MAP.values() else "")
+            if pref_full:
+                _current_lang = pref_full
+                _persist_lang(_current_lang)
+                print(f"🌐 Idioma das preferências (Drive): {_current_lang}")
+                return _current_lang
         if os.path.exists(_LANG_COOKIE_FILE):
             with open(_LANG_COOKIE_FILE, "r", encoding="utf-8") as f:
                 content = (f.read() or "").strip()
@@ -877,18 +1017,12 @@ def _ensure_lang_initialized() -> str:
                     _current_lang = _LANG_MAP.get(_short2, _current_lang if _current_lang in _LANG_MAP.values() else "pt_BR")
                 except Exception:
                     _current_lang = "pt_BR"
-                _persist_lang(_current_lang)
+                _persist_lang(_current_lang, source="browser")
                 return _current_lang
-        if os.environ.get("PESQUISAI_LANG"):
-            env_lang = str(os.environ["PESQUISAI_LANG"]).strip()
-            short = env_lang.split("_")[0].lower()
-            _current_lang = _LANG_MAP.get(short, env_lang if env_lang in _LANG_MAP.values() else "pt_BR")
-            _persist_lang(_current_lang)
-            return _current_lang
-        # Nenhuma preferência salva → detecta do sistema
+        # Nenhuma preferência salva → detecta do sistema (não grava no Drive)
         _current_lang = _detect_system_lang()
         print(f"🌐 Idioma detectado do sistema: {_current_lang}")
-        _persist_lang(_current_lang)
+        _persist_lang(_current_lang, source="auto")
         # normaliza
         try:
             _short = (_current_lang or "pt").split("_")[0].lower()
@@ -1088,6 +1222,32 @@ def _ttyd_log_file():
         return subprocess.DEVNULL
 
 
+def _ufvai_log_dir() -> str:
+    """Diretório de logs do runtime (mesmo critério do log do ttyd)."""
+    if os.path.isdir("/content/drive/My Drive"):
+        return "/tmp/ufvai-logs"          # Colab: fora do Drive do usuário
+    return os.path.join(os.path.expanduser("~/PesquisAI"), "logs")
+
+
+def _ttyd_event_log(evt: str, extra: str = "") -> None:
+    """Registra QUEM reiniciou/parou o ttyd (diagnóstico do "Reconnect").
+
+    v0.7.5+ (sem bump): o sintoma "o terminal pede Reconnect depois de um
+    tempo" só se explica sabendo se o ttyd foi reiniciado — e por quem.
+    Cada evento leva a pilha de chamadas resumida para wrapper.log.
+    """
+    try:
+        os.makedirs(_ufvai_log_dir(), exist_ok=True)
+        stack = "".join(traceback.format_stack(limit=7)[:-1]).strip()
+        with open(os.path.join(_ufvai_log_dir(), "wrapper.log"), "a",
+                  encoding="utf-8") as fh:
+            fh.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {evt} {extra}\n")
+            if stack:
+                fh.write(stack + "\n")
+    except Exception:  # noqa: BLE001 — diagnóstico nunca derruba o runtime
+        pass
+
+
 def _spawn_ttyd(ttyd_args: list, env: dict | None) -> "subprocess.Popen":
     """v0.6.5: Popen rastreado em NOVA SESSÃO de processos.
 
@@ -1106,6 +1266,7 @@ def _spawn_ttyd(ttyd_args: list, env: dict | None) -> "subprocess.Popen":
         start_new_session=True,
     )
     _TTYD_PROC = proc
+    _ttyd_event_log("spawn", f"pid={proc.pid} sessao={_current_ttyd_session}")
     return proc
 
 
@@ -1117,6 +1278,7 @@ def _stop_terminal(wait_s: float = 0.8) -> None:
        'ttyd' (NUNCA casa python/host/bash com 'opencode' na cmdline).
     """
     global _TTYD_PROC
+    _ttyd_event_log("stop", f"pid_atual={getattr(_TTYD_PROC, 'pid', None)}")
     import signal as _signal
 
     _tmux_kill_session()  # reinício explícito começa de sessão limpa
@@ -1221,6 +1383,148 @@ def _tmux_kill_session() -> None:
         pass
 
 
+def _revive_ttyd(force: bool = False) -> bool:
+    """Religa o ttyd ANEXANDO à sessão tmux existente (a conversa continua).
+
+    Quando o processo morre (SIGKILL de uma execução anterior, troca de
+    idioma interrompida), a porta do terminal fica fechada e a interface
+    mostra "Iniciando terminal…" para sempre. `_ttyd_shell_argv` usa
+    ``tmux new -A``: se a sessão já existe, ele apenas ANEXA — por isso é
+    seguro religar sem derrubar o `opencode` que está rodando.
+    """
+    global _LAST_TTYD_REVIVE
+    now = time.time()
+    with _TTYD_REVIVE_LOCK:
+        if not force and (now - _LAST_TTYD_REVIVE) < _TTYD_REVIVE_MIN_S:
+            return False
+        _LAST_TTYD_REVIVE = now
+    if not force and _TTYD_PROC is not None and _TTYD_PROC.poll() is None:
+        return False  # já existe um ttyd vivo: não duplica
+    _ttyd_event_log("revive", f"force={force} pid_atual={getattr(_TTYD_PROC, 'pid', None)}")
+    try:
+        opencode_bin, env = resolve_opencode()
+        try:
+            from .constants import DRIVE_PATH as _DRIVE_PATH
+        except Exception:  # noqa: BLE001
+            _DRIVE_PATH = os.path.join(os.environ.get("HOME", "/"), "PesquisAI")
+        project_dir = _DRIVE_PATH if _DRIVE_PATH and os.path.isdir(_DRIVE_PATH) else os.getcwd()
+        sid = _current_ttyd_session
+        _yolo = "" if os.environ.get("PESQUISAI_YOLO", "1").strip().lower() in ("0", "false", "off", "no") else " --auto"
+        if sid:
+            bash_cmd = f'cd "{project_dir}" && {opencode_bin} --session "{sid}"{_yolo} ; exec bash'
+        else:
+            bash_cmd = f'cd "{project_dir}" && bash -i'
+        base = ["ttyd", "-p", str(TERMINAL_PORT), "--writable",
+                *_ttyd_shell_argv(bash_cmd)]
+        _spawn_ttyd(_build_ttyd_args(base, env), env)
+        ok = _wait_port_open(TERMINAL_PORT, timeout_s=8.0)
+        if ok and sid:
+            _remember_ttyd_session(sid)
+        logger.info("ttyd religado (auto-cura): %s", ok)
+        return ok
+    except Exception as exc:  # noqa: BLE001 — auto-cura nunca derruba a UI
+        logger.warning("auto-cura do ttyd falhou: %s", exc)
+        return False
+
+
+def _seed_greeting_async(session_id: str, lang: str, delay: float = 0.8) -> None:
+    """Semeia a saudação padrão do idioma na sessão, em segundo plano.
+
+    v0.7.5+ (sem bump): a saudação não é mais enviada "no escuro" com o
+    idioma detectado pelo SERVIDOR (no Colab, ``en_US``) — era o que abria
+    o terminal em inglês mesmo com o navegador em português. Quem decide o
+    idioma é o CLIENTE:
+
+      • se já existe preferência no Drive, o boot semeia direto no idioma
+        certo (mensagem aparece rápido);
+      • na primeira execução, a sessão fica pendente e a mensagem sai
+        quando o frontend informa o idioma (POST /api/lang);
+      • trocar o idioma reinjeta a mensagem no idioma novo.
+
+    O processo é assíncrono: nenhum LLM disputa CPU/IO com o TUI na
+    abertura (o boot fica mais leve).
+    """
+    sid = str(session_id or "").strip()
+    if not sid:
+        return
+    try:
+        from .__version__ import get_greeting as _get_greeting
+    except Exception:  # noqa: BLE001
+        def _get_greeting(_lang: str) -> str:
+            return ""
+
+    greeting = _get_greeting(lang)
+    if not greeting:
+        return
+
+    def _run() -> None:
+        try:
+            opencode_bin, env = resolve_opencode()
+            try:
+                from .constants import DRIVE_PATH as _DRIVE_PATH
+            except Exception:  # noqa: BLE001
+                _DRIVE_PATH = os.path.join(os.environ.get("HOME", "/"), "PesquisAI")
+            project_dir = _DRIVE_PATH if _DRIVE_PATH and os.path.isdir(_DRIVE_PATH) else os.getcwd()
+            # Usa o helper dedicado: ele escolhe o modelo gratuito do Zen
+            # (`opencode/big-pickle`) quando existe. Sem isso, o `opencode run`
+            # herda o modelo padrão do opencode.json — se ele estiver sem
+            # quota, a saudação falhava em silêncio (DEVNULL).
+            ok = seed_ufvai_greeting(
+                sid, greeting, timeout_s=40.0,
+                opencode_bin=opencode_bin, env=env, cwd=project_dir,
+            )
+            if ok:
+                logger.info("Saudação semeada em %s (%s)", lang, sid)
+            else:
+                logger.debug("seed da saudação não concluiu (%s)", sid)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("seed da saudação falhou: %s", exc)
+
+    threading.Timer(max(0.0, float(delay)), _run).start()
+
+
+def _mark_greeting_pending(session_id: str, lang: str, fallback_s: float = 8.0) -> None:
+    """Marca a sessão nova para receber a saudação quando o cliente falar.
+
+    Fallback: se nenhum cliente se apresentar em ``fallback_s`` (terminal
+    aberto direto no ttyd, por exemplo), semeia no idioma atual para não
+    deixar a sessão sem a mensagem padrão.
+    """
+    sid = str(session_id or "").strip()
+    if not sid:
+        return
+    with _GREETING_LOCK:
+        _PENDING_GREETING[sid] = True
+
+    def _fallback() -> None:
+        with _GREETING_LOCK:
+            still = _PENDING_GREETING.pop(sid, False)
+        if still:
+            _seed_greeting_async(sid, _current_lang or "pt_BR", delay=0.0)
+
+    threading.Timer(max(1.0, float(fallback_s)), _fallback).start()
+
+
+def _greeting_pending(session_id: str | None) -> bool:
+    sid = str(session_id or "").strip()
+    if not sid:
+        return False
+    with _GREETING_LOCK:
+        return bool(_PENDING_GREETING.get(sid))
+
+
+def _consume_greeting(session_id: str | None, lang: str) -> bool:
+    """Se havia saudação pendente, semeia agora no idioma do cliente."""
+    sid = str(session_id or "").strip()
+    if not sid:
+        return False
+    with _GREETING_LOCK:
+        pending = bool(_PENDING_GREETING.pop(sid, False))
+    if pending:
+        _seed_greeting_async(sid, lang, delay=0.2)
+    return pending
+
+
 def _build_ttyd_cmd(lang: str | None = None, session_id: str | None = None,
                     seed_greeting: bool = True):
     """v0.6.5: constrói (args, env) do ttyd com saudação no idioma pedido.
@@ -1242,6 +1546,15 @@ def _build_ttyd_cmd(lang: str | None = None, session_id: str | None = None,
     # Normaliza para o conjunto canônico
     short = (lang or "pt_BR").split("_")[0].lower()
     full_lang = _LANG_MAP.get(short, lang if lang in _LANG_MAP.values() else "pt_BR")
+
+    # v0.7.5+ (sem bump): a TUI abre no MESMO idioma resolvido aqui (prefs do
+    # Drive incluídas). Antes o arquivo de locale só era escrito ao TROCAR o
+    # idioma — numa execução nova o terminal abria em inglês mesmo com a
+    # interface em português.
+    try:
+        _sync_terminal_locale(full_lang)
+    except Exception as exc:  # noqa: BLE001 — nunca impede o spawn
+        logger.debug("sync do locale da TUI falhou: %s", exc)
 
     greeting = get_greeting(full_lang)
     # Escapar aspas para o bash -c "..."
@@ -1277,24 +1590,21 @@ def _build_ttyd_cmd(lang: str | None = None, session_id: str | None = None,
             logger.debug("preflight_ufvai_session falhou inesperadamente: %s", exc)
             session_id, created = None, False
     if session_id:
-        # A saudação só é semeada em sessão NOVA: repeti-la a cada
-        # reinício (troca de idioma/chave) enchia a conversa de "Olá".
+        # v0.7.5+ (sem bump): a saudação NÃO é mais enviada cegamente no
+        # spawn com o idioma do SERVIDOR (no Colab, en_US). Duas situações:
+        #   • já existe preferência de idioma no Drive (usuário conhecido) →
+        #     semeia já, no idioma certo, para a mensagem aparecer rápido;
+        #   • primeira execução → fica pendente e é semeada quando o cliente
+        #     informa o idioma (POST /api/lang). Fallback de 8 s para quem
+        #     abre o ttyd direto.
+        # Em ambos os casos o boot fica mais leve: nenhum processo de LLM
+        # disputa CPU/IO com o TUI na abertura.
         if created and seed_greeting:
-            # Envia a saudação em background para não bloquear o spawn do TUI.
-            # Sem isso, o opencode run espera ~6s e adia a aparição do terminal.
-            # v0.7.5: 1,2 s de atraso — o processo Node da saudação competia
-            # com o do TUI no mesmo núcleo logo após o spawn. A TUI já abre
-            # com a saudação a caminho.
-            def _seed_greeting_bg() -> None:
-                try:
-                    subprocess.Popen(
-                        [opencode_bin, "run", "--session", str(session_id), greeting],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                        cwd=project_dir, env=env, start_new_session=True,
-                    )
-                except Exception:  # noqa: BLE001
-                    logger.debug("seed assíncrono da saudação não iniciado (ttyd continua)")
-            threading.Timer(1.2, _seed_greeting_bg).start()
+            _pref_lang = str((_read_prefs() or {}).get("lang") or "").strip()
+            if _pref_lang:
+                _seed_greeting_async(str(session_id), full_lang, delay=1.2)
+            else:
+                _mark_greeting_pending(str(session_id), full_lang)
         _current_ttyd_session = str(session_id)
         bash_cmd = f"cd \"{project_dir}\" && {opencode_bin} --session \"{session_id}\" {_yolo} ; exec bash"
     else:
@@ -1380,7 +1690,7 @@ def restart_ttyd_with_lang(lang: str) -> bool:
         _stop_terminal()
         # Persiste o idioma
         _current_lang = lang
-        _persist_lang(lang)
+        _persist_lang(lang, source="user")
         # v0.6.24: alinha a TUI (comandos, frases e rodapé) ao idioma da UI
         # ANTES de subir o terminal novo.
         _sync_terminal_locale(lang)
@@ -1601,6 +1911,33 @@ def _warm_autosave_lists(directory: str) -> None:
         _session_restore.list_session_autosaves(directory)
     except Exception:  # noqa: BLE001 — aquecimento nunca derruba o boot
         pass
+
+
+#: Cache (em processo) do index.html cru e comprimido. O HTML tem ~300 KB
+#: (5 dicionários de idioma embutidos) e comprime para ~75 KB — 4x menos
+#: bytes no proxy do Colab a cada abertura.
+_INDEX_CACHE: dict = {"key": None, "raw": b"", "gz": b""}
+
+
+def _index_payload(path: str) -> tuple[bytes, bytes]:
+    """Devolve (cru, gzip) do index.html, com cache por (mtime, tamanho)."""
+    try:
+        st = os.stat(path)
+        key = (path, int(st.st_mtime_ns), int(st.st_size))
+    except OSError:
+        key = (path, 0, 0)
+    if _INDEX_CACHE.get("key") != key:
+        try:
+            with open(path, "rb") as fh:
+                raw = fh.read()
+        except OSError:
+            raw = b""
+        _INDEX_CACHE.update({
+            "key": key,
+            "raw": raw,
+            "gz": gzip.compress(raw, 6) if raw else b"",
+        })
+    return _INDEX_CACHE["raw"], _INDEX_CACHE["gz"]
 
 
 def _list_backups_cached(directory: str | None = None,
@@ -2078,12 +2415,20 @@ def start_wrapper_server():
 
             if p in ("/", "/index.html"):
                 idx = os.path.join(WRAPPER_DIR, "index.html")
-                content = open(idx, "rb").read()
+                raw, gz = _index_payload(idx)
+                # v0.7.5+: o HTML tem ~300 KB (5 idiomas embutidos). Com
+                # gzip vai para ~75 KB — bem menos bytes pelo proxy do
+                # Colab no caminho crítico da abertura.
+                use_gz = "gzip" in (self.headers.get("Accept-Encoding", "") or "").lower()
+                content = gz if (use_gz and gz) else raw
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("X-Content-Type-Options", "nosniff")
                 self.send_header("Referrer-Policy", "no-referrer")
                 self.send_header("X-Frame-Options", "SAMEORIGIN")
+                if use_gz and gz:
+                    self.send_header("Content-Encoding", "gzip")
+                    self.send_header("Vary", "Accept-Encoding")
                 # v0.7.5: o HTML carrega o JS das telas de abertura — NUNCA
                 # deixar o navegador reusar uma versão antiga em cache
                 # (era o que mantinha o comportamento velho após a correção).
@@ -2124,7 +2469,15 @@ def start_wrapper_server():
 
             if p == "/api/lang":
                 # v0.4.2.2: retorna o idioma atual persistido
-                self._json(200, {"lang": _current_lang, "greeting": get_greeting(_current_lang)})
+                # v0.7.5+: informa se a saudação ainda está pendente — o
+                # frontend só precisa fazer o POST quando há divergência OU
+                # saudação a semear (sem isso, sessão nova com o mesmo idioma
+                # do servidor ficaria sem a mensagem padrão).
+                self._json(200, {
+                    "lang": _current_lang,
+                    "greeting": get_greeting(_current_lang),
+                    "greeting_pending": _greeting_pending(_current_ttyd_session),
+                })
                 return
 
             if p == "/api/ttyd_ready":
@@ -2138,7 +2491,22 @@ def start_wrapper_server():
                     ready = _wait_port_open(TERMINAL_PORT, timeout_s=0.25)
                 except Exception:
                     ready = False
-                self._json(200, {"ready": bool(ready), "port": TERMINAL_PORT})
+                # v0.7.5+ (sem bump): AUTO-CURA. Se o ttyd morreu (SIGKILL de
+                # uma execução anterior), a porta nunca abria e a interface
+                # ficava "carregando" para sempre. Religa anexando ao tmux —
+                # a conversa continua a mesma.
+                if not ready:
+                    try:
+                        ready = _revive_ttyd()
+                    except Exception:
+                        ready = False
+                self._json(200, {
+                    "ready": bool(ready),
+                    "port": TERMINAL_PORT,
+                    # v0.7.5+: pid do ttyd — o frontend usa para detectar
+                    # reinício do servidor e recarregar o iframe sozinho.
+                    "pid": getattr(_TTYD_PROC, "pid", None) if ready else None,
+                })
                 return
 
             if p == "/api/autosave":
@@ -3752,23 +4120,27 @@ def start_wrapper_server():
                 if isinstance(_restart, str):
                     _restart = _restart.strip().lower() not in ("0", "false", "off", "no", "")
                 if not _restart:
-                    _set_lang_only(full_lang)
+                    _set_lang_only(full_lang, source="browser")
+                    seeded = _consume_greeting(_current_ttyd_session, full_lang)
                     self._json(200, {
                         "ok": True,
                         "lang": full_lang,
                         "changed": changed,
                         "restarted": False,
+                        "greeting_seeded": seeded,
                     })
                     return
 
                 # Nada mudou e o terminal está vivo: resposta imediata, sem
                 # reiniciar (antes, um POST redundante criava outra sessão).
                 if not changed and _wait_port_open(TERMINAL_PORT, timeout_s=0.3):
+                    seeded = _consume_greeting(_current_ttyd_session, full_lang)
                     self._json(200, {
                         "ok": True,
                         "lang": full_lang,
                         "changed": False,
                         "restarted": False,
+                        "greeting_seeded": seeded,
                     })
                     return
 
@@ -3778,12 +4150,22 @@ def start_wrapper_server():
                         _tel_event("lang_changed", {"lang": full_lang})
                     except Exception:
                         pass
+                    # v0.7.5+ (sem bump): trocar o idioma INJETA a mensagem
+                    # padrão no idioma novo — antes a conversa continuava no
+                    # idioma anterior e o usuário tinha de pedir a troca.
+                    # Sessão recém-criada: a pendência é consumida aqui; sessão
+                    # com histórico: injeta agora (uma única vez).
+                    seeded = _consume_greeting(_current_ttyd_session, full_lang)
+                    if not seeded and _current_ttyd_session:
+                        _seed_greeting_async(_current_ttyd_session, full_lang, delay=1.0)
+                        seeded = True
                     self._json(200, {
                         "ok": True,
                         "lang": full_lang,
                         "changed": changed,
                         "restarted": True,
                         "greeting": get_greeting(full_lang),
+                        "greeting_seeded": seeded,
                         "message": f"ttyd reiniciado com saudação em {full_lang}",
                     })
                 else:

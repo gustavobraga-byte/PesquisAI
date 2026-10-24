@@ -589,13 +589,19 @@ def create_wrapper_html(
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Montserrat:wght@600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <!-- v0.7.5+: CSS de fontes NÃO bloqueia mais a renderização (media="print"
+       + troca para "all" no onload). Era uma requisição externa no
+       caminho crítico: em rede lenta a tela ficava em branco/inglês. -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Montserrat:wght@600;700&family=Syne:wght@700;800&display=swap"
+        rel="stylesheet" media="print" onload="this.media='all'">
   <!-- v0.7.5: o CSS do xterm era baixado do CDN e NÃO era usado (o terminal
        roda dentro do iframe do ttyd). Removido: era uma requisição
        render-blocking no caminho crítico da abertura. -->
   <!-- github-markdown-css: estilização markdown para o modal de Diretrizes -->
-  <link rel="preload" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css" as="style">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css">
+  <!-- v0.7.5+: markdown só é usado nos modais (Diretrizes/Manual). Carregar
+       fora do caminho crítico evita ~1 requisição bloqueante na abertura. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css"
+        media="print" onload="this.media='all'">
   <!-- marked.js: preload para acelerar renderização de markdown -->
   <!-- v0.6.0: marked.js EMBUTIDO (offline-first) com fallback CDN -->
   <script src="/vendor/marked.min.js"></script>
@@ -4320,13 +4326,22 @@ def create_wrapper_html(
       setTimeout(() => { el.splash.style.display = "none"; }, 500);
     }
 
+    // v0.7.5+: pid do ttyd em exibição. Se o servidor for reiniciado por
+    // baixo (idioma, restore, auto-cura), o iframe é recarregado sozinho —
+    // antes o usuário ficava no "Reconnect" mesmo com o opencode vivo.
+    let _ttydPid = null;
+    let _ttydWatch = null;
+
     async function waitTerminalReady(maxMs) {
       const t0 = Date.now();
       maxMs = maxMs || 30000;
       while (Date.now() - t0 < maxMs) {
         try {
           const r = await fetch(BASE + "/api/ttyd_ready", { cache: "no-store" });
-          if (r.ok) { const d = await r.json(); if (d.ready) return true; }
+          if (r.ok) {
+            const d = await r.json();
+            if (d.ready) { if (d.pid) _ttydPid = d.pid; return true; }
+          }
         } catch (e) {}
         await new Promise(z => setTimeout(z, 250));
       }
@@ -4356,6 +4371,24 @@ def create_wrapper_html(
       let loaded = false;
       el.frame.onload = () => { loaded = true; hideBootSplash(); };
       el.frame.src = TERMINAL_URL;
+      if (!_ttydWatch) {
+        _ttydWatch = setInterval(async () => {
+          try {
+            const r = await fetch(BASE + "/api/ttyd_ready", { cache: "no-store" });
+            if (!r.ok) return;
+            const d = await r.json();
+            if (!d.ready || !d.pid) return;
+            if (_ttydPid === null) { _ttydPid = d.pid; return; }
+            if (d.pid === _ttydPid) return;
+            _ttydPid = d.pid;                 // ttyd reiniciado por baixo
+            const f = document.getElementById("terminal-frame");
+            if (f) {
+              try { f.contentWindow.location.reload(); }
+              catch (e) { f.src = TERMINAL_URL; }
+            }
+          } catch (e) {}
+        }, 20000);
+      }
       setTimeout(() => { if (!loaded) hideBootSplash(); }, 8000); // fallback visual
     }
 
@@ -4645,7 +4678,10 @@ def create_wrapper_html(
     }
 
     // ── Inicialização ────────────────────────────────────────
-    window.addEventListener("load", () => {
+    // v0.7.5+ (sem bump): roda em DOMContentLoaded, não em `load`. O evento
+    // `load` só dispara depois do iframe do terminal e dos assets externos —
+    // a interface ficava sem tradução (e sem o relógio do autosave) até lá.
+    function _ufvaiInit() {
       // 1. Aplica idioma (síncrono, sem flash)
       applyLang(_currentLang);
       buildLangMenu();
@@ -4653,7 +4689,9 @@ def create_wrapper_html(
       setAutosaveUI(autosaveEnabled());
       setAutosaveAllUI(autosaveAllSessions());
       if (autosaveEnabled()) startAutosaveTimer();
-      setTimeout(() => checkAutosaveResume(), 900);
+      // v0.7.5+: a listagem de autosaves vem do cache do servidor (~6 ms);
+      // 350 ms já bastam para a pergunta aparecer sem espera perceptível.
+      setTimeout(() => checkAutosaveResume(), 350);
       // Ao sair da aba, tenta gravar o estado (sendBeacon, não bloqueia)
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState === "hidden" && autosaveEnabled() && !_autosaveBusy) {
@@ -4678,7 +4716,11 @@ def create_wrapper_html(
       try {
         fetch(BASE + "/api/lang", { cache: "no-store" }).then(r => r.json()).then(d => {
           const backendLang = d && d.lang;
-          if (!backendLang || backendLang === _currentLang) return;
+          if (!backendLang) return;
+          // v0.7.5+: o POST também é necessário quando a saudação da sessão
+          // nova ainda não foi semeada — mesmo que o idioma coincida.
+          const pending = !!(d && d.greeting_pending);
+          if (backendLang === _currentLang && !pending) return;
           if (!LANGS[_currentLang]) return;
           const syncVal = UFVAI_BOOT_ID + "|" + _currentLang;
           let synced = "";
@@ -4725,7 +4767,15 @@ def create_wrapper_html(
           }).catch(()=>{});
         } catch(e){}
       }, 3000);
-    });
+    }
+
+    // Dispara a inicialização o mais cedo possível. Se o script já rodou
+    // depois do parse (caso normal — está no fim do body), executa na hora.
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", _ufvaiInit, { once: true });
+    } else {
+      _ufvaiInit();
+    }
     window.addEventListener("beforeunload", () => { _stopSessionsPoll(); });
   </script>
   <!-- marked.js: renderizador de markdown para o modal de Diretrizes do Agente e preview do editor -->
