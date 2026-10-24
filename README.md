@@ -11,7 +11,7 @@
 [![Abrir no Colab](https://img.shields.io/badge/▶️_Começar_agora-Google_Colab-brightgreen?style=for-the-badge)](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb)
 [![Apresentação](https://img.shields.io/badge/📊_Slides-ver_apresentação-C9A227?style=for-the-badge)](https://gustavobraga-byte.github.io/ufvaisite/#apresentacao)
 
-[![Versão](https://img.shields.io/badge/versão-0.6.17-orange.svg)]() [![Licença MIT](https://img.shields.io/badge/licença-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![SisPPG/UFV](https://img.shields.io/badge/SisPPG-10356285004-blue.svg)](http://sisppg.ufv.br) [![LGPD](https://img.shields.io/badge/LGPD-conforme-success.svg)](PRIVACY.md)
+[![Versão](https://img.shields.io/badge/versão-0.7.5-orange.svg)]() [![Licença MIT](https://img.shields.io/badge/licença-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![SisPPG/UFV](https://img.shields.io/badge/SisPPG-10356285004-blue.svg)](http://sisppg.ufv.br) [![LGPD](https://img.shields.io/badge/LGPD-conforme-success.svg)](PRIVACY.md)
 
 > Consulta dados oficiais do Brasil e literatura validada, cita cada fonte e declara honestamente quando não há evidência suficiente.
 
@@ -104,6 +104,10 @@ sudo apt install /tmp/pesquisai.deb -y && rm /tmp/pesquisai.deb
 pesquisai
 ```
 
+> ℹ️ **`.deb`:** o pacote publicado no GitHub ainda é o **0.6.17** — o release **0.7.2** ainda não foi empacotado como `.deb`. Para a versão atual, use o boot no Colab ou o pacote do Drive (`UFVAI-v0.7.2/`).
+
+
+
 | Requisito | Especificação |
 |-----------|---------------|
 | **SO** | Debian 10+ / Ubuntu 22.04+ (amd64) |
@@ -146,13 +150,20 @@ O agente opera por *skills* — cada uma conecta a uma fonte ou capacidade.
 
 ## 🆕 Novidades
 
-**v0.6.21 — 🔧 Motor OpenCode V2 + 🍪 Aviso de cookies só quando bloqueados + 🫀 Keep-alive em célula** .
+**v0.7.5 — 🪟 Tela de e-mail/"Bem-vindo" e pergunta de retomada **uma vez por sessão** (marca em sessionStorage + localStorage + cookie, gravada antes de exibir) · ↻ reoferece a pergunta · HTML com `Cache-Control: no-store`** .
 
 <details>
-<summary>Histórico 0.6.x completo</summary>
+<summary>Histórico completo (0.7.x → 0.6.0)</summary>
 
 | Versão | Data | Destaques |
 |--------|------|-----------|
+| **0.7.5** | 23/10/2026 | 🪟 **Telas de abertura e retomada uma vez por sessão** — a marca "já mostrei" passou a ser gravada em **três camadas** (sessionStorage + localStorage com 12 h + cookie de sessão), **antes** de exibir; recargas internas não a consomem e o botão **↻** reoferece a pergunta · 🧊 **`Cache-Control: no-store`** no HTML (o navegador não reutiliza o JS antigo) |
+| **0.7.4** | 23/10/2026 | 💾 **Autosave de todas as conversas** — por padrão grava **só a sessão ativa** (e só quando ela muda); o botão **"Todas as conversas"** no rodapé liga o modo completo, em que **cada conversa** viva que tenha conteúdo novo recebe o seu próprio arquivo (`backups/autosave/sessions/<id>.json`) e todas aparecem no modal **Restaurar** · 🔓 **Free tier do Zen na restauração** (id da sessão no formato nativo) · 🪟 **Telas de abertura uma vez por entrada** |
+| **0.7.3** | 23/10/2026 | 🔓 **Free tier do OpenCode Zen na restauração corrigido** — a causa era o **formato do id** da sessão importada (`ses_` + 16 hex): o gateway do Zen recusava com **403** `OpenCode's free tier can only be used from within OpenCode` em **qualquer modelo gratuito** (confirmado por reprodução controlada); agora o id nasce no **formato nativo** (`ses_` + 12 hex + 14 base62) e a sessão restaurada é **ajustada ao contexto do modelo** (`fit` na resposta do `/api/restore`) · 🪟 **Telas de Termos / "Bem-vindo de volta" uma vez por entrada** (a detecção de idioma e o fim da restauração não reabrem mais a tela de e-mail) |
+| **0.7.3** | 22/10/2026 | 📦 **Pacote `pesquisai` instalado no ambiente** (o boot do Colab faz `pip install -e` e prova a API do autopilot a partir de um CWD neutro) · ⏱️ Autosave a cada **1 minuto** · 🗂️ **Fallback das 3 últimas interações** (`autosave_4..6` preservam o backup da conversa anterior) · 🔄 **Retomada uma vez na entrada, sem loop** (máquina de estados em `sessionStorage`) · 🔧 Autosave na sessão do **terminal** e chave estável (o `id` é re-gerado a cada reinício) |
+| **0.7.2** | 22/10/2026 | 🔄 **Retomada do autosave uma única vez por aba** (flag `sessionStorage`; fim do laço restore → reload → pergunta) · 📅 **Calendário do "Restaurar" corrigido** (chips dos meses com backup, contagem nos dias, tooltip, item sem data visível) |
+| **0.7.1** | 22/10/2026 | 🔧 Retomada do autosave corrigida na entrada · 💾 Autosave sem duplicata (3 slots = 3 versões distintas) · 🗑 Botão de apagar backup · 🔁 Fallback na retomada (até 3 autosaves) |
+| **0.7.0** | 21/10/2026 | 🏷️ Marca **UFVAI** na tela de nova sessão · 🇨🇳 Chinês também troca o terminal · 🎨 Manual e Diretrizes no tema claro · 📱 "Idioma" fora do sanduíche · ⏱️ Autosave a cada 3 min + menu "Restaurar" com calendário |
 | **0.6.21** | 13/10/2026 | 🔧 Motor **OpenCode V2**  · 🍪 aviso de cookies de terceiros **só quando o bloqueio é detectado**  |
 | **0.6.20** | 01/10/2026 | Boot simplificado (ipynb: clone + run + keep-alive subprocesso) + botão SAIR com confirmação (runtime.unassign) |
 | **0.6.19** | 29/09/2026 | Menu mobile sem SVG + hamburger à direita no mobile (fix `.sep` `flex:1`) + teste de cascata + docs em paridade (§2.1.0) |
@@ -211,7 +222,7 @@ Interface web `:8001` (Colab) com tela de Termos v2.2 (nome+e-mail+IP, opt-out) 
 
 ```
 BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.6.21. Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão 0.7.5. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -227,7 +238,7 @@ Verificar autenticidade em: http://sisppg.ufv.br
   title        = {{UFVAI}: Agente de Intelig{\^e}ncia Artificial
                   para Pesquisa Cient{\'\i}fica},
   year         = {2026},
-  version      = {0.6.21},
+  version      = {0.7.5},
   institution  = {Universidade Federal de Vi{\c{c}}osa (UFV)},
   url          = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/}
 }
@@ -300,6 +311,6 @@ Desenvolvido por **Gustavo Bastos Braga** — Universidade Federal de Viçosa (D
 
 <div align="center">
 
-Feito com 💙 para impulsionar a ciência brasileira · UFVAI v0.6.20 · SisPPG/UFV nº 10356285004
+Feito com 💙 para impulsionar a ciência brasileira · UFVAI v0.7.5 · SisPPG/UFV nº 10356285004
 
 </div>

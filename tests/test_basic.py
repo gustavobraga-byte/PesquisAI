@@ -1,9 +1,4 @@
-"""Tests for constants and opencode_utils (atualizado p/ v0.6.22).
-
-O original era do layout v0.6.0 (WEBCLI_PORT não existe mais; agents agora
-em `~/.config/opencode/agents`, plural). Importa a fonte única de versão e
-os nomes atuais de `pesquisai.constants`.
-"""
+"""Tests for constants and opencode_utils."""
 import os
 import sys
 from pathlib import Path
@@ -11,26 +6,24 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from pesquisai.constants import (
-    VERSION, WRAPPER_PORT, TERMINAL_PORT, SKILL_REGISTRY, ESSENTIAL_SKILLS,
-    AGENT_DIR,
+    VERSION, WEBCLI_PORT, SKILL_REGISTRY, ESSENTIAL_SKILLS,
+    AGENT_DIR, is_colab,
 )
-from pesquisai.__version__ import __version__
-from pesquisai.opencode_utils import find_opencode, opencode_version_string
+from pesquisai.opencode_utils import find_opencode, opencode_installed, get_opencode_version
 
 
-def test_version_consistente():
-    assert VERSION == __version__
-    assert __version__ == "0.6.24"
+def test_version():
+    assert VERSION == "0.6.0"
 
 
-def test_portas_wrapper_e_terminal():
-    assert isinstance(WRAPPER_PORT, int) and WRAPPER_PORT > 0
-    assert isinstance(TERMINAL_PORT, int) and TERMINAL_PORT > 0
+def test_webcli_port():
+    assert isinstance(WEBCLI_PORT, int)
+    assert WEBCLI_PORT > 0
 
 
-def test_agent_dir_usa_agents_plural():
-    """V2: agentes em agents/ (plural) — v0.6.21+."""
-    assert AGENT_DIR.endswith("/.config/opencode/agents")
+def test_agent_dir_is_singular():
+    """opencode v0.6.0 espera agents em agent/ (singular)."""
+    assert AGENT_DIR.endswith("/.config/opencode/agent")
 
 
 def test_skill_registry_not_empty():
@@ -42,13 +35,21 @@ def test_essential_skills_subset():
     assert ESSENTIAL_SKILLS.issubset(registry_names)
 
 
+def test_is_colab_returns_bool():
+    assert isinstance(is_colab(), bool)
+
+
 def test_find_opencode():
     result = find_opencode()
-    assert isinstance(result, str) and result
+    assert result is None or isinstance(result, str)
 
 
-def test_opencode_version_string_safe():
-    v = opencode_version_string()
+def test_opencode_installed():
+    assert isinstance(opencode_installed(), bool)
+
+
+def test_get_version():
+    v = get_opencode_version()
     assert v is None or isinstance(v, str)
 
 

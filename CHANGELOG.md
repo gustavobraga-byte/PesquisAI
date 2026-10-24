@@ -1,5 +1,97 @@
 # Changelog — PesquisAI
 
+## [0.7.5] — 2026-10-23 — 🪟 Telas de abertura e retomada **UMA VEZ POR SESSÃO**
+
+### 🪟 A tela de e-mail/"Bem-vindo" e a pergunta de retomada apareciam várias vezes
+- **Relato do autor:** *"a tela de email/boas vindas está aparecendo inúmeras vezes na mesma
+  sessão. Ela deve aparecer somente uma vez em cada sessão. A opção por restaurar sessão
+  também deve aparecer somente uma vez."*
+- **Causa:** a marca de "já mostrei" vivia **só no `sessionStorage`** — e o UFVAI roda no
+  proxy/iframe do Colab, onde o `sessionStorage` pode ser particionado e o cookie de
+  terceiros bloqueado. A abertura faz **2–3 recargas** (idioma → terminal → restore), então
+  a marca se perdia e a tela voltava. No caso da retomada, o estado `"restored"` era
+  **consumido a cada load**: a recarga seguinte voltava a perguntar.
+- **Correção — marca em TRÊS camadas:** `sessionStorage` + `localStorage` (validade de 12 h)
+  + cookie de sessão, gravada **ANTES** de a tela aparecer. Recargas internas não a
+  consomem; só o botão **↻** limpa a marca da retomada. Nova aba/sessão → mostra de novo.
+- **Sequenciamento:** a retomada espera a tela de Termos/"Bem-vindo" fechar antes de abrir
+  (nunca duas telas de abertura ao mesmo tempo).
+- **Cache:** a resposta do HTML agora leva `Cache-Control: no-store` — o navegador não
+  reutiliza o JavaScript antigo depois de uma correção.
+
+### 🧪 Testes
+- `tests/js/test_v075_opening_once.js` (**novo**) 26/26 — mecânica das 3 camadas, expiração
+  de 12 h, limpeza pelo ↻ e contrato das telas.
+- `tests/js/test_v072_resume_once.js` 43/43 · `tests/js/test_v073_autosave_policy.js` 21/21
+  — atualizados para o contrato "uma vez por sessão".
+- `tests/js/test_autosave_ui.js` 27/27 · `tests/js/test_restore_calendar.js` 47/47 ·
+  `tests/js/test_v074_autosave_scope.js` 20/20 · **Python 118/118** → **302 verdes**.
+
+## [0.7.4] — 2026-10-23 — 💾 Autosave de **todas** as conversas · 🔓 Free tier do OpenCode Zen na restauração · 🪟 Telas de abertura uma vez por entrada
+
+### 💾 Autosave: com várias sessões, **todas** são salvas
+- **Pedido do autor:** *"quando tem várias sessões o autosave salva somente uma. Queria que
+  salvasse todas ou a que está ativa."*
+- **Antes:** o `POST /api/autosave` exportava **uma** sessão — a do terminal (`opencode -s <id>`)
+  — para os slots rotativos `autosave_1..3`. As outras conversas abertas (o TUI tem abas) ficavam
+  **sem backup**.
+- **Agora:**
+  1. os slots `autosave_1..3` (e o histórico `autosave_4..6`) continuam sendo a **rotação da
+     interação atual** — nenhuma mudança no que já funcionava;
+  2. **cada conversa viva** que tenha conteúdo novo recebe o seu **próprio arquivo** em
+     `backups/autosave/sessions/<id>.json`;
+  3. esses arquivos entram na lista do modal **🔄 Restaurar** (`GET /api/backups`) e podem ser
+     restaurados (`POST /api/restore` com `autosave/sessions/<id>.json`).
+- **Custo controlado:** só é exportada a conversa que **mudou** (o `time.updated` da sessão é
+  comparado com a data do arquivo salvo); limite de **6 conversas por ciclo** e de **6 horas** de
+  inatividade; a conversa de outro projeto (ex.: `/root`) fica de fora — o projeto é deduzido
+  das próprias conversas (`infer_project_dir()`), não do CWD do processo.
+- **Arquivos:** `session_restore.session_autosave_dir/path()` · `write_session_autosave()` ·
+  `list_session_autosaves()` · `save_all_sessions()` · `infer_project_dir()`.
+- **Testes:** `tests/test_autosave_multi_session.py` (**novo**) **18/18** (nome seguro sem
+  traversal · grava e não reescreve conteúdo idêntico · listagem no formato aceito pelo restore ·
+  dedução do projeto ignorando as sessões de preflight · salva todas · pula as que não mudaram ·
+  respeita o limite por ciclo · o restore aceita `autosave/sessions/<id>.json` e barra traversal).
+
+### 🎚️ O alcance do autosave: **por padrão, só a sessão ativa**
+- **Pedido do autor:** *"tem como alterar, só salvar a sessão ativa com mudança?"*
+- **Padrão (v0.7.4):** o autosave grava **só a sessão ativa** — e **só quando ela muda**
+  (o `content_digest` impede a reescrita de conteúdo idêntico; a interface avisa
+  *"Sem novidades — o autosave mais recente já é o atual"*).
+- **Opção:** o botão **"Todas as conversas"** no rodapé (ao lado do liga/desliga do autosave)
+  liga o modo completo — **um arquivo por sessão** em `backups/autosave/sessions/<id>.json`,
+  com as conversas que **mudaram** (as que não mudaram são puladas, sem escrita no Drive).
+- A preferência fica no `localStorage` (`ufvai_autosave_all_sessions`) e é enviada no
+  `POST /api/autosave` (`all_sessions`); a resposta traz `sessions_saved.scope`
+  (`active` | `all`).
+- **Testes:** `tests/js/test_v074_autosave_scope.js` (**novo**) **20/20**.
+
+### 🔓 Free tier do OpenCode Zen na restauração (id da sessão no formato nativo)
+- **Sintoma (print do autor):** sessão restaurada ("Greeting", 298.326 tokens, 28%) + modelo
+  **free do Zen** ("Nemotron 3.5 Super VL Free") → `Error: OpenCode's free tier can only be used
+  from within OpenCode`. Uma sessão **nova** funcionava.
+- **Causa (reproduzida, não presumida):** o gateway do *free tier* do **Zen** valida o cabeçalho
+  `x-opencode-session` e recusa ids fora do formato nativo do motor. A retomada gerava
+  `ses_` + **16 hex** (legado) → **HTTP 403** em **qualquer modelo gratuito** (o **OpenCode Go**
+  não aplica o mesmo portão).
+- **Correção:** `NATIVE_ID_RE`/`LEGACY_ID_RE` viram **contrato**; `mint_id_like()` usa **apenas
+  amostras nativas** (a regra anterior, "tamanho majoritário", podia escolher o formato legado —
+  o banco tinha 9 nativos × 4 legados); sem amostra, monta o formato oficial. A sessão restaurada
+  ainda é **ajustada ao contexto do modelo** (`fit_to_context()`: cabe → nada · não cabe →
+  compactação **manual** · falhou → reimporta aparada).
+- **Prova:** `POST /api/restore` → id nativo `ses_e99ced15dffeiN0kC8uDy2xYXy` e **"OK"** com
+  modelo free do Zen na sessão restaurada.
+
+### 🪟 Telas de abertura (Termos / "Bem-vindo de volta") **uma vez por entrada**
+- Termos **e** "Bem-vindo de volta" abrem **uma vez por carga**; o "Bem-vindo" (que mostra o
+  e-mail) **uma vez por aba** (`sessionStorage` + cookie); os Termos não reabrem se a versão atual
+  já foi aceita neste navegador; a sincronização de idioma **espera** as telas fecharem e não
+  repete a cada recarga.
+
+### 🧪 Testes — 272 verificações verdes
+- **Python 118/118** (100 da v0.7.3 + **18** de `tests/test_autosave_multi_session.py`) ·
+  **JS 154/154** (27 + 47 + 39 + 21 + **20** de `tests/js/test_v074_autosave_scope.js`).
+
 ## [0.7.3] — 2026-10-22 — 📦 O pacote `pesquisai` instalado no ambiente · ⏱️ Autosave a cada 1 minuto · 🗂️ Fallback das 3 últimas interações · 🔄 Retomada uma vez na entrada
 
 ### ⏱️ Intervalo do autosave: 3 minutos → **1 minuto**
@@ -58,12 +150,71 @@ found"** e `from pesquisai.obsidian.autopilot import recall` a partir de um dire
 - **`scripts/install.sh`**: `pip install -e ".[colab]"` → `".[obsidian]"` (o extra `colab`
   não existia).
 
-### 🧪 Testes — 205 verificações verdes
+### 🔓 Restauração com modelos gratuitos: o id da sessão nasce no formato nativo (23/10)
+- **Sintoma:** ao restaurar um autosave, o terminal mostrava `✗ Compaction` com
+  `OpenCode's free tier can only be used from within OpenCode…`; uma sessão **nova**
+  (criada pelo próprio motor) funcionava.
+- **Causa:** a sessão restaurada é criada pelo UFVAI, não pelo motor, e o id saía como
+  `ses_` + 16 hex. O gateway do *free tier* valida o cabeçalho `x-opencode-session`
+  (upstream #49433) e recusa ids fora do padrão com **HTTP 403** — na primeira mensagem
+  **ou na compactação**.
+- **Correção:** `id_shape()` + `mint_id_like()` **inferem** o formato dos ids nativos vivos
+  (`ses_` + 12 hex + 14 base62) e geram o id importado nesse formato; sem amostras, usam o
+  padrão oficial. Vale também para os ids de mensagem (`msg_`). O import registra aviso se
+  o id ficar fora do formato nativo.
+- **Efeito:** sessões restauradas voltam a funcionar com modelos gratuitos.
+
+#### 🔬 Reprodução controlada (23/10, sandbox isolado `/tmp/ft-test`)
+
+| Sessão importada | id | Modelo | Resultado |
+|---|---|---|---|
+| formato **nativo** (26) | `ses_e99ced15dffe…` | Zen `beam-free` (1M) | ✅ responde |
+| formato **nativo** (26) | `ses_e99ced15dffe…` | Zen `deepseek-v4.1-flash-free` (200k) | ✅ responde |
+| formato **nativo** (26) | `ses_e99ced15dffe…` | TUI (tmux) | ✅ responde |
+| formato **LEGADO** (20) | `ses_566e11111111abcd` | Zen `beam-free` | ❌ **403 free tier** |
+| formato **LEGADO** (20) | `ses_566e00000000abcd` | Go `beam-free` | ✅ responde |
+
+→ O portão é do **OpenCode Zen** (`providerID=opencode`); o **OpenCode Go** não aplica o
+mesmo bloqueio. Medido no `opencode.db` vivo: **9 ids nativos** (`ses_` + 12 hex + 14 base62)
+e **4 legados** (`ses_` + 16 hex).
+
+#### 🔧 Refinamentos (23/10, sem bump)
+
+1. **`NATIVE_ID_RE` / `LEGACY_ID_RE` / `is_native_id()` / `native_ids()`** — o formato
+   nativo passa a ser **contrato** (medido, não presumido).
+2. **`mint_id_like()` usa SOMENTE amostras nativas.** A regra anterior ("tamanho
+   majoritário") podia escolher o formato **legado** quando os ids antigos fossem mais
+   numerous que os nativos — reintroduzindo o bug (o banco tinha 9 nativos × 4 legados).
+   Sem amostra nativa, monta o formato oficial (12 hex + 14 base62).
+3. **Ajuste ao contexto do modelo na restauração** (`fit_to_context()`): cabe → não faz
+   nada · não cabe → **compactação manual** (`POST /api/session/<id>/compact`, caminho que
+   o gateway **não** recusa) · falhou → **reimporta aparado** (as mensagens mais recentes
+   que cabem). O orçamento é 85% do contexto do modelo (130 mil tokens quando o modelo é
+   desconhecido). O `POST /api/restore` devolve o ajuste em `fit`.
+4. **Aviso no import** quando o id resultante não segue o formato nativo.
+5. **Prova end-to-end no runtime vivo:** `POST /api/restore` → `session_id`
+   `ses_e99ced15dffeiN0kC8uDy2xYXy` (**nativo**, 30 caracteres), `fit.action = "none"`
+   (279.506 tokens ≤ 891.289 do modelo de 1M) e mensagem **"OK"** com **modelo free do
+   Zen** na sessão restaurada — o cenário que antes devolvia 403.
+
+### 🪟 Telas de abertura (Termos / "Bem-vindo") **uma vez por carga** (23/10)
+- A sincronização de idioma recarregava a página e reabria as telas de abertura. Agora a
+  guarda é **dupla** (`sessionStorage` + cookie de sessão), a sincronização **espera** as
+  telas fecharem (e não roda por cima da restauração), e a abertura — Termos **ou**
+  "Bem-vindo de volta" — acontece **uma vez** por carga.
+- **Detalhamento:** `_shown` garante **uma** abertura por carga (Termos ou "Bem-vindo");
+  o "Bem-vindo de volta" grava `ufvai_welcome_seen` no `sessionStorage` (fallback: cookie
+  de sessão) → **não reabre a cada recarga** da aba; se o navegador já aceitou a versão
+  atual dos Termos (`localStorage.ufvai_terms_version`), a tela de Termos **não reabre**;
+  a sincronização de idioma guarda `ufvai_lang_synced` (sessionStorage + cookie) e só
+  reinicia o terminal **depois** que as telas de abertura fecharam.
+
+### 🧪 Testes — 225 verificações verdes
 - `tests/js/test_v073_autosave_policy.js` (**novo**) 21/21 · `tests/test_autosave_history_v073.py`
   (**novo**) 13/13 · `tests/js/test_v072_resume_once.js` 39/39 (seções 1, 2 e 4 atualizadas
   para o contrato novo) · `tests/js/test_autosave_ui.js` 27/27 ·
   `tests/js/test_restore_calendar.js` 47/47 · `tests/test_restore_backups.py` 26/26
-  (2 testes ajustados: a listagem inclui o histórico) · `tests/test_session_restore.py` 22/22 · `tests/test_instalacao_pacote.py` (**novo**) 10/10 (pacote instalado, nome da distribuição, boot cell, instaladores).
+  (2 testes ajustados: a listagem inclui o histórico) · `tests/test_session_restore.py` 22/22 · `tests/test_instalacao_pacote.py` (**novo**) 10/10 (pacote instalado, nome da distribuição, boot cell, instaladores) · `tests/test_session_id_format.py` (**novo**, 23/10) 9/9 (formato nativo inferido, id de mensagem, unicidade e fallback sem amostras) · `tests/test_restore_free_tier.py` (**novo**, 23/10) 20/20 (filtro de ids nativos, regressão "id legado no meio das amostras", ids de mensagem, estimativa de tokens, aparo, orçamento de contexto e os três caminhos do `fit_to_context`).
 
 ## [0.7.2] — 2026-10-22 — 🔄 Retomada do autosave uma única vez por aba + 📅 Calendário do "Restaurar" corrigido
 
