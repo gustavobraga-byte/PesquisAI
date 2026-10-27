@@ -300,6 +300,39 @@ def resolve_opencode() -> tuple[str, dict]:
     return _opencode_bin, _env
 
 
+def _workspace_dir() -> str:
+    """Diretório de trabalho do UFVAI: a pasta PesquisAI (Drive no Colab).
+
+    v0.7.7 (correção 27/10/2026 — SEM bump): o terminal abria em ``/root``
+    porque cada ponto de spawn resolvia o projeto por conta própria e, quando
+    ``DRIVE_PATH`` ainda não existia (Drive montando) ou quando o caminho era
+    o do modo offline, caía em ``os.getcwd()`` — o cwd do kernel do Colab.
+    Aqui a ordem é explícita e NUNCA devolve a raiz:
+
+      1. ``DRIVE_PATH`` (``/content/drive/My Drive/PesquisAI``) se existir;
+      2. ``~/PesquisAI`` (modo offline/.deb) se existir;
+      3. ``DRIVE_PATH`` mesmo que precise ser criado (o chamador garante);
+      4. ``~/PesquisAI`` como último recurso.
+    """
+    try:
+        from .constants import DRIVE_PATH as _drive_path
+    except Exception:  # noqa: BLE001
+        _drive_path = os.path.join(os.environ.get("HOME", "/"), "PesquisAI")
+    home_dir = os.path.join(os.environ.get("HOME", "/"), "PesquisAI")
+    for candidate in (_drive_path, home_dir):
+        try:
+            if candidate and os.path.isdir(candidate):
+                return candidate
+        except OSError:
+            continue
+    target = _drive_path or home_dir
+    try:
+        os.makedirs(target, exist_ok=True)
+    except OSError:
+        return home_dir
+    return target
+
+
 # ── OpenCode V2 · tema do terminal (cli.json) ─────────────────
 # Um só tema (pesquisai) cobre claro e escuro: o modo fica em theme.mode.
 # A interface web continua usando os nomes 'pesquisai' / 'pesquisai-light'.
@@ -478,20 +511,49 @@ OrigWebSocket.prototype.send=function(data){
   return origSend.call(this,data);
 };
 
-// ====== AUTO-RECONNECT (v0.7.5+, sem bump) ======
+// ====== KEEPALIVE (v0.7.7, correção 27/10/2026 — SEM bump) ======
+// O proxy do Colab derruba WebSocket ocioso (sem tráfego de APLICAÇÃO) em
+// ~30–60 s; o ping do ttyd é controle de protocolo e não conta. Resultado:
+// o terminal "desconectava" sozinho a cada minuto, mesmo sem ninguém tocar.
+// A cada 20 s enviamos um RESIZE (protocolo do ttyd: '1' + JSON) com o
+// tamanho ATUAL — é idempotente, não altera a tela e mantém o socket vivo.
+setInterval(function(){
+  var s=capturedSocket;
+  if(!s||s.readyState!==1)return;
+  try{
+    var t=findTerminal();
+    var rows=(t&&t.rows)||24, cols=(t&&t.cols)||80;
+    s.send('1'+JSON.stringify({columns:cols,rows:rows}));
+  }catch(e){}
+},20000);
+
+// ====== AUTO-RECONNECT (v0.7.5+; revisto em 27/10/2026) ======
 // O cliente do ttyd só reconecta sozinho quando o close code != 1000; num
 // reinício do servidor (troca de idioma, restore, auto-cura) ele fica em
-// "Press ⏎ to Reconnect" / "Reconnecting..." esperando o usuário. Aqui:
-// 1) Enter sintético no xterm (dispara o reconnect nativo);
-// 2) se em ~10 s ainda não voltou E o servidor responde /health, recarrega
-//    o iframe (último recurso) — sem laço quando o ttyd está realmente fora.
-var _reconnectTries=0, _lastReconnectTry=0, _reloads=0;
+// "Press ⏎ to Reconnect" / "Reconnecting..." esperando o usuário.
+// v0.7.7: o reload antigo podia entrar em LAÇO (cada reload zerava o
+// contador) e era ele próprio a causa das quedas de ~30 s. Agora:
+//   1) Enter sintético no máximo 1×/5 s e só se o socket está fechado há >3 s;
+//   2) reload só como último recurso, no máximo 2× por sessão de aba
+//      (sessionStorage) e apenas se o terminal exibir "Reconnect"/"closed".
+var _reconnectTries=0, _lastReconnectTry=0, _closedSince=0;
+function _reloadBudget(){
+  try{
+    var k='ufvai_ttyd_reloads', now=Date.now();
+    var v=JSON.parse(sessionStorage.getItem(k)||'{"n":0,"t":0}');
+    if(now-v.t>600000){v={n:0,t:now}}
+    if(v.n>=2)return false;
+    v.n++;sessionStorage.setItem(k,JSON.stringify(v));return true;
+  }catch(e){return false}
+}
 setInterval(function(){
   var s=capturedSocket;
   if(!s)return;
-  if(s.readyState===1){_reconnectTries=0;return}
+  if(s.readyState===1){_reconnectTries=0;_closedSince=0;return}
   var now=Date.now();
-  if(now-_lastReconnectTry<2500)return;
+  if(!_closedSince)_closedSince=now;
+  if(now-_closedSince<3000)return;
+  if(now-_lastReconnectTry<5000)return;
   _lastReconnectTry=now;
   _reconnectTries++;
   var ta=document.querySelector('.xterm-helper-textarea');
@@ -503,13 +565,16 @@ setInterval(function(){
       }));
     }catch(e){}
   }
-  if(_reconnectTries>=4&&_reloads<3){
-    _reconnectTries=0;
-    try{
-      fetch('/health',{cache:'no-store'}).then(function(r){
-        if(r&&r.ok){_reloads++;window.location.reload()}
-      }).catch(function(){});
-    }catch(e){}
+  if(_reconnectTries>=3){
+    var txt=(document.body&&document.body.innerText)||'';
+    if(/Reconnect|Connection closed|Desconect/i.test(txt) && _reloadBudget()){
+      _reconnectTries=0;
+      try{
+        fetch('/health',{cache:'no-store'}).then(function(r){
+          if(r&&r.ok){window.location.reload()}
+        }).catch(function(){});
+      }catch(e){}
+    }
   }
 },2500);
 
@@ -1248,13 +1313,18 @@ def _ttyd_event_log(evt: str, extra: str = "") -> None:
         pass
 
 
-def _spawn_ttyd(ttyd_args: list, env: dict | None) -> "subprocess.Popen":
+def _spawn_ttyd(ttyd_args: list, env: dict | None, cwd: str | None = None) -> "subprocess.Popen":
     """v0.6.5: Popen rastreado em NOVA SESSÃO de processos.
 
     start_new_session=True faz o ttyd ser líder do próprio grupo — assim
     _stop_terminal() consegue matar ttyd + bash + opencode (a árvore toda)
     com um único killpg, sem pkill -f global (que matava qualquer processo
     com 'opencode' na cmdline, inclusive o agente hospedeiro).
+
+    v0.7.7 (correção 27/10/2026 — SEM bump): o ttyd nasce com cwd na pasta
+    PesquisAI. Antes, os caminhos que não faziam ``cd`` no bash_cmd
+    (/api/run_terminal e /api/session-import) herdavam o cwd do processo
+    servidor — ``/root`` no Colab — e a sessão do agente abria fora do Drive.
     """
     global _TTYD_PROC
     logf = _ttyd_log_file()
@@ -1263,6 +1333,7 @@ def _spawn_ttyd(ttyd_args: list, env: dict | None) -> "subprocess.Popen":
         stdout=logf,
         stderr=subprocess.STDOUT,
         env=env,
+        cwd=cwd or _workspace_dir(),
         start_new_session=True,
     )
     _TTYD_PROC = proc
@@ -1403,11 +1474,7 @@ def _revive_ttyd(force: bool = False) -> bool:
     _ttyd_event_log("revive", f"force={force} pid_atual={getattr(_TTYD_PROC, 'pid', None)}")
     try:
         opencode_bin, env = resolve_opencode()
-        try:
-            from .constants import DRIVE_PATH as _DRIVE_PATH
-        except Exception:  # noqa: BLE001
-            _DRIVE_PATH = os.path.join(os.environ.get("HOME", "/"), "PesquisAI")
-        project_dir = _DRIVE_PATH if _DRIVE_PATH and os.path.isdir(_DRIVE_PATH) else os.getcwd()
+        project_dir = _workspace_dir()
         sid = _current_ttyd_session
         _yolo = "" if os.environ.get("PESQUISAI_YOLO", "1").strip().lower() in ("0", "false", "off", "no") else " --auto"
         if sid:
@@ -1460,11 +1527,7 @@ def _seed_greeting_async(session_id: str, lang: str, delay: float = 0.8) -> None
     def _run() -> None:
         try:
             opencode_bin, env = resolve_opencode()
-            try:
-                from .constants import DRIVE_PATH as _DRIVE_PATH
-            except Exception:  # noqa: BLE001
-                _DRIVE_PATH = os.path.join(os.environ.get("HOME", "/"), "PesquisAI")
-            project_dir = _DRIVE_PATH if _DRIVE_PATH and os.path.isdir(_DRIVE_PATH) else os.getcwd()
+            project_dir = _workspace_dir()
             # Usa o helper dedicado: ele escolhe o modelo gratuito do Zen
             # (`opencode/big-pickle`) quando existe. Sem isso, o `opencode run`
             # herda o modelo padrão do opencode.json — se ele estiver sem
@@ -1483,12 +1546,17 @@ def _seed_greeting_async(session_id: str, lang: str, delay: float = 0.8) -> None
     threading.Timer(max(0.0, float(delay)), _run).start()
 
 
-def _mark_greeting_pending(session_id: str, lang: str, fallback_s: float = 8.0) -> None:
+def _mark_greeting_pending(session_id: str, lang: str, fallback_s: float = 60.0) -> None:
     """Marca a sessão nova para receber a saudação quando o cliente falar.
 
-    Fallback: se nenhum cliente se apresentar em ``fallback_s`` (terminal
-    aberto direto no ttyd, por exemplo), semeia no idioma atual para não
-    deixar a sessão sem a mensagem padrão.
+    v0.7.7 (correção 27/10/2026 — SEM bump): o fallback NÃO usa mais o idioma
+    detectado no servidor. No Colab o locale é ``en_US``; a interface leva
+    alguns segundos para abrir e informar o idioma real, e o fallback de 8 s
+    semeava "Hello! (Tip: ...)" antes do cliente falar — a interface aparecia
+    em português com a saudação em inglês. Agora:
+      • espera 60 s (tempo de sobra para o navegador se apresentar);
+      • se ninguém falar, usa a preferência do Drive ou o padrão do produto
+        (``pt_BR``) — nunca o locale do servidor.
     """
     sid = str(session_id or "").strip()
     if not sid:
@@ -1500,7 +1568,8 @@ def _mark_greeting_pending(session_id: str, lang: str, fallback_s: float = 8.0) 
         with _GREETING_LOCK:
             still = _PENDING_GREETING.pop(sid, False)
         if still:
-            _seed_greeting_async(sid, _current_lang or "pt_BR", delay=0.0)
+            pref = str((_read_prefs() or {}).get("lang") or "").strip()
+            _seed_greeting_async(sid, pref or "pt_BR", delay=0.0)
 
     threading.Timer(max(1.0, float(fallback_s)), _fallback).start()
 
@@ -1540,9 +1609,20 @@ def _build_ttyd_cmd(lang: str | None = None, session_id: str | None = None,
     global _current_ttyd_session
     opencode_bin, env = resolve_opencode()
 
-    # Resolve idioma (param > env > _current_lang > detecção do sistema)
+    # Resolve idioma (param > env > prefs do Drive > _current_lang > sistema).
+    # v0.7.7 (correção 27/10/2026 — SEM bump): a preferência do Drive vem ANTES
+    # de ``_current_lang``. Antes, um ``_current_lang`` herdado da detecção
+    # automática (``en_US`` no servidor do Colab) vencia o idioma que o próprio
+    # usuário já tinha escolhido — a saudação saía em inglês ("Hello! (Tip: ...)")
+    # mesmo com a interface em português.
+    _pref_lang = str((_read_prefs() or {}).get("lang") or "").strip()
+    _env_lang = str(os.environ.get("PESQUISAI_LANG") or "").strip()
     if lang is None:
-        lang = os.environ.get("PESQUISAI_LANG") or _current_lang or _detect_system_lang()
+        lang = _env_lang or _pref_lang or _current_lang or _detect_system_lang()
+    # Idioma CONFIRMADO = escolha explícita (env) ou preferência salva no Drive.
+    # Sem confirmação, a saudação espera o cliente (/api/lang) — nunca o locale
+    # do servidor.
+    lang_confident = bool(_env_lang or _pref_lang)
     # Normaliza para o conjunto canônico
     short = (lang or "pt_BR").split("_")[0].lower()
     full_lang = _LANG_MAP.get(short, lang if lang in _LANG_MAP.values() else "pt_BR")
@@ -1556,7 +1636,9 @@ def _build_ttyd_cmd(lang: str | None = None, session_id: str | None = None,
     except Exception as exc:  # noqa: BLE001 — nunca impede o spawn
         logger.debug("sync do locale da TUI falhou: %s", exc)
 
-    greeting = get_greeting(full_lang)
+    # Saudação só no idioma confirmado; sem confirmação usa o padrão do produto
+    # (pt_BR) até o cliente informar o idioma — o /api/lang reescreve depois.
+    greeting = get_greeting(full_lang if lang_confident else "pt_BR")
     # Escapar aspas para o bash -c "..."
     safe_prompt = greeting.replace('"', '\\"').replace("'", "\\'")
     # Auto-aprovação de permissões (flag do OpenCode V2 é --auto; antes --yolo).
@@ -1575,11 +1657,7 @@ def _build_ttyd_cmd(lang: str | None = None, session_id: str | None = None,
     # leaves the saudação unanswered). Best-effort: any failure (key/model/quota)
     # leaves the pinned session available; later typed messages still target
     # the UFVAI (post-baseline session agent persiste).
-    try:
-        from .constants import DRIVE_PATH as _DRIVE_PATH
-    except Exception:  # noqa: BLE001
-        _DRIVE_PATH = os.path.join(os.environ.get("HOME", "/"), "PesquisAI")
-    project_dir = _DRIVE_PATH if _DRIVE_PATH and os.path.isdir(_DRIVE_PATH) else os.getcwd()
+    project_dir = _workspace_dir()
 
     session_id = str(session_id or "").strip() or None
     created = False
@@ -1600,8 +1678,7 @@ def _build_ttyd_cmd(lang: str | None = None, session_id: str | None = None,
         # Em ambos os casos o boot fica mais leve: nenhum processo de LLM
         # disputa CPU/IO com o TUI na abertura.
         if created and seed_greeting:
-            _pref_lang = str((_read_prefs() or {}).get("lang") or "").strip()
-            if _pref_lang:
+            if lang_confident:
                 _seed_greeting_async(str(session_id), full_lang, delay=1.2)
             else:
                 _mark_greeting_pending(str(session_id), full_lang)
@@ -3541,9 +3618,9 @@ def start_wrapper_server():
                 # entao nao precisa de segunda sanitizacao — isso causaria falso positivo
                 # pois sanitize_command bloqueia ";" mesmo em comandos validos.
                 if no_fallback:
-                    bash_cmd = f"{cmd}; exec bash"
+                    bash_cmd = f'cd "{_workspace_dir()}" && {cmd}; exec bash'
                 else:
-                    bash_cmd = f"{cmd}; {_opencode_bin}; exec bash"
+                    bash_cmd = f'cd "{_workspace_dir()}" && {cmd}; {_opencode_bin}; exec bash'
 
                 # v0.4.2.5: usar --index com touch handlers se disponível
                 base_ttyd = ["ttyd", "--writable", "-p", str(TERMINAL_PORT),
@@ -3901,7 +3978,8 @@ def start_wrapper_server():
 
                         def _spawn():
                             opencode_bin, env = resolve_opencode()
-                            bash_cmd = f'{opencode_bin} -s "{session_id}" ; exec bash'
+                            _pd = _workspace_dir()
+                            bash_cmd = f'cd "{_pd}" && {opencode_bin} -s "{session_id}" ; exec bash'
                             # v0.6.2: --writable restaurado (regressão v0.6.0 deixava o terminal read-only)
                             base_args = ["ttyd", "-p", str(TERMINAL_PORT), "--writable",
                                          *_ttyd_shell_argv(bash_cmd)]

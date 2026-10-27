@@ -204,6 +204,92 @@ def merge_cli_preset(existing: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
+# ─────────────────────────────────────────────────────────────────
+# v0.7.7 — Drive Guard: "My Drive" só dentro de PesquisAI
+# ─────────────────────────────────────────────────────────────────
+
+DRIVE_GUARD_ID: str = "ufvai-drive-guard"
+DRIVE_GUARD_MOUNT: str = "/content/drive"
+DRIVE_GUARD_ALLOWED: str = "/content/drive/My Drive/PesquisAI"
+
+
+def drive_guard_permissions(
+    mount: str = DRIVE_GUARD_MOUNT,
+    allowed: str = DRIVE_GUARD_ALLOWED,
+) -> list[dict[str, str]]:
+    """Regras de permissão que fecham "My Drive" fora de PesquisAI.
+
+    A V2 avalia em ordem e a ÚLTIMA regra que casa vence. Por isso cada ação
+    recebe primeiro o ``deny`` da raiz vigiada (a própria raiz e descendentes) e,
+    logo depois, o ``allow`` da raiz permitida. Fecham a lista os ``deny`` dos
+    arquivos de chave (§2.2.1 do AGENTS.md) e os ``ask`` de ``.env`` que a
+    política padrão já tinha — eles precisam ser reafirmados porque o ``allow``
+    de PesquisAI vem depois.
+
+    Regra ``deny`` é final no motor: a flag ``--auto`` não a transforma em
+    aprovação.
+    """
+    mount = mount.rstrip("/")
+    allowed = allowed.rstrip("/")
+    rules: list[dict[str, str]] = []
+    for action in ("external_directory", "read", "edit"):
+        rules.append({"action": action, "resource": mount, "effect": "deny"})
+        rules.append({"action": action, "resource": f"{mount}/*", "effect": "deny"})
+        rules.append({"action": action, "resource": allowed, "effect": "allow"})
+        rules.append({"action": action, "resource": f"{allowed}/*", "effect": "allow"})
+    # Nunca expor o material criptográfico de "Minha memória".
+    rules.append(
+        {"action": "read", "resource": f"{allowed}/*keys_store.json", "effect": "deny"}
+    )
+    rules.append(
+        {"action": "read", "resource": f"{allowed}/*keys_encryption_key.bin", "effect": "deny"}
+    )
+    # Reafirma a política padrão de .env (o allow acima vem depois dela).
+    rules.append({"action": "read", "resource": f"{allowed}/*.env", "effect": "ask"})
+    rules.append({"action": "read", "resource": f"{allowed}/*.env.*", "effect": "ask"})
+    return rules
+
+
+def merge_drive_guard(
+    existing: dict[str, Any],
+    plugin_path: str,
+    mount: str = DRIVE_GUARD_MOUNT,
+    allowed: str = DRIVE_GUARD_ALLOWED,
+) -> dict[str, Any]:
+    """Instala o plugin do Drive Guard e as regras de permissão no ``opencode.json``.
+
+    Idempotente: não duplica o plugin nem as regras. Preserva a ordem e as
+    escolhas do usuário — as regras do guard são acrescentadas ao FINAL (é o
+    que garante que elas vençam). Se ``permissions`` existir em formato
+    inesperado (não-lista), o arquivo do usuário é preservado e só o plugin é
+    registrado.
+    """
+    merged = dict(existing)
+
+    plugins = merged.get("plugins")
+    items: list[Any] = list(plugins) if isinstance(plugins, list) else []
+    already = any(
+        item == plugin_path
+        or (isinstance(item, dict) and item.get("package") == plugin_path)
+        for item in items
+    )
+    if not already:
+        items.append(plugin_path)
+    merged["plugins"] = items
+    merged.setdefault("$schema", CONFIG_SCHEMA_URL)
+
+    ours = drive_guard_permissions(mount, allowed)
+    current = merged.get("permissions")
+    if current is None:
+        merged["permissions"] = list(ours)
+    elif isinstance(current, list):
+        # Remove cópias idênticas das nossas regras e reanexa no fim, para
+        # manter a ordem estável entre execuções e a precedência do guard.
+        kept = [rule for rule in current if rule not in ours]
+        merged["permissions"] = kept + ours
+    return merged
+
+
 def merge_cli_plugins(existing: dict[str, Any], plugin_path: str) -> dict[str, Any]:
     """Habilita um plugin de CLI (TUI) em ``cli.json`` sem duplicar entradas.
 

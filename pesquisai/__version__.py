@@ -24,6 +24,44 @@ Compatível com o PesquisAI principal (v0.2.1+).
 ═════════════════════════════════════════════════════════════════════════
 Histórico de versões:
 ═══════════════════════════════════════════════════════════════════════
+  v0.7.7 — 27/10/2026: 🔒 Drive Guard — "My Drive" só dentro de PesquisAI
+            • REGRA DO AUTOR: "não deixe acessar a pasta My Drive exceto a
+              subpasta PesquisAI e todas as suas subpastas — mesmo estando em
+              auto".
+            • Plugin do servidor UFVAI V2 (`pesquisai/plugins/drive_guard/`)
+              instalado em `<config>/plugins/ufvai-drive-guard/` no boot
+              (`ensure_drive_guard()`, fail-open).
+            • TRÊS CAMADAS: (1) regras `permissions` no `opencode.json` —
+              `deny` da raiz vigiada seguido de `allow` de PesquisAI (regra
+              `deny` é final: `--auto` não a converte em aprovação);
+              (2) hook `permission.evaluate`; (3) hook `tool.execute.before`,
+              que lança erro antes de qualquer acesso ao disco.
+            • Raiz vigiada `/content/drive` (fecha enumeração de "My Drive");
+              liberado `/content/drive/My Drive/PesquisAI` e subpastas.
+            • `..`, `file://`, `~` e comandos de shell (sem aspas, com aspas,
+              `-c "open(...)"`) são resolvidos antes da decisão; referência
+              ofuscada cai em falha fechada. No Colab, `MyDrive` e "My Drive"
+              são o MESMO diretório (mesmo inode): a comparação normaliza os
+              dois nomes, então `MyDrive/PesquisAI` continua acessível e
+              `MyDrive/<qualquer outra coisa>` continua bloqueado.
+            • Auditoria em `~/.local/state/ufvai/drive-guard.log`.
+            • Testes: `tests/js/test_drive_guard.mjs` (34 verificações, Node
+              puro) e `tests/test_drive_guard.py` (20 testes).
+  v0.7.6 — 24/10/2026: 🏷️ Rebrand do agente: "opencode" → "ufvai" (identidade
+            completa, no estilo Flint)
+            • DOCUMENTOS DO AGENTE: AGENTS.md + agents/AGENTS.{pt,en,es,fr,zh}.md
+              + novo agents/UFVAI.md — todas as ocorrências de opencode/OpenCode
+              viraram ufvai/UFVAI (caminhos ~/.config/ufvai/, ufvai.json,
+              ~/.local/share/ufvai/, comando `ufvai auth export`); §0.1 rebatizada
+              de "Motor UFVAI V2".
+            • ALIASING DO MOTOR: scripts/ufvai-alias.sh cria symlinks
+              (~/.config/ufvai, ~/.local/share/ufvai, ufvai.json) e o comando
+              `ufvai` (wrapper POSIX com OPENCODE_CONFIG_DIR/OPENCODE_CONFIG) —
+              o runtime físico continua sendo o motor original; nada renomeado
+              em execução (banco SQLite/crédenciais intactos).
+            • PRESERVADO: código (pesquisai/opencode_*.py), install-offline.sh,
+              Dockerfile, histórico do CHANGELOG e citações funcionais do
+              gateway (OpenCode Zen/Go) — o rebrand é de IDENTIDADE.
   v0.7.0 — 21/10/2026: 🏷️ Marca UFVAI na tela de NOVA SESSÃO + 4 correções
             de interface
             • LOGO: a arte de blocos "opencode" da tela de nova sessão foi
@@ -425,13 +463,13 @@ Histórico de versões:
 """
 
 # ── Versão semântica (SemVer) ──────────────────────────────────
-__version__: str = "0.7.5"
+__version__: str = "0.7.7"
 __brand__: str = "UFVAI"
 __brand_tagline__: str = "Pesquisa científica com integridade."
 
 # ── Metadados do release ───────────────────────────────────────
-__release_date__: str = "2026-10-22"
-__codename__: str = "Telas de abertura e retomada uma unica vez por sessao (marca em 3 camadas)"
+__release_date__: str = "2026-10-27"
+__codename__: str = "Drive Guard: My Drive só dentro de PesquisAI (inclusive com --auto)"
 
 # ── Identidade do projeto ──────────────────────────────────────
 __author__: str = "Gustavo Bastos Braga"
@@ -465,6 +503,7 @@ __components__: dict[str, str] = {
     "footer_pc_align": "0.1.0",           # NOVO v0.4.2.2: provedor + OpenCode à direita
     "sessions_loader": "0.1.0",           # NOVO v0.4.2.2: openSessions faz fetch
     "lang_aware_greeting": "0.1.0",       # NOVO v0.4.2.2: saudação no idioma
+    "drive_guard": "0.7.7",               # NOVO v0.7.7: My Drive só em PesquisAI
 }
 
 # ── Idiomas suportados ─────────────────────────────────────────

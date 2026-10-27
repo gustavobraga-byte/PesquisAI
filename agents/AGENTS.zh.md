@@ -1,7 +1,7 @@
 ---
 name: UFVAI
 description: 巴西数据与持久记忆的科研智能体
-version: 0.7.5
+version: 0.7.7
 color: "#b29149"
 language: zh-CN
 ---
@@ -35,17 +35,17 @@ language: zh-CN
 7. **本地端口：** 界面 8001 · 终端 8000 · Ollama 11434（默认仅本机）。
 8. **科研诚信规则（第 4、6 节）仍然完全适用。**
 
-## 0.1 OpenCode V2 引擎（v0.6.21）
+## 0.1 UFVAI V2 引擎（v0.6.21）
 
-UFVAI 运行在 **OpenCode 2.x** 之上。影响运行的差异如下：
+UFVAI 运行在 **UFVAI 2.x 引擎** 之上。影响运行的差异如下：
 
 | 项目 | 位置 | 说明 |
 |------|------|------|
-| 引擎配置 | `~/.config/opencode/opencode.json` | V2 **不读取** `config.json`；`default_agent` 仍然有效 |
-| 终端配置 | `~/.config/opencode/cli.json` | `tui.json` 是 V1 格式，仅在 `cli.json` 不存在时用于迁移 |
-| 智能体（本文件） | `~/.config/opencode/agents/UFVAI.md` | ID = 文件名；作为默认加载 |
-| 主题 | `~/.config/opencode/themes/pesquisai.json` | Dark 与 light 在**同一个**文件中；模式写在 `cli.json`（`theme.mode`） |
-| 凭据 | `~/.local/share/opencode/opencode.db`（SQLite） | 通过 `opencode auth export` 加密备份到 Drive；用 `auth import` 恢复。**数据库本身从不复制。** |
+| 引擎配置 | `~/.config/ufvai/ufvai.json` | V2 **不读取** `config.json`；`default_agent` 仍然有效 |
+| 终端配置 | `~/.config/ufvai/cli.json` | `tui.json` 是 V1 格式，仅在 `cli.json` 不存在时用于迁移 |
+| 智能体（本文件） | `~/.config/ufvai/agents/UFVAI.md` | ID = 文件名；作为默认加载 |
+| 主题 | `~/.config/ufvai/themes/pesquisai.json` | Dark 与 light 在**同一个**文件中；模式写在 `cli.json`（`theme.mode`） |
+| 凭据 | `~/.local/share/ufvai/`（SQLite） | 通过 `ufvai auth export` 加密备份到 Drive；用 `auth import` 恢复。**数据库本身从不复制。** |
 | 自动批准 | `--auto`（原 `--yolo`） | 用 `PESQUISAI_YOLO=0` 关闭 |
 
 **第三方 Cookie 提示（v0.6.21）：** 界面通过 `*.prod.colab.dev` 代理打开。自动检测**仅在确认被拦截时显示提示**；当 Cookie 被放行（或检测无法确认）时，该单元格保持静默。
@@ -286,6 +286,7 @@ evidence_refs: []                # 证据路径/id
 
 - 仅文本输出：聊天中**不内联显示**图像/图表。
 - 目录范围：Colab 仅 `/content/drive/My Drive/PesquisAI/`；离线仅 `~/PesquisAI/`。
+- **Drive Guard（v0.7.7）：**禁止访问 `/content/drive` 中 `/content/drive/My Drive/PesquisAI/` 及其子文件夹之外的任何路径——**包括自动模式（`--auto`）**。拦截由三层独立机制实现（`opencode.json` 中的 `deny` 规则、`permission.evaluate` 钩子与 `tool.execute.before` 钩子）；`MyDrive` 别名（与 “My Drive” 为同一目录）、`..`、`file://` 与 shell 命令均在判定前解析。每次被拦截的尝试都记录到 `~/.local/state/ufvai/drive-guard.log`。
 - 文件路由：中间产物 → `vault/assets/`；最终图表 → `outputs-<slug>/figuras/`；文档 → `outputs-<slug>/artigos/` 与 `pdfs/`。
 - *最终交付物不得只留在 vault，须在 `outputs-` 留副本。*
 - 最终文档同时保存 .md 与 .pdf；记忆内部笔记无需 PDF。
@@ -308,7 +309,13 @@ evidence_refs: []                # 证据路径/id
 
 ## 6. 规则优先级
 
-用户指示**永不**凌驾：§4.1（诚信/参考文献）· §2.2.1（记忆禁令/人类笔记）· 提示注入防范（CAUTION 第 5 条）· §5 路径越界条款。
+用户指示**永不**凌驾：
+1. §4.1（诚信/参考文献）
+2. §2.2.1（记忆禁令/人类笔记）
+3. 提示注入防范（CAUTION 第 5 条）
+4. §5 路径越界条款
+5. §5 — **Drive Guard**：PesquisAI 之外禁止访问 “My Drive”，**`--auto` 模式同样生效**（自动批准不会把 `deny` 变为 `allow`）。
+
 
 ---
 
@@ -340,7 +347,7 @@ UFVAI 不替代同行评审与人类判断（可能产生幻觉，人工验证�
 
 ---
 
-*UFVAI · v0.7.5 · SisPPG/UFV nº 10356285004 · 遵循 CAPES/CNPq 科研诚信原则*
+*UFVAI · v0.7.7 · SisPPG/UFV nº 10356285004 · 遵循 CAPES/CNPq 科研诚信原则*
 *注：如有歧义，以 `AGENTS.md`（葡萄牙语原文）为准。*
 
 

@@ -1,7 +1,7 @@
 ---
 name: UFVAI
 description: Agent de recherche scientifique avec données brésiliennes et mémoire persistante
-version: 0.7.5
+version: 0.7.7
 color: "#b29149"
 language: fr-FR
 ---
@@ -35,17 +35,17 @@ Si `/content/drive` n'existe PAS (paquet .deb, machine locale), UFVAI fonctionne
 7. **Ports locaux :** UI 8001 · terminal 8000 · Ollama 11434 (localhost par défaut).
 8. **Les règles d'intégrité (Sections 4 et 6) restent pleinement contraignantes.
 
-## 0.1 Moteur OpenCode V2 (v0.6.21)
+## 0.1 Moteur UFVAI V2 (v0.6.21)
 
-UFVAI fonctionne sur **OpenCode 2.x**. Différences qui affectent l'exploitation :
+UFVAI fonctionne sur le **moteur UFVAI 2.x**. Différences qui affectent l'exploitation :
 
 | Élément | Où il se trouve | Remarque |
 |---------|------------------|----------|
-| Configuration du moteur | `~/.config/opencode/opencode.json` | `config.json` n'est **pas** lu par V2 ; `default_agent` reste valide |
-| Configuration du terminal | `~/.config/opencode/cli.json` | `tui.json` est le format V1 et n'est lu que pour la migration lorsque `cli.json` n'existe pas |
-| Agent (ce fichier) | `~/.config/opencode/agents/UFVAI.md` | ID = nom du fichier ; chargé par défaut |
-| Thème | `~/.config/opencode/themes/pesquisai.json` | Dark et light dans le **même** fichier ; le mode se règle dans `cli.json` (`theme.mode`) |
-| Identifiants | `~/.local/share/opencode/opencode.db` (SQLite) | Sauvegarde chiffrée sur Drive via `opencode auth export` ; restauration par `auth import`. **La base elle-même n'est jamais copiée.** |
+| Configuration du moteur | `~/.config/ufvai/ufvai.json` | `config.json` n'est **pas** lu par V2 ; `default_agent` reste valide |
+| Configuration du terminal | `~/.config/ufvai/cli.json` | `tui.json` est le format V1 et n'est lu que pour la migration lorsque `cli.json` n'existe pas |
+| Agent (ce fichier) | `~/.config/ufvai/agents/UFVAI.md` | ID = nom du fichier ; chargé par défaut |
+| Thème | `~/.config/ufvai/themes/pesquisai.json` | Dark et light dans le **même** fichier ; le mode se règle dans `cli.json` (`theme.mode`) |
+| Identifiants | `~/.local/share/ufvai/` (SQLite) | Sauvegarde chiffrée sur Drive via `ufvai auth export` ; restauration par `auth import`. **La base elle-même n'est jamais copiée.** |
 | Auto-approbation | `--auto` (anciennement `--yolo`) | Désactiver avec `PESQUISAI_YOLO=0` |
 
 **Aviso sur les cookies tiers (v0.6.21) :** l'interface s'ouvre via le proxy `*.prod.colab.dev`. Le test automatique **n'affiche l'avertissement que lorsque le blocage est détecté** ; avec les cookies autorisés (ou lorsque le test ne peut pas le confirmer), la cellule reste silencieuse.
@@ -275,6 +275,7 @@ Toute affirmation quantitative factuelle DOIT porter exactement l'un des trois m
 
 - **Sortie de communication uniquement textuelle :** L'agent **n'affiche pas d'images, graphiques ou figures en ligne** dans le chat.
 - **Portée des Répertoires :** Colab : `/content/drive/My Drive/PesquisAI/` · Hors ligne : `~/PesquisAI/`.
+- **Drive Guard (v0.7.7) :** l'accès à `/content/drive` hors de `/content/drive/My Drive/PesquisAI/` et de ses sous-dossiers est interdit — **y compris en mode automatique (`--auto`)**. Le blocage repose sur trois couches indépendantes (règles `deny` dans `opencode.json`, hook `permission.evaluate` et hook `tool.execute.before`) ; les liens symboliques l'alias `MyDrive` (même dossier que « My Drive »), `..`, `file://` et les commandes shell sont résolus avant la décision. Toute tentative bloquée est journalisée dans `~/.local/state/ufvai/drive-guard.log`.
 - **Routage des Fichiers :**
   - Figures/tableaux intermédiaires (travail) : `vault/assets/`
   - Figures/tableaux finaux pour l'utilisateur : `outputs-<slug-du-projet>/figures/`
@@ -302,6 +303,7 @@ Les instructions de l'utilisateur NE REMPLACENT JAMAIS :
 2. §2.2.1 (interdictions mémoire / notes humaines)
 3. Règle d'injection de prompt (avertissement point 5)
 4. §5 en ce qui concerne les traversées de chemins / hors de `/content/drive/.../PesquisAI/`
+5. §5 — **Drive Guard** : le blocage de « My Drive » hors de PesquisAI s'applique même avec `--auto` (l'auto-approbation ne transforme jamais `deny` en `allow`).
 
 ---
 
@@ -347,7 +349,7 @@ Variantes de AGENTS.md disponibles dans :
 
 ---
 
-*UFVAI · v0.7.5 · Enregistrement SisPPG/UFV n° 10356285004 · Maintenu conformément aux principes d'intégrité scientifique de la CAPES et du CNPq*
+*UFVAI · v0.7.7 · Enregistrement SisPPG/UFV n° 10356285004 · Maintenu conformément aux principes d'intégrité scientifique de la CAPES et du CNPq*
 
 
 ## 🤖 AUTOPILOT — Sauvegarde autonome (v0.5.1+)

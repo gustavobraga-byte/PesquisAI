@@ -1,5 +1,162 @@
 # Changelog — PesquisAI
 
+
+## [0.7.7] — 2026-10-27 — 🔒 Drive Guard: **“My Drive” só dentro de PesquisAI**
+
+### 📂 O app inicia na pasta PesquisAI (não em `/root`)
+- **Relato do autor (27/10/2026):** *“a versão 0.7.7 quando inicia está no root,
+  deve iniciar na pasta PesquisAI no Drive.”*
+- **Causa [DADO CONFIRMADO no runtime]:** o motor V2 sobe um
+  `opencode serve --service` desanexado que **herda o cwd de quem o inicia**. No
+  Colab, o kernel roda em `/root`; o serviço nascia ali e as sessões criadas sem
+  `location` explícita adotavam `/root` como diretório de projeto — o agente
+  executava ferramentas fora do Drive mesmo com o `cd` no comando do ttyd.
+- **Correção (três camadas):**
+  1. `ensure_service_project_dir()` (`run_fast.py`) roda no boot, depois das
+     dependências: se o serviço está em outro cwd, faz `service stop` e sobe
+     `opencode serve --service` **com `cwd` = pasta PesquisAI** (fast-path quando
+     já está correto; best-effort, nunca derruba o boot).
+  2. `_workspace_dir()` (`launch_app.py`) resolve o diretório do projeto sem
+     nunca cair na raiz: `DRIVE_PATH` → `~/PesquisAI` → cria `DRIVE_PATH`. Todos
+     os spawns de terminal (`start_ttyd`, auto-cura, troca de idioma,
+     `/api/run_terminal`, importação de sessão) usam esse valor no `cd` **e** no
+     `cwd` do `Popen` do ttyd.
+  3. `preflight_ufvai_session_info()` cria a sessão com
+     `location: {"directory": <projeto>}` explícito — a sessão nasce presa ao
+     Drive mesmo se o processo estiver em outro diretório.
+- **Efeito:** sessões novas, o terminal e as ferramentas do agente passam a
+  abrir em `/content/drive/My Drive/PesquisAI` (offline: `~/PesquisAI`).
+- **Testes:** `tests/test_v077_start_dir.py` — 5/5 (preferência do Drive,
+  fallback offline, `cwd` do ttyd, `location` da sessão, fast-path do serviço).
+
+### 🌐 Saudação inicial no idioma do CLIENTE (nunca no locale do servidor)
+- **Relato do autor (27/10/2026):** *“ainda está com a mensagem em inglês
+  `Hello! (tip: ...)` mesmo com a interface detectando corretamente o
+  português.”*
+- **Causa [DADO CONFIRMADO]:** quando não havia preferência no Drive, a
+  saudação ficava pendente e um **fallback de 8 s** a semeava com
+  `_current_lang` — que, no Colab, vinha do locale do **servidor** (`en_US`).
+  A interface abria depois (em português) e o `/api/lang` já não tinha o que
+  consumir: a mensagem em inglês permanecia no histórico.
+- **Correção:**
+  1. `_build_ttyd_cmd()` resolve o idioma na ordem **env → prefs do Drive →
+     `_current_lang` → sistema** (antes `_current_lang` vencia as prefs).
+  2. Só semeia a saudação imediatamente quando o idioma é **confirmado**
+     (env ou preferência salva). Sem confirmação, fica pendente para o
+     `/api/lang` do navegador.
+  3. O fallback passou de **8 s → 60 s** e usa **prefs ou `pt_BR`** — nunca
+     o locale do servidor.
+  4. Caminho `--prompt` (sem sessão pré-criada) usa `pt_BR` quando o idioma
+     não está confirmado.
+- **Testes:** +2 em `tests/test_v077_start_dir.py` (prefs vencem
+  `_current_lang`; fallback não usa locale do servidor) — **7/7**.
+
+### 🔌 ttyd sem quedas: keepalive de aplicação e fim do laço de reload
+- **Relato do autor (27/10/2026):** *“o terminal ttyd está desconectando
+  constantemente”*.
+- **Evidência [DADO CONFIRMADO]:** `ttyd.log` mostrava `WS closed` a cada
+  30–60 s, sempre seguido de `/token` + `/ws` novos — a página recarregava em
+  laço. O reload vinha do auto-reconnect injetado em v0.7.5, cujo contador
+  reiniciava a cada recarga (`_reloads<3`), e o proxy do Colab derruba
+  WebSocket **sem tráfego de aplicação** (o ping do ttyd é controle de
+  protocolo e não conta).
+- **Correção (no HTML injetado no ttyd, `_get_touch_handler_script`):**
+  1. **Keepalive**: a cada **20 s** envia um `RESIZE` do próprio protocolo do
+     ttyd (`'1' + JSON`) com o tamanho atual — idempotente, invisível na tela,
+     mantém o socket ativo.
+  2. **Auto-reconnect domado**: Enter no máximo 1×/5 s e só após 3 s de socket
+     fechado; reload só como último recurso, no máximo **2× por aba/10 min**
+     (`sessionStorage`) e apenas se o terminal exibir “Reconnect/Connection
+     closed”.
+- **Efeito imediato:** o ttyd serve o `index.html` do disco a cada request —
+  basta **recarregar a página** para o keepalive entrar em vigor (sem
+  reiniciar o app).
+- **Teste:** `test_touch_script_tem_keepalive_e_sem_laco_de_reload` — 8/8.
+
+### 🔒 O agente não acessa mais “My Drive” fora da pasta PesquisAI
+- **Regra do autor:** *“não deixe acessar a pasta My Drive exceto a subpasta PesquisAI e
+  todas as suas subpastas — mesmo estando em auto.”*
+- **Antes:** o agente rodava com `--auto` (auto-aprovação) e podia ler, listar e gravar
+  qualquer arquivo de `/content/drive/My Drive` — inclusive os documentos pessoais do
+  usuário que não fazem parte da memória.
+- **Agora:** um plugin do servidor UFVAI V2 (`pesquisai/plugins/drive_guard/`) fecha
+  `/content/drive` e libera **somente** `/content/drive/My Drive/PesquisAI/**`. A decisão
+  **não depende de aprovação**, então `--auto` não a contorna.
+- **Três camadas independentes:**
+  1. **Regras declarativas** em `opencode.json` — `permissions` com `deny` da raiz vigiada
+     seguido de `allow` de PesquisAI para `external_directory`, `read` e `edit`. No motor,
+     `deny` é **final**: nenhuma flag de auto-aprovação a transforma em `allow`.
+  2. **Hook `permission.evaluate`** — qualquer decisão que sobrevenha para `read`, `edit`,
+     `external_directory`, `shell`, `glob` ou `grep` apontando para fora de PesquisAI é
+     reescrita para `deny`.
+  3. **Hook `tool.execute.before`** — inspeciona a entrada da ferramenta (`path`, `file`,
+     `pattern`, `command`, `cwd`, inclusive aninhada) e lança erro **antes** de tocar no disco.
+- **Resolução de caminho:** `realpath` do ancestral mais próximo (resolve symlinks e
+  alvos que ainda não existem), `..`, `file://`, `~`, `$HOME`, aspas e escapes. O alias
+  `MyDrive` do Colab (mesmo diretório de `My Drive`, mesmo inode) é normalizado na
+  comparação. Em comando de shell, além dos tokens, procura caminhos absolutos do Drive em
+  qualquer posição — pega `python3 -c "open('/content/drive/My Drive/x')"`. Referência
+  ofuscada (variável montada em tempo de execução) cai em **falha fechada**.
+- **Preservação:** o material criptográfico de “Minha memória”
+  (`*keys_store.json`, `*keys_encryption_key.bin`) continua com `deny`; `*.env` continua
+  exigindo aprovação. Arquivos do usuário relacionados ao agente não são tocados.
+- **O que NÃO muda:** o servidor Python da interface (memória, backups, autosave) continua
+  acessando o Drive normalmente — o guard governa **as ferramentas do agente**.
+- **Auditoria:** cada bloqueio é registrado em `~/.local/state/ufvai/drive-guard.log`
+  (ISO-8601, uma linha por evento).
+- **Fail-open no boot:** se a cópia do plugin falhar, o UFVAI inicia normalmente e avisa no
+  log; um `opencode.json` ilegível **nunca** é sobrescrito (as regras já gravadas
+  permanecem).
+
+### ⚙️ Instalação automática
+- `ensure_drive_guard()` é chamado por `ensure_ufvai_agent()` — portanto roda no boot e em
+  **todo** (re)spawn do terminal (troca de idioma, troca de chave, `/api/run_terminal`,
+  import de sessão). O plugin vai para `<config>/plugins/ufvai-drive-guard/` e o caminho
+  absoluto é registrado em `plugins`.
+
+### 🧪 Testes
+- `tests/js/test_drive_guard.mjs` (**novo**) 35/35 — caminhos, symlink real, comandos de
+  shell, entradas de ferramenta, hook de permissão e o contrato do `setup()` (um evento
+  que chega como `allow` — o que a auto-aprovação faz — é reescrito para `deny`).
+- `tests/test_drive_guard.py` (**novo**) 20/20 — ordem `deny` → `allow`, idempotência do
+  merge, preservação de regras do usuário, cópia do plugin e config ilegível.
+
+## [0.7.6] — 2026-10-24 — 🏷️ Rebrand do agente: **opencode → ufvai** (identidade completa, estilo Flint)
+
+### 🎯 Pedido do autor
+- *"faça uma nova versão trocando o 'opencode' por 'ufvai' como o Flint fez customizando o opencode"*
+  — o Flint rebrandizou o motor de verdade (binário `flint`, config em `~/.config/flint/`).
+  Aqui a troca é de **IDENTIDADE** (documentos do agente + nome de comando), com o
+  runtime físico preservado para não quebrar nada em execução.
+
+### 🏷️ O que virou "ufvai"
+- **Documentos do agente** (`AGENTS.md`, `agents/AGENTS.{pt,en,es,fr,zh}.md` e o **novo**
+  `agents/UFVAI.md` — o arquivo que era instalado como agente padrão): todas as ocorrências
+  de `opencode`/`OpenCode` passaram a `ufvai`/`UFVAI` — caminhos de config
+  (`~/.config/ufvai/...`), arquivo `ufvai.json`, dados em `~/.local/share/ufvai/` e comando
+  `ufvai auth export`. §0.1 rebatizada de **"Motor UFVAI V2"**; versão do agente → **v0.7.6**.
+  Frases que ficariam redundantes foram reescritas ("O UFVAI opera sobre o **motor UFVAI 2.x**").
+- **Aliasing do motor** (novo `scripts/ufvai-alias.sh`, idempotente e fail-open): cria
+  `~/.config/ufvai` → `~/.config/opencode` (symlink), `ufvai.json` → `opencode.json`,
+  `~/.local/share/ufvai` → `~/.local/share/opencode` e o comando **`ufvai`** (wrapper POSIX
+  com `OPENCODE_CONFIG_DIR`/`OPENCODE_CONFIG`). O motor físico continua sendo o mesmo —
+  nada é renomeado em execução (banco SQLite e crédenciais intactos).
+
+### 🧱 O que NÃO mudou (de propósito)
+- **Código-fonte** (`pesquisai/opencode_*.py`), `install-offline.sh`, `Dockerfile` e
+  binários continuam referenciando o motor real — renomear módulos/imports quebraria o
+  runtime sem ganho de marca.
+- **CHANGELOG/histórico** e citações funcionais do gateway (`OpenCode Zen`,
+  erro `OpenCode's free tier...`) permanecem intactos — são registros factuais.
+- **Banco de dados:** o SQLite continua com o nome original (renomear com o motor em
+  execução corromperia o WAL); os docs referenciam o **diretório** `~/.local/share/ufvai/`,
+  que resolve para o mesmo banco via symlink.
+
+### 🧪 Verificações
+- `grep -ric opencode` → **0** nos 7 documentos de identidade ·
+  `bash -n scripts/ufvai-alias.sh` OK · `py_compile` de `__version__.py` OK ·
+  aliases aplicados no ambiente Colab e `ufvai --version` responde `opencode v2.1.4`.
+
 ## [0.7.5] — 2026-10-23 — 🪟 Telas de abertura e retomada **UMA VEZ POR SESSÃO**
 
 ### 🪟 A tela de e-mail/"Bem-vindo" e a pergunta de retomada apareciam várias vezes

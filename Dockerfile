@@ -20,7 +20,7 @@ FROM python:3.12-slim AS base
 
 LABEL org.opencontainers.image.title="UFVAI"
 LABEL org.opencontainers.image.description="Agente de IA para Pesquisa Científica com foco em dados brasileiros"
-LABEL org.opencontainers.image.version="0.7.5"
+LABEL org.opencontainers.image.version="0.7.7"
 LABEL org.opencontainers.image.licenses="MIT"
 LABEL org.opencontainers.image.source="https://github.com/gustavobraga-byte/PesquisAI"
 LABEL org.opencontainers.image.vendor="Universidade Federal de Viçosa (UFV)"

@@ -1,6 +1,6 @@
 # 📘 Manual do UFVAI
 
-> **Agente de Pesquisa Científica de Alta Performance · v0.7.5 · Outubro 2026**
+> **Agente de Pesquisa Científica de Alta Performance · v0.7.7 · Outubro 2026**
 > Registro SisPPG/UFV nº 10356285004 · Universidade Federal de Viçosa
 
 ---
@@ -970,7 +970,7 @@ Ou, em último caso: `sudo dpkg -i --force-depends pesquisai_*.deb` (o pip já e
 
 ```
 BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.7.5. Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão 0.7.7. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -981,7 +981,7 @@ Verificar autenticidade em: http://sisppg.ufv.br
 **Formato simplificado (nota de rodapé):**
 
 ```
-UFVAI, versão 0.7.5, desenvolvido por Gustavo Bastos Braga (UFV, 2026). Disponível em:
+UFVAI, versão 0.7.7, desenvolvido por Gustavo Bastos Braga (UFV, 2026). Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 ```
 
@@ -1010,7 +1010,7 @@ https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 | **Tipo** | Software / Computer Program |
 | **Autor** | Braga, Gustavo Bastos |
 | **Título** | UFVAI: agente de inteligência artificial para pesquisa científica |
-| **Versão** | 0.7.5 |
+| **Versão** | 0.7.7 |
 | **Ano** | 2026 |
 | **Instituição** | Universidade Federal de Viçosa (UFV) |
 | **URL** | https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/ |
@@ -1026,7 +1026,7 @@ https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 author = {Gustavo Bastos Braga},
 title = {{UFVAI}: Agente de Intelig{\^e}ncia Artificial para Pesquisa Cient{\'\i}fica},
 year = {2026},
-version = {0.7.5},
+version = {0.7.7},
 institution = {Universidade Federal de Vi{\c{c}}osa (UFV)},
 url = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/},
 note = {Acessado em: DD m{\^e}s AAAA}
@@ -1083,7 +1083,7 @@ Ethics (COPE).
 
 Referência da ferramenta:
 BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para
-pesquisa científica. Versão 0.7.5. Viçosa: UFV, 2026. Disponível em:
+pesquisa científica. Versão 0.7.7. Viçosa: UFV, 2026. Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Registro SisPPG/UFV nº 10356285004 — http://sisppg.ufv.br
 ```
@@ -1369,6 +1369,8 @@ Resumo das versões da série 0.6.x (detalhes completos no `CHANGELOG.md` do rep
 
 | Versão | Data | Destaques |
 |--------|------|-----------|
+| **0.7.7** | 27/10/2026 | 🔒 **Drive Guard** — o agente não acessa mais “My Drive” fora de `My Drive/PesquisAI` (nem com `--auto`): regras `permissions` com `deny` **final** no `opencode.json` + hooks `permission.evaluate` e `tool.execute.before`; alias `MyDrive`, `..`, `file://`, `~` e comandos de shell resolvidos antes da decisão; referência ofuscada cai em **falha fechada**; auditoria em `~/.local/state/ufvai/drive-guard.log` · 🧪 35 verificações em Node + 20 testes Python |
+| **0.7.6** | 24/10/2026 | 🏷️ **Rebrand do agente: opencode → ufvai** — as Diretrizes (`AGENTS.md` + `agents/*` nos 5 idiomas + **novo** `agents/UFVAI.md`) agora se referem ao motor como **UFVAI** em todos os caminhos e comandos (`~/.config/ufvai/`, `ufvai.json`, `~/.local/share/ufvai/`, `ufvai auth export`); novo `scripts/ufvai-alias.sh` cria os symlinks e o comando `ufvai` por cima do motor físico, sem tocar no runtime (banco/crédenciais intactos) |
 | **0.7.5** | 23/10/2026 | 🪟 **Telas de abertura e retomada uma vez por sessão** — marca em **três camadas** (sessionStorage + localStorage 12 h + cookie), gravada antes de exibir; recargas internas não a consomem e o **↻** reoferece · 🧊 HTML com `Cache-Control: no-store` |
 | **0.7.4** | 23/10/2026 | 💾 **Autosave de todas as conversas** — com várias sessões abertas, o autosave salvava **só uma** (a do terminal); agora **cada conversa** viva que tenha conteúdo novo recebe o seu próprio arquivo (`backups/autosave/sessions/<id>.json`) e todas entram na lista do modal **Restaurar** · 🔓 **Free tier do OpenCode Zen na restauração corrigido** (o id da sessão importada agora nasce no **formato nativo** do motor — sem isso o gateway recusava com 403) · 🪟 **Telas de Termos / "Bem-vindo de volta" uma vez por entrada** |
 | **0.7.3** | 22/10/2026 | 📦 **O pacote `pesquisai` passa a ser INSTALADO no ambiente** (o boot do Colab faz `pip install -e` e prova a API do autopilot a partir de um CWD neutro — antes a "Minha memória" não salvava nada fora da pasta do repo) · 🔄 **Retomada uma vez na entrada, sem loop** (máquina de estados em `sessionStorage`) · ⏱️ **Autosave a cada 1 minuto** · 🗂️ **Fallback das 3 últimas interações** (`autosave_4..6` preservam o backup da conversa anterior) · 📅 **Calendário do "Restaurar" corrigido** (chips dos meses com backup, contagem nos dias, tooltip, item sem data visível) |
@@ -1424,4 +1426,4 @@ O UFVAI usa estes marcadores para indicar o nível de confiança:
 ---
 
 *Documentação atualizada: Setembro 2026*  
-*UFVAI v0.7.5 · Registro SisPPG/UFV nº 10356285004*
+*UFVAI v0.7.7 · Registro SisPPG/UFV nº 10356285004*

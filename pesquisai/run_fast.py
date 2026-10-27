@@ -58,6 +58,7 @@ from .constants import (
 )
 from .jokes import next_joke
 from .progress_bar import show as progress, finish as progress_finish
+from .drive_guard import ensure_drive_guard
 from .opencode_config import (
     build_agent_markdown,
     build_ufvai_theme,
@@ -343,6 +344,105 @@ def setup_drive() -> tuple[str, str]:
         pass
 
     return DRIVE_PATH, folder_url
+
+
+def _service_cwd() -> Optional[str]:
+    """cwd do processo ``opencode serve --service`` em execução (None se não há).
+
+    O motor V2 roda um servidor de background que herda o cwd de quem o
+    iniciou. Sessões criadas sem ``location`` explícita nascem nesse cwd —
+    por isso o servidor precisa nascer dentro da pasta PesquisAI.
+    """
+    try:
+        listing = subprocess.run(
+            ["pgrep", "-f", "opencode serve --service"],
+            capture_output=True, text=True, timeout=3,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for pid in (listing.stdout or "").split():
+        try:
+            return os.readlink(f"/proc/{pid}/cwd")
+        except OSError:
+            continue
+    return None
+
+
+def ensure_service_project_dir(project_dir: str, timeout_s: float = 20.0) -> bool:
+    """Garante que o serviço do OpenCode nasça com cwd na pasta do projeto.
+
+    v0.7.7 (correção 27/10/2026 — SEM bump): relatado pelo autor — "a versão
+    0.7.7 quando inicia está no root, deve iniciar na pasta PesquisAI no
+    drive". Causa [DADO CONFIRMADO no runtime]: o ``opencode serve --service``
+    era iniciado pelo kernel do Colab em ``/root``; as sessões criadas pelo
+    serviço herdavam ``/root`` como diretório de projeto e o agente executava
+    ferramentas fora do Drive, mesmo com o ``cd`` no comando do ttyd.
+
+    Esta rotina roda no boot, ANTES de qualquer TUI:
+      1. se o serviço já está no projeto, não faz nada (fast-path);
+      2. para o serviço antigo (``service stop``);
+      3. sobe ``opencode serve --service`` com ``cwd=project_dir``;
+      4. espera o serviço responder (``service status``).
+
+    Best-effort: qualquer falha devolve False e o boot segue — os spawns do
+    ttyd também passam a usar ``cwd`` explícito (camada 2).
+    """
+    target = os.path.abspath(project_dir or "")
+    if not target or not os.path.isdir(target):
+        return False
+
+    current = _service_cwd()
+    try:
+        if current and os.path.realpath(current) == os.path.realpath(target):
+            return True
+    except OSError:
+        pass
+
+    try:
+        from .opencode_utils import build_env, find_opencode
+        opencode_bin = find_opencode()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("ensure_service_project_dir: opencode indisponível (%s)", exc)
+        return False
+
+    try:
+        subprocess.run(
+            [opencode_bin, "service", "stop"],
+            capture_output=True, text=True, timeout=10,
+        )
+    except Exception as exc:  # noqa: BLE001 — serviço ausente é o caso normal
+        logger.debug("ensure_service_project_dir: service stop falhou (%s)", exc)
+
+    try:
+        subprocess.Popen(
+            [opencode_bin, "serve", "--service"],
+            cwd=target,
+            env=build_env(),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("ensure_service_project_dir: não subiu o serviço (%s)", exc)
+        return False
+
+    deadline = time.monotonic() + max(1.0, float(timeout_s))
+    while time.monotonic() < deadline:
+        try:
+            status = subprocess.run(
+                [opencode_bin, "service", "status"],
+                capture_output=True, text=True, timeout=3,
+            )
+            if (status.stdout or "").strip().startswith("http"):
+                logger.info(
+                    "Serviço OpenCode iniciado em %s (cwd do projeto)", target,
+                )
+                return True
+        except (OSError, subprocess.SubprocessError):
+            pass
+        time.sleep(0.4)
+    logger.warning("ensure_service_project_dir: serviço não respondeu em %ss", timeout_s)
+    return False
 
 
 # ── Etapa 2: Dependências ────────────────────────────────────
@@ -665,6 +765,20 @@ Existe uma pasta persistente de skills personalizadas em:
         # comandos slash em PT (merge_ufvai_commands) — nunca sobrescreve os
         # comandos já definidos pelo usuário.
         write_json_atomic(OPENCODE_CFG, merge_opencode_config(cfg, AGENT_NAME))
+        # v0.7.7 — DRIVE GUARD: "My Drive" só é acessível dentro de PesquisAI
+        # (inclusive com --auto). Instala o plugin no perfil do usuário e
+        # reafirma as regras `deny` no opencode.json. Fail-open: se algo der
+        # errado aqui, o boot continua (as regras já gravadas permanecem).
+        try:
+            _guard = ensure_drive_guard()
+            if not _guard.get("ok"):
+                logger.warning(
+                    "drive-guard: não instalado (%s) — o agente pode acessar "
+                    "My Drive fora de PesquisAI.",
+                    _guard.get("reason") or "motivo desconhecido",
+                )
+        except Exception:  # noqa: BLE001
+            logger.exception("drive-guard: falha na instalação (boot segue).")
         # v0.6.24 (ajuste 18/10/2026, SEM bump): o plugin opencode-i18n-v2 foi
         # REMOVIDO (duplicava comandos na paleta e trazia títulos em chinês).
         # Limpa instalações/estado deixados por ele para que nenhuma versão
@@ -745,10 +859,17 @@ def preflight_ufvai_session_info(
         logger.debug("preflight_ufvai_session: opencode não encontrado")
         return None, False
 
-    payload = _json.dumps({
+    payload_data: dict = {
         "agent": AGENT_NAME,
         "title": "Terminal PesquisAI (UFVAI)",
-    })
+    }
+    # v0.7.7 (correção 27/10/2026 — SEM bump): a sessão nasce explicitamente
+    # PRESA à pasta PesquisAI. Antes, quando ``cwd`` era relativo a um
+    # processo iniciado em /root (kernel do Colab), o motor criava a sessão
+    # em /root — o agente abria fora do Drive mesmo com o ``cd`` no ttyd.
+    if cwd and os.path.isdir(cwd):
+        payload_data["location"] = {"directory": os.path.abspath(cwd)}
+    payload = _json.dumps(payload_data)
 
     def _api(arguments: list[str]) -> dict:
         result = subprocess.run(
@@ -1157,6 +1278,30 @@ def seed_ufvai_greeting(
                 model = None
         except Exception:
             model = None
+    # v0.7.5+ (sem bump): 1ª tentativa pela API do serviço.
+    # O `opencode run` RE-QUOTEIA o prompt quando ele tem parênteses/dois-pontos
+    # (reproduzido: "Olá! (Dica: ...)" chega ao histórico com aspas literais).
+    # A rota POST /api/session/{id}/prompt grava o texto exato.
+    try:
+        import json as _json
+        payload = _json.dumps(
+            {"text": greeting, "files": [], "agents": []}, ensure_ascii=False
+        )
+        api = subprocess.run(
+            [bin_path, "api", "post", f"/api/session/{session_id}/prompt",
+             "--data", payload],
+            capture_output=True, text=True, timeout=min(20.0, timeout_s),
+            cwd=cwd or _os.getcwd(), env=run_env,
+        )
+        if api.returncode == 0 and '"data"' in (api.stdout or ""):
+            return True
+        logger.debug(
+            "seed via API não concluiu (rc=%s): %s",
+            api.returncode, (api.stderr or api.stdout or "")[:160],
+        )
+    except Exception as exc:  # noqa: BLE001 — cai no fallback
+        logger.debug("seed via API falhou: %s", exc)
+
     try:
         cmd = [bin_path, "run", "--session", str(session_id)]
         if model:
@@ -1265,6 +1410,9 @@ def run() -> None:
 
     folder_path, drive_url = setup_drive()
     setup_dependencies()
+    # v0.7.7 (27/10/2026 — SEM bump): o serviço do motor nasce no PesquisAI,
+    # não em /root — é dele que as sessões herdam o diretório de projeto.
+    ensure_service_project_dir(folder_path)
     setup_skills()
     setup_custom_skills()  # v0.6.18: skills personalizadas do usuário
     setup_obsidian_vault()
