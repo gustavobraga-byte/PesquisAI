@@ -24,6 +24,40 @@
 - `tests/test_v078_service_keys.py` — 15 testes (store → env, detecção no serviço, fast-path x reinício, injeção no Popen, reerguer serviço, script sem vazamento de segredo).
 - Regressão: `test_v077_start_dir` · `test_drive_guard` · `test_version_sync` · `test_security` — 119 testes verdes.
 
+### ⌨️ Ajuste (29/10, **sem bump** — continua 0.7.8) — Ctrl+C copia · Ctrl+V cola no terminal
+
+#### 🐞 Sintoma
+- No terminal do UFVAI (ttyd 1.7.4 + xterm.js) o **Ctrl+C** chegava ao PTY como `^C` (0x03) e, na TUI do opencode com o campo vazio, **encerrava a conversa** — o terminal "morria" no meio do trabalho.
+- O **Ctrl+V** mandava `^V` (0x16) para o aplicativo **além** de colar (literal-next do readline).
+
+#### ✅ Correção
+- **`Ctrl+C` copia** a seleção (`xterm.getSelection()`, com `navigator.clipboard.writeText` e fallback `document.execCommand('copy')`) e **nunca** vai ao PTY. Sem seleção, só aparece a dica (com throttle de 10 s).
+- **`Ctrl+Shift+C`** envia `\x03` de verdade (saída de emergência para interromper um comando).
+- **`Ctrl+V` cola** — o filtro impede o `^V` e a colagem vem do evento `paste` do navegador; se o foco estiver fora do terminal, o texto é entregue ao PTY (`term.paste` → `__pesquisaiSendToPTY`).
+- **`Ctrl+Shift+V`** mantém o caminho nativo (texto puro). Campos de formulário da UI ficam intocados (`isFormField`), exceto o `xterm-helper-textarea`.
+- Duas camadas independentes: `attachCustomKeyEventHandler` (API pública do xterm, impede os bytes de controle) + listeners em fase de **captura** no `document`; rede de segurança da Clipboard API em 400 ms, sem duplicar (`lastPasteAt`).
+
+#### 🧠 Cache do HTML do ttyd (por que "não funcionava" mesmo com o código novo)
+- `_prepare_ttyd_touch_index()` reaproveitava o `ttyd_touch_<uid>.html` só checando **existência**. O arquivo em disco (gerado antes do ajuste) continuou sendo servido pelo `--index` — o terminal rodava o JavaScript **velho**, sem o teclado.
+- Agora o HTML injetado carrega a marca `<!-- ufvai-inject:<sha256[:16] do script> -->` e `_ttyd_index_is_current()` regenera o arquivo quando a marca não corresponde ao script atual. Como o ttyd relê o `--index` a cada requisição, **um F5 já aplica** — sem reiniciar o terminal.
+
+#### 🖱️ Ajuste 2 (29/10, **sem bump**) — "Nada selecionado" com a TUI no controle do mouse
+- **Sintoma (relatado pelo autor):** `Ctrl+V` passou a colar, mas `Ctrl+C` respondia *"Nada selecionado · Ctrl+Shift+C envia Ctrl+C"* — a área de transferência ficava vazia.
+- **Causa:** a TUI do opencode liga *mouse reporting* (DECSET `1000`/`1002`/`1006`). Nesse estado o xterm.js **desativa o serviço de seleção**: arrastar não seleciona nada e `term.getSelection()` devolve `''`. Não é configuração da TUI a ser desligada — é o comportamento padrão de terminal com o mouse capturado (a seleção nativa só acontece com **Shift+arraste**).
+- **Correções:**
+  - **Memória da última seleção** (`onSelectionChange` + `lastSel`/`lastSelAt`): a TUI redesenha a cada token e o xterm invalida a seleção; sem isso, `Ctrl+C` logo após o arrasto voltava a dizer "nada selecionado".
+  - **Arrasto vira seleção** (`installDragSelect`): em arrasto > 6 px com mouse capturado, sintetiza `mouseup` + `mousedown{shiftKey:true}` para o xterm entrar em modo seleção; a seleção é copiada no `mouseup` ("copiar ao selecionar"). Clique, duplo-clique e roda do mouse seguem para a TUI; a barra de rolagem (últimas ~2,5 colunas) é preservada.
+  - **Dica correta por contexto:** *"Nada selecionado · arraste para selecionar (ou Shift+arraste)"* quando a captura está ativa; *"Nada selecionado · Ctrl+Shift+C envia Ctrl+C"* quando não está.
+  - **Kill switch (tempo de execução):** `window.__ufvaiDragSelect = false` no console desliga o arrasto-vira-seleção **na hora** (guarda nos três handlers de mouse), mantendo só o caminho nativo (Shift+arraste), sem tocar no resto.
+- **Status da verificação (29/10, após instalar as libs do Chromium):** `tests/test_ttyd_clipboard.py` **33/33** · `tests/js/test_v078_clipboard.js` **8/8** · `scripts/diag_clipboard_ttyd.py` **9/9 PASS** (Chromium + ttyd 1.7.4 reais) · teste de arrasto em navegador real **19/19** (ttyd de sandbox com *mouse reporting* ligado): seleção durante o arrasto, `Ctrl+C` copia, nenhum `^C`, `Ctrl+Shift+C` envia, arrasto simples seleciona e copia, clique/duplo-clique e roda seguem para a TUI, `Ctrl+V` cola sem `^V`, kill switch funciona.
+
+#### 🧪 Testes
+- `tests/test_ttyd_clipboard.py` — **33 testes** de contrato (script autocontido, listeners em captura, `attachCustomKeyEventHandler`, `Ctrl+Shift+C`, rede de segurança do paste, ordem touch→teclado, campos de formulário, fingerprint do cache, versão **0.7.8** inalterada, memória da última seleção, arrasto→Shift, eventos sintéticos ignorados como gesto, cópia ao selecionar, barra de rolagem preservada, kill switch).
+- `scripts/diag_selecao_tui.py` — diagnóstico dedicado ao caminho de seleção (mouse capturado × Shift+arraste × `Ctrl+C`).
+- `tests/js/test_v078_clipboard.js` — **8/8** de comportamento (DOM simulado, roda o script real): `Ctrl+C` copia e não envia `^C`; `Ctrl+Shift+C` envia `\x03`; `paste` fora do terminal entrega 1×; formulário intocado.
+- `scripts/diag_clipboard_ttyd.py` — **9/9** com **Chromium + ttyd 1.7.4 reais** (Playwright): digitação chega ao PTY, `Ctrl+V` cola 1× sem `^V`, Clipboard API como rede de segurança, `Ctrl+C` copia e **não** gera `GOT_SIGINT`, `Ctrl+Shift+C` gera. O ttyd de teste sobe em porta livre e é encerrado no fim — o terminal real não é tocado.
+- Regressão: `test_security` · `test_launch_app` · `test_run_fast` · `test_version_sync` (ver relatório da sessão).
+
 ---
 
 ## [0.7.7] — 2026-10-27 — 🔒 Drive Guard: "My Drive" só dentro de PesquisAI

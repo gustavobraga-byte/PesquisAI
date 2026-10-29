@@ -815,7 +815,7 @@ def create_wrapper_html(terminal_url: str, drive_url: str) -> str:
     </a>
     <span class="footer-sep"></span>
     <!-- v0.6.20-fix: link do SITE OFICIAL no rodapé (falta reportada pelo usuário) -->
-    <a href="https://gustavobraga-byte.github.io/ufvaisite/" target="_blank" rel="noopener" class="footer-link footer-site" title="Site oficial do UFVAI">
+    <a href="https://der.ufv.br/ufvai/" target="_blank" rel="noopener" class="footer-link footer-site" title="Site oficial do UFVAI">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
       Site
     </a>
