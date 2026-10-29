@@ -24,6 +24,34 @@ Compatível com o PesquisAI principal (v0.2.1+).
 ═════════════════════════════════════════════════════════════════════════
 Histórico de versões:
 ═══════════════════════════════════════════════════════════════════════
+  v0.7.8 — 29/10/2026: 🔑 Chaves de API do Drive chegavam ao shell, não ao SERVIÇO
+            • RELATO DO AUTOR: "o UFVAI não está carregando as chaves de API
+              que estão no Drive. Aconteceu depois que o opencode atualizou
+              para a v2.2".
+            • CAUSA [DADO CONFIRMADO no runtime]: `run_fast.run()` chama
+              `ensure_service_project_dir()` ANTES de `start_wrapper_server()`,
+              que é quem chamava `load_keys_from_drive()`. O
+              `opencode serve --service` nascia sem NENHUMA variável de chave
+              (medido: `/proc/<pid>/environ` com 0 das 5 variáveis, enquanto o
+              shell tinha as 5). Até o motor 2.1 a TUI resolvia provedores com
+              o próprio ambiente; na v2.2 o catálogo é resolvido DENTRO do
+              serviço — por isso o sintoma só apareceu agora.
+              Prova: `opencode models` (via serviço) → opencode, opencode-go;
+              `opencode models --standalone` (env do shell) → + openrouter,
+              google e nvidia.
+            • CORREÇÃO (1): `ensure_service_project_dir(..., backup_dir=)`
+              decifra o `keys_store.json`, injeta as variáveis no `env` do
+              Popen do serviço E no `os.environ` do boot.
+            • CORREÇÃO (2) — auto-cura: serviço já no diretório certo mas sem
+              as chaves é reiniciado (`service_missing_key_envs`), então um
+              boot antigo não deixa o motor "cego" para sempre.
+            • CORREÇÃO (3): ao salvar/remover chave pela interface, o serviço
+              volta JÁ com as chaves novas (`_start_opencode_service_with_keys`)
+              antes do reinício do terminal.
+            • DIAGNÓSTICO: `scripts/diag_keys_v22.py` (store × processo ×
+              serviço × `opencode models`), sem imprimir segredo; códigos de
+              saída 0/1/2/3.
+            • Testes: `tests/test_v078_service_keys.py` (14 testes).
   v0.7.7 — 27/10/2026: 🔒 Drive Guard — "My Drive" só dentro de PesquisAI
             • REGRA DO AUTOR: "não deixe acessar a pasta My Drive exceto a
               subpasta PesquisAI e todas as suas subpastas — mesmo estando em
@@ -463,13 +491,13 @@ Histórico de versões:
 """
 
 # ── Versão semântica (SemVer) ──────────────────────────────────
-__version__: str = "0.7.7"
+__version__: str = "0.7.8"
 __brand__: str = "UFVAI"
 __brand_tagline__: str = "Pesquisa científica com integridade."
 
 # ── Metadados do release ───────────────────────────────────────
 __release_date__: str = "2026-10-27"
-__codename__: str = "Drive Guard: My Drive só dentro de PesquisAI (inclusive com --auto)"
+__codename__: str = "Chaves de API no serviço do motor (OpenCode v2.2)"
 
 # ── Identidade do projeto ──────────────────────────────────────
 __author__: str = "Gustavo Bastos Braga"

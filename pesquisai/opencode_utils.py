@@ -209,3 +209,101 @@ def is_opencode_v2(bin_path: Optional[str] = None) -> bool:
     """True se o binário detectado for OpenCode 2.x ou superior."""
     major = opencode_major(bin_path)
     return major is not None and major >= OPENCODE_MIN_MAJOR
+
+
+# ── v0.7.8 · chaves do Drive no ambiente do SERVIÇO ─────────────
+#
+# O serviço de background (`opencode serve --service`) resolve catálogo de
+# provedores e credenciais NO PRÓPRIO PROCESSO, a partir do ambiente com que
+# nasceu. No OpenCode v2.2 a TUI/CLI apenas consulta esse serviço — logo, se
+# ele nascer sem as variáveis de chave, nenhum provedor além do nativo
+# (`opencode`/`opencode-go`) aparece, mesmo com as chaves certas no Drive.
+#
+# As funções abaixo só LEEM nomes de variáveis e valores já decifrados em
+# memória; nunca gravam, nunca logam segredo.
+
+def keys_env_from_store(backup_dir: str) -> dict[str, str]:
+    """Traduz o ``keys_store.json`` (cifrado) em ``{VAR_DE_AMBIENTE: valor}``.
+
+    Args:
+        backup_dir: pasta ``backups/`` do PesquisAI (Drive ou ``~/PesquisAI``).
+
+    Returns:
+        Dicionário de variáveis prontas para o ambiente do serviço. Vazio se
+        o armazenamento não existir, estiver ilegível ou não tiver metadados
+        ``_env_<provedor>`` (nunca inventa nome de variável).
+    """
+    try:
+        from .security import load_encrypted_keys
+    except Exception:  # noqa: BLE001 — sem módulo de segurança não há chaves
+        return {}
+    try:
+        store = load_encrypted_keys(backup_dir)
+    except Exception:  # noqa: BLE001
+        return {}
+    if not isinstance(store, dict):
+        return {}
+
+    env: dict[str, str] = {}
+    for name, value in store.items():
+        if name.startswith("_env_") or not isinstance(value, str) or not value:
+            continue
+        var = store.get(f"_env_{name}") or ""
+        if isinstance(var, str) and var.strip():
+            env[var.strip()] = value
+    return env
+
+
+def service_pids() -> list[str]:
+    """PIDs dos processos ``opencode serve --service`` em execução."""
+    try:
+        out = subprocess.run(
+            ["pgrep", "-f", "opencode serve --service"],
+            capture_output=True, text=True, timeout=3,
+            stdin=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return [p for p in (out.stdout or "").split() if p.isdigit()]
+
+
+def service_env(pid: str) -> dict[str, str]:
+    """Ambiente de um processo lido de ``/proc/<pid>/environ``.
+
+    Returns:
+        Dicionário de variáveis; vazio se o ``/proc`` não estiver acessível.
+    """
+    try:
+        with open(f"/proc/{pid}/environ", "rb") as fh:
+            raw = fh.read()
+    except (OSError, ValueError):
+        return {}
+    env: dict[str, str] = {}
+    for chunk in raw.split(b"\0"):
+        if b"=" in chunk:
+            key, _, value = chunk.partition(b"=")
+            env[key.decode("utf-8", "replace")] = value.decode("utf-8", "replace")
+    return env
+
+
+def service_missing_key_envs(backup_dir: str) -> list[str]:
+    """Variáveis de chave do Drive que FALTAM no serviço em execução.
+
+    Serve de gatilho de auto-cura: se o serviço já está no diretório certo mas
+    nasceu sem as chaves (caso do boot anterior à v0.7.8), ele precisa ser
+    reiniciado — senão a TUI conversa com um motor sem credenciais.
+
+    Returns:
+        Lista de NOMES de variáveis ausentes. Vazia quando não há serviço em
+        execução (nada a corrigir) ou quando ele já tem todas as chaves.
+    """
+    expected = keys_env_from_store(backup_dir)
+    if not expected:
+        return []
+    pids = service_pids()
+    if not pids:
+        return []
+    have: set[str] = set()
+    for pid in pids:
+        have |= set(service_env(pid))
+    return sorted(var for var in expected if var not in have)

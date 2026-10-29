@@ -1,5 +1,31 @@
 # Changelog — PesquisAI
 
+## [0.7.8] — 2026-10-29 — 🔑 Chaves de API do Drive no serviço do motor (OpenCode v2.2)
+
+### 🐞 Sintoma
+- Depois da atualização para o **OpenCode v2.2**, o UFVAI deixou de enxergar os provedores configurados: `opencode models` listava apenas `opencode` e `opencode-go`, embora as 5 chaves estivessem no `backups/keys_store.json` do Drive e no `~/.bashrc`.
+
+### 🔎 Causa raiz (medida no runtime)
+- O boot chama `ensure_service_project_dir()` **antes** de `start_wrapper_server()` — e é neste último que o UFVAI carrega as chaves do Drive. Resultado: o processo `opencode serve --service` nascia com **0 das 5 variáveis** de chave no próprio ambiente, enquanto o shell tinha as 5.
+- Até o motor 2.1 isso não aparecia porque a TUI resolvia provedores com o ambiente dela (herdado do `~/.bashrc`). **Na v2.2 o catálogo de provedores é resolvido dentro do serviço** — por isso o sintoma surgiu só agora.
+- Prova: `opencode models` (via serviço) → `opencode`, `opencode-go`; `opencode models --standalone` (mesmo ambiente do shell) → + `openrouter`, `google`, `nvidia`.
+
+### ✅ Correções
+- **Injeção no serviço:** `ensure_service_project_dir(..., backup_dir=)` decifra o `keys_store.json` e injeta as variáveis no `env` do `Popen` do serviço **e** no `os.environ` do boot (o resto do processo — ttyd, wrappers, terminal — também passa a vê-las).
+- **Auto-cura:** se o serviço já está no diretório certo mas nasceu sem as chaves, ele é reiniciado (`service_missing_key_envs`). Um boot antigo não deixa mais o motor "cego" até o próximo restart manual.
+- **Salvar/remover chave vale na hora:** `_apply_opencode_env_change_async` agora reergue o serviço **já com as chaves novas** antes de reiniciar o terminal.
+- **Sem quebra de compatibilidade:** o `keys_store.json` não muda de formato; nada é copiado para o banco do motor; a pasta do store é resolvida (Drive → `~/PesquisAI/backups`).
+
+### 🩺 Diagnóstico
+- Novo `scripts/diag_keys_v22.py`: mostra store, processo, `~/.bashrc`, **ambiente do serviço** e provedores vistos pelo motor — sem nunca imprimir segredo. Códigos de saída: `0` ok · `1` chaves não chegaram ao serviço · `2` store vazio · `3` sem serviço/erro.
+- `--json` para uso em suporte e em testes.
+
+### 🧪 Testes
+- `tests/test_v078_service_keys.py` — 15 testes (store → env, detecção no serviço, fast-path x reinício, injeção no Popen, reerguer serviço, script sem vazamento de segredo).
+- Regressão: `test_v077_start_dir` · `test_drive_guard` · `test_version_sync` · `test_security` — 119 testes verdes.
+
+---
+
 ## [0.7.7] — 2026-10-27 — 🔒 Drive Guard: "My Drive" só dentro de PesquisAI
 
 ### 📂 O app inicia na pasta PesquisAI (não em `/root`)

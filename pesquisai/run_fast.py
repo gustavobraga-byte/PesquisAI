@@ -368,8 +368,10 @@ def _service_cwd() -> Optional[str]:
     return None
 
 
-def ensure_service_project_dir(project_dir: str, timeout_s: float = 20.0) -> bool:
-    """Garante que o serviço do OpenCode nasça com cwd na pasta do projeto.
+def ensure_service_project_dir(
+    project_dir: str, timeout_s: float = 20.0, backup_dir: Optional[str] = None
+) -> bool:
+    """Garante que o serviço do OpenCode nasça com cwd E chaves do projeto.
 
     v0.7.7 (correção 27/10/2026 — SEM bump): relatado pelo autor — "a versão
     0.7.7 quando inicia está no root, deve iniciar na pasta PesquisAI no
@@ -378,11 +380,28 @@ def ensure_service_project_dir(project_dir: str, timeout_s: float = 20.0) -> boo
     serviço herdavam ``/root`` como diretório de projeto e o agente executava
     ferramentas fora do Drive, mesmo com o ``cd`` no comando do ttyd.
 
+    v0.7.8 (29/10/2026): o serviço também nascia SEM as chaves de API do
+    Drive. Até o OpenCode 2.1 isso passava porque a TUI resolvia provedores
+    com o próprio ambiente (que recebe as chaves do ``~/.bashrc``); a partir
+    da v2.2 o catálogo de provedores é resolvido DENTRO do serviço, então o
+    motor passou a listar somente ``opencode``/``opencode-go`` —
+    [DADO CONFIRMADO]: ``opencode models`` via serviço ⇒ 2 provedores;
+    ``opencode models --standalone`` (mesmo ambiente do shell) ⇒ 5.
+    Aqui as chaves decifradas do Drive entram no ``env`` do Popen e no
+    ``os.environ`` do processo; um serviço já em execução que não tenha essas
+    variáveis é reiniciado (auto-cura do boot anterior).
+
     Esta rotina roda no boot, ANTES de qualquer TUI:
-      1. se o serviço já está no projeto, não faz nada (fast-path);
+      1. se o serviço já está no projeto E com as chaves, não faz nada;
       2. para o serviço antigo (``service stop``);
-      3. sobe ``opencode serve --service`` com ``cwd=project_dir``;
+      3. sobe ``opencode serve --service`` com ``cwd=project_dir`` e as chaves;
       4. espera o serviço responder (``service status``).
+
+    Args:
+        project_dir: pasta do projeto (PesquisAI) — cwd do serviço.
+        timeout_s: espera máxima pelo ``service status``.
+        backup_dir: pasta das chaves cifradas. Padrão:
+            ``<project_dir>/backups`` (com fallback ``~/PesquisAI/backups``).
 
     Best-effort: qualquer falha devolve False e o boot segue — os spawns do
     ttyd também passam a usar ``cwd`` explícito (camada 2).
@@ -391,12 +410,45 @@ def ensure_service_project_dir(project_dir: str, timeout_s: float = 20.0) -> boo
     if not target or not os.path.isdir(target):
         return False
 
+    keys_dir = backup_dir or os.path.join(target, "backups")
+    if backup_dir is None:
+        # Modo offline/Drive não gravável: a interface pode ter usado
+        # ~/PesquisAI/backups. Escolhe a pasta que realmente tem o store.
+        for candidate in (
+            os.path.join(target, "backups"),
+            os.path.join(os.path.expanduser("~"), "PesquisAI", "backups"),
+        ):
+            if os.path.exists(os.path.join(candidate, "keys_store.json")):
+                keys_dir = candidate
+                break
+
+    keys_env: dict[str, str] = {}
+    missing: list[str] = []
+    try:
+        from .opencode_utils import keys_env_from_store, service_missing_key_envs
+        keys_env = keys_env_from_store(keys_dir)
+        missing = service_missing_key_envs(keys_dir)
+    except Exception as exc:  # noqa: BLE001 — chaves são best-effort
+        logger.debug("ensure_service_project_dir: leitura de chaves falhou (%s)", exc)
+
+    if keys_env:
+        # O resto do boot (ttyd, wrappers, comandos do terminal) também vê as
+        # chaves — antes elas só entravam em start_wrapper_server(), DEPOIS
+        # deste ponto.
+        os.environ.update(keys_env)
+
     current = _service_cwd()
     try:
-        if current and os.path.realpath(current) == os.path.realpath(target):
+        if current and os.path.realpath(current) == os.path.realpath(target) and not missing:
             return True
     except OSError:
         pass
+
+    if missing:
+        logger.info(
+            "Serviço OpenCode sem %d chave(s) do Drive (%s) — reiniciando.",
+            len(missing), ", ".join(missing),
+        )
 
     try:
         from .opencode_utils import build_env, find_opencode
@@ -417,7 +469,7 @@ def ensure_service_project_dir(project_dir: str, timeout_s: float = 20.0) -> boo
         subprocess.Popen(
             [opencode_bin, "serve", "--service"],
             cwd=target,
-            env=build_env(),
+            env=build_env(keys_env),
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,

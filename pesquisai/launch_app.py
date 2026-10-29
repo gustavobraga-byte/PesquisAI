@@ -207,6 +207,11 @@ _TTYD_PROC: "subprocess.Popen | None" = None
 # DUAS sessões na mesma entrada.
 _current_ttyd_session: str | None = None
 
+# v0.7.8: pasta de chaves efetivamente usada nesta execução (Drive ou
+# `~/PesquisAI`). Definida em `start_wrapper_server()` e consumida por
+# `_keys_backup_dir()` ao reiniciar o serviço com as chaves novas.
+_KEYS_BACKUP_DIR: str | None = None
+
 # v0.7.5+ (sem bump): saudação pendente por sessão. A mensagem padrão é
 # semeada quando o CLIENTE informa o idioma (POST /api/lang), e não mais no
 # spawn do ttyd — o servidor não sabe o idioma do navegador.
@@ -2267,17 +2272,63 @@ def restore_opencode_auth_from_drive(backup_dir: "str | None" = None) -> bool:
             pass
 
 
-def _apply_opencode_env_change_async() -> None:
-    """Após salvar/remover chave: o serviço do V2 guarda o ambiente de quando subiu.
+def _keys_backup_dir() -> str:
+    """Pasta das chaves cifradas (``backups/``) em uso nesta execução.
 
-    Paramos o serviço em background e reiniciamos o terminal para que o motor
-    leia as chaves novas. Roda em thread para não atrasar a resposta HTTP.
+    v0.7.8: o reinício do serviço após salvar/remover chave precisa usar o
+    MESMO armazenamento que a interface usa. ``start_wrapper_server`` guarda
+    o caminho resolvido em ``_KEYS_BACKUP_DIR``; sem ele, cai no Drive e
+    depois no modo offline (``~/PesquisAI/backups``).
+    """
+    if _KEYS_BACKUP_DIR:
+        return _KEYS_BACKUP_DIR
+    drive = os.path.join("/content", "drive", "My Drive", "PesquisAI", "backups")
+    if os.path.isdir(drive):
+        return drive
+    return os.path.join(os.path.expanduser("~"), "PesquisAI", "backups")
+
+
+def _start_opencode_service_with_keys(timeout_s: float = 20.0) -> bool:
+    """Sobe o serviço do motor já com as chaves decifradas do Drive.
+
+    v0.7.8 (29/10/2026): o serviço guarda o ambiente de quando nasceu. Sem
+    isto, uma chave salva/removida pela interface só valeria no próximo boot
+    — o serviço antigo, sem a variável, continuava atendendo as sessões. Foi
+    o que fez o OpenCode v2.2 "parar de carregar as chaves do Drive": na v2.2
+    o catálogo de provedores é resolvido DENTRO do serviço.
+
+    Returns:
+        True se o serviço respondeu no prazo.
+    """
+    try:
+        from .run_fast import ensure_service_project_dir
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Serviço com chaves: import indisponível (%s)", exc)
+        return False
+    project = _workspace_dir()
+    return bool(
+        ensure_service_project_dir(
+            project, timeout_s=timeout_s, backup_dir=_keys_backup_dir()
+        )
+    )
+
+
+def _apply_opencode_env_change_async() -> None:
+    """Após salvar/remover chave: reergue o serviço com o ambiente novo.
+
+    Paramos o serviço em background, subimos de novo JÁ com as chaves
+    decifradas (v0.7.8) e reiniciamos o terminal. Roda em thread para não
+    atrasar a resposta HTTP.
     """
     def _worker() -> None:
         try:
             _shutdown_stop_opencode_service()
         except Exception:  # noqa: BLE001
             pass
+        try:
+            _start_opencode_service_with_keys()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Serviço não voltou com as chaves novas: %s", exc)
         try:
             restart_ttyd_with_lang(_current_lang or "pt_BR")
         except Exception as exc:  # noqa: BLE001
@@ -2310,6 +2361,10 @@ def start_wrapper_server():
         os.makedirs(_base, exist_ok=True)
     DRIVE_BACKUP_DIR = os.path.join(_base, "backups")
     os.makedirs(DRIVE_BACKUP_DIR, exist_ok=True)
+    # v0.7.8: guarda o caminho resolvido — o reinício do serviço após
+    # salvar/remover chave precisa ler exatamente este armazenamento.
+    global _KEYS_BACKUP_DIR
+    _KEYS_BACKUP_DIR = DRIVE_BACKUP_DIR
     # v0.7.0: pasta dos autosaves (3 ultimos, rotacionados)
     AUTOSAVE_DIR = os.path.join(DRIVE_BACKUP_DIR, "autosave")
     os.makedirs(AUTOSAVE_DIR, exist_ok=True)
