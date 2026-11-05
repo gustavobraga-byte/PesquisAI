@@ -1,5 +1,128 @@
 # Changelog — PesquisAI
 
+## [0.7.10] — 2026-11-05 — 🧭 Onboarding de primeiro uso: provedor e chave
+
+### 🚪 A tela que faltava
+- **Pedido do autor:** *"um novo user, quero que ele use a apikey dele, mas de modo
+  simples"* — e, para quem já usa, *"essa tela aparece se não tiverem uma apikey"*.
+- Depois do aceite dos **Termos** (e do "Bem-vindo de volta", quando houver), surge a
+  tela **"Para usar o UFVAI você precisa de um provedor de IA"** com duas escolhas:
+  **Já tenho um provedor** (abre o modal `Conectar Provedor de IA` de sempre) e
+  **Não tenho / não sei o que é isso** (abre as opções guiadas).
+- A condição é **objetiva**: sem chave utilizável no `keys_store.json` nem no ambiente,
+  a tela aparece — inclusive para usuário antigo que trocou de conta ou apagou as
+  chaves. Com qualquer chave, o app abre como sempre.
+
+### 🆓 Opções (com tutorial e campo de colar)
+- **Google Gemini — RECOMENDADO** (grátis no AI Studio), **NVIDIA NIM**, **OpenRouter**
+  e **OpenCode Go** marcado como **PAGO**.
+- Cada card leva ao tutorial do provedor: passos numerados, **link oficial**, uma
+  **reprodução da tela** (rotulada como reprodução) e o campo para colar a chave.
+- No Google: link direto para `https://aistudio.google.com/api-keys`, instrução de
+  clicar em **Copiar**, voltar para a janela e colar; a chave (`AIza…`) é salva como
+  **`GOOGLE_GENERATIVE_AI_API_KEY`**.
+
+### ⏳ O motor espera a chave
+- **Sem chave, o `opencode` não sobe.** `needs_onboarding_now()` é avaliado no
+  boot: o serviço do motor e o ttyd ficam parados; só a interface web sobe para
+  receber o onboarding.
+- **Ao salvar a chave, reinício duro:** `_hard_restart_engine()` encerra o
+  terminal (ttyd + TUI), derruba o serviço (todas as sessões) e sobe tudo de novo
+  já com a chave e o modelo corretos.
+
+### 🔁 Retry automático em cota/429
+- Plugin `ufvai-retry` (hook `retry` do motor): **somente quando a mensagem é de
+  cota** (`quota`, `RESOURCE_EXHAUSTED`, `free_tier`, `per minute`) espera **~62 s**
+  — a janela de 1 min da cota gratuita do Google. Mensagens de sobrecarga (“high demand”, “overloaded”) esperam só **5 s**;
+  outros 429/503 seguem o retry padrão do motor.
+- Lê `retry in 23s`/`retryDelay` da própria mensagem quando existir; teto de 3 min;
+  desiste após 8 tentativas. Instalado no boot por `retry_plugin.ensure_retry_plugin()`.
+- **Fallback após 5 tentativas:** se o modelo principal (Flash-Lite Latest) não
+  passar, troca a sessão para `google/gemini-3.1-flash-lite` e repete a requisição
+  (uma troca por sessão a cada 30 min; `UFVAI_RETRY_SWITCH_AFTER`/`UFVAI_RETRY_FALLBACK`).
+
+### 🎛️ Modelo padrão do Google
+- Com chave do Google, o modelo padrão passa a ser **`google/gemini-flash-lite-latest`**
+  com variante **`high`** ("Gemini Flash-Lite Latest Google · high") e continua valendo
+  nos próximos usos (aplicado no boot, em `load_keys_from_drive`).
+- O `model` raiz não guarda variante (limite do V2); ela vai em
+  `agents.UFVAI.model = "google/gemini-flash-lite-latest#high"`.
+- Constante `GOOGLE_DEFAULT_MODEL` em `pesquisai/onboarding.py`; override por
+  **`UFVAI_GOOGLE_MODEL`** e desligamento por **`UFVAI_GOOGLE_MODEL_LOCK=0`**.
+- Se o catálogo do motor estiver disponível, o id é conferido contra a lista real
+  (`google_model_from_catalog`) e cai nos fallbacks declarados — nada é inventado.
+
+### 🔌 API e arquitetura
+- `GET  /api/onboarding` → `{needs, has_key, google_model, providers[], docs, guide}`.
+- `POST /api/onboarding/key` → valida formato, grava **cifrado** em `backups/`,
+  injeta a variável no processo/serviço, define o modelo padrão e reinicia o terminal
+  (`_apply_opencode_env_change_async`). **Nunca loga a chave**; devolve só `masked`.
+- Módulo puro **`pesquisai/onboarding.py`** (prefixos, validação, `mask_key`,
+  `needs_onboarding`, `merge_model`, `providers_public`), sem rede e sem disco.
+- "Agora não" (✕) esconde apenas nesta aba (`sessionStorage`); a próxima abertura
+  sem chave volta a mostrar.
+
+### 🧪 Testes
+- `tests/test_v0710_onboarding.py` — 24 verificações: detecção por prefixo, chave
+  ambígua, validação de formato, mascaramento, `needs_onboarding` (store/ambiente),
+  modelo do Google e fallback de catálogo, `merge_model` preservando config e o
+  contrato do HTML/JS (overlay, endpoint, ordem das opções, badge de pago).
+
+## [0.7.9] — 2026-11-04 — 🔑 Chaves de API e free tier para novos usuários
+
+### 🆓 Quem chega sem chave vê **como obter uma gratuita**
+- **Pedido do autor:** *"quem instala o UFVAI pela primeira vez não tem chave de API e não
+  sabe como conseguir uma. Coloque as instruções e uma opção gratuita."*
+- No modal **🔌 Provedores**, o bloco `#prov-howto` aparece **sozinho quando não há
+  nenhuma chave salva** (`renderSavedKeys()`): links diretos para **OpenRouter**
+  (`openrouter.ai/keys`) e **NVIDIA** (`build.nvidia.com`), o guia
+  [`docs/CHAVES_API.md`](docs/CHAVES_API.md) e o aviso de responsabilidade.
+- A **opção paga** (OpenCode Go) aparece como link separado: o UFVAI **não emite, não
+  cobra e não garante limites** de nenhum provedor.
+- O mesmo aviso foi incluído na **tela de Termos** (abertura), com link para o guia.
+
+### 🎛️ Seletor de modelos gratuitos + **modelo padrão**
+- **`GET /api/free_models`** lê `opencode models` e filtra apenas o que é gratuito:
+  `openrouter/free`, `openrouter/*:free` e `nvidia/*` (cache de 10 min). A resposta
+  inclui `key_links` e `docs`.
+- **`POST /api/default_model`** grava o campo `model` do `opencode.json`
+  **preservando o restante** da configuração (escrita atômica); recusa qualquer
+  modelo pago com **400**.
+- No modal, o seletor **🎛️ Modelo gratuito padrão** (OpenRouter/NVIDIA) e o botão
+  **Definir como padrão** usam esses endpoints.
+- Regras em módulo puro **`pesquisai/free_models.py`** (`is_free_model`,
+  `filter_free_models`, `merge_default_model`), testável sem rede.
+
+### 💾 Botão **⚙ Autosave**: intervalo e conversas
+- **Pedido do autor:** *"queria escolher de quanto em quanto tempo salva e quais
+  conversas salvar."*
+- O **⚙** ao lado do autosave abre a configuração: intervalo **1–60 min**
+  (1, 3, 5, 10, 15, 30, 60) e escopo **sessão ativa · todas as conversas · escolher
+  conversas** (lista com checkboxes vinda de `/api/sessions`).
+- Preferências em `localStorage` (`ufvai_autosave_interval_min`,
+  `ufvai_autosave_scope`, `ufvai_autosave_session_ids`); o timer passa a usar o
+  intervalo escolhido.
+- **Backend:** `POST /api/autosave` aceita `session_ids` e grava **somente** as
+  conversas escolhidas (`save_all_sessions`), sem tocar nos slots da sessão ativa.
+
+### 📚 Documentação
+- **`docs/CHAVES_API.md`** (PT + EN): como criar chave gratuita no OpenRouter/NVIDIA,
+  limites definidos pelo provedor, opção paga, onde a chave fica (cifrada no Drive) e
+  o que o UFVAI nunca faz.
+- README e MANUAL atualizados para **0.7.9** (badge, citação ABNT/BibTeX, rodapé).
+
+### 🧪 Testes
+- **`tests/test_v079_free_models.py`** — classificação de gratuitos (`openrouter/free`,
+  `:free`, `nvidia/*`), rejeição de pagos e do Zen fora do escopo, deduplicação e
+  ordenação, merge que preserva a configuração e links.
+- **`tests/test_v079_ui_contract.py`** (**novo**) — contrato dos endpoints
+  (`/api/free_models`, `/api/default_model`), do bloco de instruções, do seletor, do
+  ⚙ e do `session_ids`.
+- `test_version_sync` verde: versão idêntica em `__version__.py`, `constants.py`,
+  `pyproject.toml`, `Dockerfile` e CHANGELOG.
+
+---
+
 ## [0.7.8] — 2026-10-29 — 🔑 Chaves de API do Drive no serviço do motor (OpenCode v2.2)
 
 ### 🐞 Sintoma
