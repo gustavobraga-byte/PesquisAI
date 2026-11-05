@@ -24,6 +24,32 @@ Compatível com o PesquisAI principal (v0.2.1+).
 ═════════════════════════════════════════════════════════════════════════
 Histórico de versões:
 ═══════════════════════════════════════════════════════════════════════
+  v0.7.10 — 05/11/2026: 🧭 Onboarding de primeiro uso (provedor + chave)
+    • REGRA DO AUTOR: "um novo user, quero que ele use a apikey dele, mas de
+      modo simples"; a tela aparece no primeiro uso e também para quem já usa
+      o UFVAI mas ficou sem chave.
+    • TELAS: depois dos Termos → "Para usar o UFVAI você precisa de um
+      provedor de IA" com duas opções (já tenho / não tenho ou não sei).
+      "Não tenho" abre as opções: Google Gemini (RECOMENDADO), NVIDIA,
+      OpenRouter e OpenCode Go (PAGA); cada uma leva ao tutorial do provedor,
+      com link e reprodução da tela, e ao campo de colar a chave.
+    • GOOGLE: link para aistudio.google.com/api-keys, instrução de clicar em
+      Copiar e voltar; a chave é salva como GOOGLE_GENERATIVE_AI_API_KEY.
+    • MODELO PADRÃO: com chave do Google, o padrão passa a ser
+      `google/gemini-flash-lite-latest` (constante `GOOGLE_DEFAULT_MODEL`, ajustável
+      por UFVAI_GOOGLE_MODEL) e continua valendo nos próximos usos.
+    • SEM CHAVE = TELA: a condição é objetiva (`needs_onboarding`), sem flag
+      de "já viu" — quem perdeu a chave volta a ver o guia.
+    • API: `GET /api/onboarding` e `POST /api/onboarding/key` (grava cifrado,
+      injeta no serviço, define o modelo e reinicia o terminal).
+    • Módulo puro `pesquisai/onboarding.py` + testes em
+      `tests/test_v0710_onboarding.py`.
+  v0.7.9 — 04/11/2026: 🔑 Chaves de API e free tier para novos usuários
+    • Instruções de chave gratuita (OpenRouter, NVIDIA) aparecem quando não há chave salva
+    • Seletor de modelos gratuitos (OpenRouter :free e NVIDIA) + "modelo padrão"
+    • Link para opção paga (OpenCode Go)
+    • Aviso ao abrir: chaves de API são responsabilidade do usuário, sem vínculo com a plataforma
+    • Botão ⚙ Autosave: intervalo (1–60 min) e escolha de conversas
   v0.7.8 — 29/10/2026: 🔑 Chaves de API do Drive chegavam ao shell, não ao SERVIÇO
             • RELATO DO AUTOR: "o UFVAI não está carregando as chaves de API
               que estão no Drive. Aconteceu depois que o opencode atualizou
@@ -491,13 +517,13 @@ Histórico de versões:
 """
 
 # ── Versão semântica (SemVer) ──────────────────────────────────
-__version__: str = "0.7.8"
+__version__: str = "0.7.10"
 __brand__: str = "UFVAI"
 __brand_tagline__: str = "Pesquisa científica com integridade."
 
 # ── Metadados do release ───────────────────────────────────────
-__release_date__: str = "2026-10-27"
-__codename__: str = "Chaves de API no serviço do motor (OpenCode v2.2)"
+__release_date__: str = "2026-11-05"
+__codename__: str = "Onboarding de primeiro uso: provedor e chave em um só lugar"
 
 # ── Identidade do projeto ──────────────────────────────────────
 __author__: str = "Gustavo Bastos Braga"

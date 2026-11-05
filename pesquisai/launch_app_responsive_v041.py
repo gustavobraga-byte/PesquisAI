@@ -1355,6 +1355,7 @@ def create_wrapper_html(
       </label>
       <!-- v0.7.2: reabrir a pergunta de retomada sob demanda (a pergunta
            automatica e oferecida UMA VEZ por aba; este botao reoferece). -->
+      <button class="btn-provider" onclick="openAutosaveCfg()" title="Configurar autosave (intervalo e conversas)">⚙</button>
       <button class="btn-provider" onclick="reofferAutosaveResume()"
               title="Retomar a última sessão salva" data-i18n-title="autosave.resume.again">↻</button>
       <span class="footer-sep"></span>
@@ -1453,13 +1454,52 @@ def create_wrapper_html(
     </div>
   </div>
 
+  <div id="autosave-cfg-overlay" onclick="if(event.target===this)closeAutosaveCfg()" style="position:fixed;inset:0;background:var(--ov-dim);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
+    <div style="background:var(--rail);border:1px solid var(--line);border-radius:10px;padding:24px;width:480px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
+      <div class="modal-title">💾 <span>Configurar autosave</span></div>
+      <label style="display:block;font-size:10.5px;color:var(--ink-muted);margin:4px 0 6px;">Intervalo entre salvamentos</label>
+      <select id="as-interval" style="background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink);font-size:12px;padding:7px 9px;margin-bottom:12px;">
+        <option value="1">1 minuto</option><option value="3">3 minutos</option><option value="5">5 minutos</option>
+        <option value="10">10 minutos</option><option value="15">15 minutos</option><option value="30">30 minutos</option><option value="60">60 minutos</option>
+      </select>
+      <label style="display:block;font-size:10.5px;color:var(--ink-muted);margin:4px 0 6px;">Quais conversas salvar</label>
+      <label style="display:block;font-size:12px;margin-bottom:4px;"><input type="radio" name="as-scope" value="active" onchange="asScopeChanged()"> Somente a sessão ativa</label>
+      <label style="display:block;font-size:12px;margin-bottom:4px;"><input type="radio" name="as-scope" value="all" onchange="asScopeChanged()"> Todas as conversas abertas</label>
+      <label style="display:block;font-size:12px;margin-bottom:4px;"><input type="radio" name="as-scope" value="selected" onchange="asScopeChanged()"> Escolher conversas</label>
+      <div id="as-sessions" style="display:none;max-height:200px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px;margin:8px 0;"></div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button onclick="closeAutosaveCfg()" style="padding:9px 14px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink-muted);font-size:12px;cursor:pointer;">Cancelar</button>
+        <button onclick="saveAutosaveCfg()" style="flex:1;padding:9px;background:var(--accent-dim);border:1px solid rgba(var(--accent-rgb),.3);border-radius:var(--radius);color:var(--accent);font-size:12px;cursor:pointer;">Salvar configuração</button>
+      </div>
+    </div>
+  </div>
   <div id="provider-overlay" onclick="if(event.target===this)closeProvider()" style="position:fixed;inset:0;background:var(--ov-dim);display:flex;align-items:center;justify-content:center;z-index:99999;opacity:0;pointer-events:none;transition:opacity .2s;">
     <div style="background:var(--rail);border:1px solid var(--line);border-radius:10px;padding:24px;width:520px;max-width:94vw;box-shadow:0 28px 72px rgba(0,0,0,.7);">
       <div id="prov-step0">
         <div class="modal-title">🔌 <span data-i18n="providers.title">Conectar Provedor de IA</span></div>
+        <!-- v0.7.9: instruções aparecem sozinhas quando NÃO há chave salva -->
+        <div id="prov-howto" style="display:none;border:1px solid rgba(178,145,73,.35);border-radius:var(--radius);padding:12px;margin-bottom:14px;background:rgba(178,145,73,.06);">
+          <div style="font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px;">🆓 Comece grátis — obtenha uma chave gratuita</div>
+          <p style="font-size:11px;color:var(--ink-muted);line-height:1.5;margin-bottom:10px;">As chaves de API são <b>de sua responsabilidade</b> e não têm qualquer vínculo com esta plataforma (UFVAI). Os limites gratuitos são definidos por cada provedor.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+            <a class="prov-link" href="https://openrouter.ai/keys" target="_blank" rel="noopener">Chave OpenRouter (grátis)</a>
+            <a class="prov-link" href="https://build.nvidia.com/" target="_blank" rel="noopener">Chave NVIDIA (grátis)</a>
+            <a class="prov-link" href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/docs/CHAVES_API.md" target="_blank" rel="noopener">📘 Instruções passo a passo</a>
+          </div>
+          <div style="font-size:10.5px;color:var(--ink-muted);">💳 Opção paga: <a href="https://opencode.ai/go" target="_blank" rel="noopener" style="color:#b29149;">OpenCode Go</a></div>
+        </div>
         <p style="font-size:11.5px;color:var(--ink-muted);margin-bottom:14px;line-height:1.6;" data-i18n="providers.saved_keys">Chaves salvas no Drive:</p>
         <div id="prov-saved-list" style="max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px;margin-bottom:14px;">
           <div style="font-size:11px;color:var(--ink-muted);padding:8px 0;text-align:center;" data-i18n="ui.loading">Carregando…</div>
+        </div>
+        <div id="prov-free" style="border:1px solid var(--line);border-radius:var(--radius);padding:10px;margin-bottom:14px;">
+          <div style="font-size:11.5px;font-weight:600;color:var(--ink);margin-bottom:8px;">🎛️ Modelo gratuito padrão</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <select id="free-prov" onchange="loadFreeModels()" style="background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink);font-size:11.5px;padding:6px 8px;">
+              <option value="openrouter">OpenRouter</option><option value="nvidia">NVIDIA</option></select>
+            <select id="free-model" style="flex:1;min-width:0;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink);font-size:11.5px;padding:6px 8px;"></select>
+          </div>
+          <button onclick="setDefaultModel()" style="padding:6px 12px;font-size:11.5px;background:var(--accent-dim);border:1px solid rgba(var(--accent-rgb),.3);border-radius:var(--radius);color:var(--accent);cursor:pointer;">Definir como padrão</button>
         </div>
         <div style="display:flex;gap:8px;">
           <button onclick="openNewProvider()" style="flex:1;padding:9px;background:var(--accent-dim);border:1px solid rgba(var(--accent-rgb),.3);border-radius:var(--radius);color:var(--accent);font-family:var(--font-sans);font-size:12px;cursor:pointer;">+ <span data-i18n="providers.add_new">Novo provedor</span></button>
@@ -2654,6 +2694,7 @@ def create_wrapper_html(
       overlay.style.pointerEvents = "all";
       showProviderStep("prov-step0");
       loadSavedKeys(true);
+      loadFreeModels();
     }
 
     function showProviderStep(stepId) {
@@ -2819,6 +2860,8 @@ def create_wrapper_html(
       if (!listEl) return;
       const dict = I18N[_currentLang] || I18N["pt_BR"];
       const keys = Object.keys(_savedKeys).filter(k => !k.startsWith("_env_"));
+      const _howto = document.getElementById("prov-howto");
+      if (_howto) _howto.style.display = keys.length ? "none" : "block";
       if (!keys.length) {
         listEl.innerHTML = '<div style="font-size:11px;color:var(--ink-muted);padding:8px 0;text-align:center;">' + (dict["providers.no_saved_keys"] || "Nenhuma chave salva ainda.") + '</div>';
         return;
@@ -4517,9 +4560,105 @@ def create_wrapper_html(
       }
     }
 
+    // v0.7.9 — intervalo, escopo e conversas escolhidas (botão ⚙)
+    const AUTOSAVE_INTERVAL_KEY = "ufvai_autosave_interval_min";
+    const AUTOSAVE_SCOPE_KEY = "ufvai_autosave_scope";        // active | all | selected
+    const AUTOSAVE_SELECTED_KEY = "ufvai_autosave_session_ids";
+    const _AS_SCOPE_LABEL = {active: "sessão ativa", all: "todas as conversas", selected: "conversas escolhidas"};
+    function autosaveIntervalMs() {
+      let m = parseInt(localStorage.getItem(AUTOSAVE_INTERVAL_KEY) || "1", 10);
+      if (!(m >= 1)) m = 1;
+      return m * 60000;
+    }
+    function autosaveScope() {
+      try { const s = localStorage.getItem(AUTOSAVE_SCOPE_KEY); if (s) return s; } catch (e) {}
+      return autosaveAllSessions() ? "all" : "active";
+    }
+    function autosaveSelectedIds() {
+      try { const a = JSON.parse(localStorage.getItem(AUTOSAVE_SELECTED_KEY) || "[]"); return Array.isArray(a) ? a : []; }
+      catch (e) { return []; }
+    }
+    function openAutosaveCfg() {
+      document.getElementById("as-interval").value = String(Math.round(autosaveIntervalMs() / 60000));
+      const radio = document.querySelector('input[name="as-scope"][value="' + autosaveScope() + '"]');
+      if (radio) radio.checked = true;
+      asScopeChanged();
+      const ov = document.getElementById("autosave-cfg-overlay");
+      ov.style.opacity = "1"; ov.style.pointerEvents = "all";
+    }
+    function closeAutosaveCfg() {
+      const ov = document.getElementById("autosave-cfg-overlay");
+      ov.style.opacity = "0"; ov.style.pointerEvents = "none";
+    }
+    function asScopeChanged() {
+      const sc = (document.querySelector('input[name="as-scope"]:checked') || {}).value || "active";
+      document.getElementById("as-sessions").style.display = sc === "selected" ? "block" : "none";
+      if (sc === "selected") renderAutosaveSessions();
+    }
+    async function renderAutosaveSessions() {
+      const box = document.getElementById("as-sessions");
+      box.innerHTML = '<div style="font-size:11px;color:var(--ink-muted)">Carregando conversas…</div>';
+      try {
+        const r = await fetch(BASE + "/api/sessions");
+        const d = await r.json();
+        const list = d.sessions || [];
+        const sel = new Set(autosaveSelectedIds());
+        box.innerHTML = list.length
+          ? list.map(s => '<label style="display:flex;gap:8px;align-items:center;font-size:12px;padding:4px 0;cursor:pointer;"><input type="checkbox" class="as-sess" value="' + escapeHtml(s.id) + '"' + (sel.has(s.id) ? " checked" : "") + '> <span>' + escapeHtml(s.title || s.id) + ' <span style="opacity:.6">' + escapeHtml(s.date || "") + '</span></span></label>').join("")
+          : '<div style="font-size:11px;color:var(--ink-muted)">Nenhuma conversa encontrada.</div>';
+      } catch (e) {
+        box.innerHTML = '<div style="font-size:11px;color:var(--red)">Falha ao listar conversas: ' + escapeHtml(e.message) + '</div>';
+      }
+    }
+    function saveAutosaveCfg() {
+      const mins = Math.max(1, parseInt(document.getElementById("as-interval").value, 10) || 1);
+      const scope = (document.querySelector('input[name="as-scope"]:checked') || {}).value || "active";
+      const ids = [...document.querySelectorAll(".as-sess:checked")].map(x => x.value);
+      if (scope === "selected" && !ids.length) { toast("Escolha ao menos uma conversa.", "info"); return; }
+      try {
+        localStorage.setItem(AUTOSAVE_INTERVAL_KEY, String(mins));
+        localStorage.setItem(AUTOSAVE_SCOPE_KEY, scope);
+        localStorage.setItem(AUTOSAVE_SELECTED_KEY, JSON.stringify(ids));
+        localStorage.setItem(AUTOSAVE_ALL_KEY, scope === "all" ? "1" : "0");
+      } catch (e) {}
+      setAutosaveAllUI(scope === "all");
+      if (autosaveEnabled()) startAutosaveTimer();
+      closeAutosaveCfg();
+      toast("💾 Autosave: a cada " + mins + " min · " + _AS_SCOPE_LABEL[scope], "info");
+    }
+
+    // v0.7.9 — seletor de gratuitos (OpenRouter/NVIDIA) e modelo padrão
+    async function loadFreeModels() {
+      const prov = document.getElementById("free-prov").value;
+      const sel = document.getElementById("free-model");
+      sel.innerHTML = '<option value="">Carregando…</option>';
+      try {
+        const r = await fetch(BASE + "/api/free_models");
+        const d = await r.json();
+        const items = (d.models || []).filter(m => m.provider === prov);
+        sel.innerHTML = items.length
+          ? items.map(m => '<option value="' + escapeHtml(m.id) + '">' + escapeHtml(m.id) + '</option>').join("")
+          : '<option value="">Nenhum modelo gratuito listado (verifique a chave do provedor)</option>';
+      } catch (e) {
+        sel.innerHTML = '<option value="">Falha ao carregar modelos</option>';
+      }
+    }
+    async function setDefaultModel() {
+      const m = document.getElementById("free-model").value;
+      if (!m) { toast("Escolha um modelo gratuito.", "info"); return; }
+      try {
+        const r = await fetch(BASE + "/api/default_model", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({model: m})
+        });
+        const d = await r.json().catch(() => ({}));
+        toast(d.ok ? ("✅ Modelo padrão: " + m) : ("❌ " + (d.error || "Falha ao definir o modelo padrão")), "info");
+      } catch (e) { toast("❌ Falha de conexão: " + e.message, "info"); }
+    }
+
     function startAutosaveTimer() {
       stopAutosaveTimer();
-      _autosaveTimer = setInterval(() => autosaveTick(false), AUTOSAVE_INTERVAL_MS);
+      _autosaveTimer = setInterval(() => autosaveTick(false), autosaveIntervalMs());
     }
 
     function stopAutosaveTimer() {
@@ -4529,12 +4668,16 @@ def create_wrapper_html(
     async function autosaveTick(silent) {
       if (_autosaveBusy) return;
       if (!autosaveEnabled() && !silent) return;
+      if (autosaveScope() === "selected" && !autosaveSelectedIds().length) return;
       _autosaveBusy = true;
       try {
         const r = await fetch(BASE + "/api/autosave", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({all_sessions: autosaveAllSessions()})
+          body: JSON.stringify({
+            all_sessions: autosaveScope() === "all",
+            session_ids: autosaveScope() === "selected" ? autosaveSelectedIds() : []
+          })
         });
         const d = await r.json();
         if (d && d.ok) {
@@ -4831,6 +4974,7 @@ def create_wrapper_html(
 
 <!-- ═══ v0.6.0 — Termos de Uso (aceite obrigatório na 1ª entrada) ═══ -->
 <style>
+  .prov-link{font-size:11px;padding:5px 9px;border:1px solid rgba(178,145,73,.45);border-radius:6px;color:#b29149;text-decoration:none;display:inline-block}
   #terms-overlay{position:fixed;inset:0;z-index:99999;display:none;align-items:center;
     justify-content:center;background:rgba(10,13,17,.93);backdrop-filter:blur(6px);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;padding:16px;
@@ -4986,6 +5130,7 @@ def create_wrapper_html(
       O Google Analytics <b>nunca</b> recebe seu nome/e-mail/IP (apenas contador anônimo).
       Você pode apagar a qualquer momento (art. 18).<br>
       Name and e-mail to activate UFVAI and contact you; stored locally and in YOUR Drive; never sent to Google Analytics.</span>
+    <div style="font-size:11.5px;line-height:1.5;margin:8px 0;padding:9px 11px;border:1px solid rgba(178,145,73,.35);border-radius:8px;">🔑 <b>Chaves de API são de sua responsabilidade</b> e não têm qualquer vínculo com esta plataforma (API keys are your responsibility and unrelated to this platform). <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/docs/CHAVES_API.md" target="_blank" rel="noopener" style="color:#b29149;font-weight:600;">Como obter uma chave gratuita (NVIDIA / OpenRouter) →</a></div>
     <label class="t-check"><input type="checkbox" id="t-accept">
       <span>Li e aceito os Termos de Uso e a Licença MIT &nbsp;<span style="opacity:.7">(I have read and accept the Terms of Use and the MIT License)</span></span></label>
     <div class="t-actions">
@@ -5063,6 +5208,440 @@ def create_wrapper_html(
     </div>
   </div>
 </div>
+<!-- ═══════════════════════════════════════════════════════════════════
+     v0.7.10 — ONBOARDING DE PRIMEIRO USO (provedor + chave)
+     Aparece quando NÃO existe nenhuma chave (store cifrado ou ambiente),
+     depois dos Termos e do "Bem-vindo de volta". Uma vez com chave, nunca
+     mais aparece. Fecha com "Agora não" apenas nesta aba (sessionStorage).
+     ═══════════════════════════════════════════════════════════════════ -->
+<style>
+  #onboard-overlay{position:fixed;inset:0;z-index:99997;display:none;align-items:center;
+    justify-content:center;background:rgba(8,11,15,.94);backdrop-filter:blur(7px);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  #onboard-overlay .ob-card{width:100%;max-width:620px;background:#141c24;color:#e8e6e0;
+    border:1px solid rgba(178,145,73,.55);border-radius:16px;padding:26px 28px 22px;
+    box-shadow:0 28px 80px rgba(0,0,0,.65);max-height:calc(100vh - 32px);
+    max-height:calc(100dvh - 32px);overflow-y:auto;position:relative;}
+  #onboard-overlay .ob-top{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+  #onboard-overlay .ob-brand{font-family:"Montserrat","Syne",sans-serif;font-size:22px;
+    letter-spacing:-.02em;line-height:1;}
+  #onboard-overlay .ob-brand b{font-weight:700}
+  #onboard-overlay .ob-brand em{font-style:normal;font-weight:600;color:#b29149}
+  #onboard-overlay .ob-kicker{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:#9a9790;border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:2px 6px;}
+  #onboard-overlay .ob-x{display:none;margin-left:auto;background:transparent;border:0;color:#9a9790;
+    font-size:16px;cursor:pointer;padding:4px 8px;border-radius:6px;}
+  #onboard-overlay .ob-x:hover{color:#e8e6e0;background:rgba(255,255,255,.05)}
+  #onboard-overlay h2{font-size:19px;line-height:1.3;margin:0 0 6px;letter-spacing:-.01em;}
+  #onboard-overlay .ob-sub{font-size:12.5px;color:#9a9790;line-height:1.55;margin:0 0 18px;}
+  #onboard-overlay .ob-step{display:none}
+  #onboard-overlay .ob-choice{display:flex;align-items:center;gap:14px;width:100%;text-align:left;
+    background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.09);border-radius:11px;
+    padding:15px 16px;margin-bottom:10px;cursor:pointer;color:inherit;font-family:inherit;
+    transition:border-color .15s,background .15s,transform .15s;}
+  #onboard-overlay .ob-choice:hover{border-color:rgba(178,145,73,.65);background:rgba(178,145,73,.09);transform:translateY(-1px)}
+  #onboard-overlay .ob-choice .ob-ico{font-size:20px;width:34px;height:34px;display:flex;
+    align-items:center;justify-content:center;background:rgba(178,145,73,.12);border-radius:9px;flex:0 0 auto;}
+  #onboard-overlay .ob-choice b{display:block;font-size:13.5px;font-weight:600;margin-bottom:3px}
+  #onboard-overlay .ob-choice small{display:block;font-size:11px;color:#9a9790;line-height:1.4}
+  #onboard-overlay .ob-arrow{margin-left:auto;color:#b29149;font-size:16px}
+  #onboard-overlay .ob-back{background:transparent;border:0;color:#9a9790;font-size:11.5px;
+    cursor:pointer;padding:0 0 12px;font-family:inherit;}
+  #onboard-overlay .ob-back:hover{color:#b29149}
+  #onboard-overlay .ob-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  #onboard-overlay .ob-prov{position:relative;text-align:left;background:rgba(255,255,255,.03);
+    border:1px solid rgba(255,255,255,.09);border-radius:11px;padding:14px;cursor:pointer;
+    color:inherit;font-family:inherit;transition:border-color .15s,background .15s,transform .15s;}
+  #onboard-overlay .ob-prov:hover{border-color:rgba(178,145,73,.6);background:rgba(178,145,73,.08);transform:translateY(-1px)}
+  #onboard-overlay .ob-prov.rec{border-color:rgba(178,145,73,.55);background:rgba(178,145,73,.07)}
+  #onboard-overlay .ob-prov .p-name{font-size:13px;font-weight:600;margin-bottom:3px;display:block}
+  #onboard-overlay .ob-prov .p-tag{font-size:10px;color:#9a9790;line-height:1.4;display:block}
+  #onboard-overlay .ob-prov .p-badge{position:absolute;top:9px;right:9px;font-size:8.5px;
+    letter-spacing:.08em;text-transform:uppercase;padding:2px 5px;border-radius:3px;}
+  #onboard-overlay .p-badge.free{color:#5dba7e;background:rgba(93,186,126,.12);border:1px solid rgba(93,186,126,.3)}
+  #onboard-overlay .p-badge.rec{color:#141c24;background:linear-gradient(135deg,#D1A705,#b29149);font-weight:700}
+  #onboard-overlay .p-badge.paid{color:#e07070;background:rgba(224,112,112,.12);border:1px solid rgba(224,112,112,.35)}
+  #onboard-overlay .ob-note{font-size:10.5px;color:#7d7a72;line-height:1.5;margin-top:6px}
+  #onboard-overlay .ob-note a{color:#b29149;text-decoration:none}
+  #onboard-overlay ol.ob-steps{list-style:none;counter-reset:obs;margin:0 0 14px;padding:0}
+  #onboard-overlay ol.ob-steps li{counter-increment:obs;position:relative;padding-left:30px;
+    font-size:12.5px;color:#cfccc5;line-height:1.5;margin-bottom:8px}
+  #onboard-overlay ol.ob-steps li::before{content:counter(obs);position:absolute;left:0;top:0;
+    width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:rgba(178,145,73,.14);border:1px solid rgba(178,145,73,.5);color:#b29149;
+    font-size:10.5px;font-family:ui-monospace,monospace}
+  #onboard-overlay .ob-open{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;
+    border-radius:8px;background:linear-gradient(135deg,#D1A705,#b29149);color:#141c24;
+    font-weight:700;font-size:12px;text-decoration:none;margin:0 0 14px;}
+  #onboard-overlay .ob-open:hover{filter:brightness(1.06)}
+  #onboard-overlay .ob-shot{border:1px solid rgba(255,255,255,.1);border-radius:10px;
+    overflow:hidden;margin:0 0 14px;background:#fff;position:relative}
+  #onboard-overlay .ob-shot-bar{display:flex;align-items:center;gap:5px;padding:6px 9px;
+    background:#20262c;font-family:ui-monospace,monospace;font-size:9px;color:#9aa4ae}
+  #onboard-overlay .ob-shot-bar i{width:6px;height:6px;border-radius:50%;background:#4b5563;display:inline-block}
+  #onboard-overlay .ob-shot-bar i:nth-child(1){background:#e07070}
+  #onboard-overlay .ob-shot-bar i:nth-child(2){background:#D1A705}
+  #onboard-overlay .ob-shot-bar i:nth-child(3){background:#5dba7e}
+  #onboard-overlay .ob-shot-tag{position:absolute;right:7px;bottom:6px;font-size:8px;
+    letter-spacing:.08em;text-transform:uppercase;color:#9a9790;background:rgba(20,28,36,.85);
+    border:1px solid rgba(255,255,255,.12);border-radius:3px;padding:1px 4px}
+  #onboard-overlay .ob-shot.light{color:#111}
+  #onboard-overlay .ob-shot-img{display:block;width:100%;height:auto}
+  #onboard-overlay .ob-print{position:relative;display:block;line-height:0}
+  #onboard-overlay .ob-ring{position:absolute;left:85.3%;top:36.5%;width:30px;height:30px;
+    transform:translate(-50%,-50%);border:2px solid #ffd166;border-radius:50%;
+    box-shadow:0 0 0 4px rgba(255,209,102,.25);animation:obring 1.5s infinite;pointer-events:none}
+  @keyframes obring{0%,100%{box-shadow:0 0 0 4px rgba(255,209,102,.25)}50%{box-shadow:0 0 0 10px rgba(255,209,102,.06)}}
+  #onboard-overlay .ob-call{position:absolute;left:calc(85.3% - 30px);top:36.5%;
+    transform:translate(-100%,-50%);background:#ffd166;color:#1a1408;font-weight:700;
+    font-size:11px;line-height:1;padding:6px 10px;border-radius:6px;white-space:nowrap;
+    box-shadow:0 6px 18px rgba(0,0,0,.5);pointer-events:none;animation:obbob 1.6s infinite}
+  #onboard-overlay .ob-call::after{content:"";position:absolute;left:100%;top:50%;
+    transform:translateY(-50%);border:7px solid transparent;border-left-color:#ffd166}
+  @keyframes obbob{0%,100%{transform:translate(-100%,-50%)}50%{transform:translate(calc(-100% - 4px),-50%)}}
+  #onboard-overlay .ob-g{padding:12px 14px;font-size:11px;background:#fff;color:#111}
+  #onboard-overlay .ob-g-head{display:flex;align-items:center;gap:7px;font-size:10px;
+    color:#5f6368;margin-bottom:10px}
+  #onboard-overlay .ob-g-head b{color:#111;font-size:11px}
+  #onboard-overlay .ob-g-head .sp{flex:1}
+  #onboard-overlay .ob-g-title{font-size:14px;font-weight:600;margin-bottom:2px;color:#111}
+  #onboard-overlay .ob-g-desc{font-size:9.5px;color:#5f6368;margin-bottom:10px}
+  #onboard-overlay .ob-g-row{display:flex;align-items:center;gap:8px;border:1px solid #e0e3e7;
+    border-radius:7px;padding:8px 10px;margin-bottom:7px;background:#fff}
+  #onboard-overlay .ob-g-row .n{font-size:10px;font-weight:600;color:#111}
+  #onboard-overlay .ob-g-row .k{font-family:ui-monospace,monospace;font-size:9.5px;color:#5f6368}
+  #onboard-overlay .ob-g-copy{margin-left:auto;font-size:9px;font-weight:700;color:#14532d;
+    background:#dcfce7;border:1px solid #22c55e;border-radius:5px;padding:3px 7px;
+    box-shadow:0 0 0 3px rgba(34,197,94,.18);animation:obpulse 1.6s infinite}
+  @keyframes obpulse{0%,100%{box-shadow:0 0 0 3px rgba(34,197,94,.18)}50%{box-shadow:0 0 0 6px rgba(34,197,94,.07)}}
+  #onboard-overlay .ob-g-btn{display:inline-block;font-size:9.5px;color:#1a73e8;
+    border:1px solid #dadce0;border-radius:6px;padding:5px 9px}
+  #onboard-overlay .ob-d{padding:12px 14px;font-size:11px;background:#0b0f14;color:#e8e6e0}
+  #onboard-overlay .ob-d-row{display:flex;align-items:center;gap:8px;border:1px solid #26313c;
+    border-radius:7px;padding:8px 10px;background:#131a22}
+  #onboard-overlay .ob-d-row .k{font-family:ui-monospace,monospace;font-size:9.5px;color:#b9c4cf}
+  #onboard-overlay .ob-d-btn{margin-left:auto;font-size:9px;font-weight:700;color:#0b0f14;
+    background:#76b900;border-radius:5px;padding:3px 7px}
+  #onboard-overlay .ob-label{display:block;font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;
+    color:#9a9790;margin:0 0 5px}
+  #onboard-overlay .ob-input{width:100%;box-sizing:border-box;padding:11px 12px;border-radius:8px;
+    border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:#e8e6e0;
+    font-family:ui-monospace,monospace;font-size:12.5px;outline:none;margin-bottom:8px}
+  #onboard-overlay .ob-input:focus{border-color:rgba(178,145,73,.7);background:rgba(178,145,73,.06)}
+  #onboard-overlay .ob-hint{font-size:10.5px;color:#7d7a72;line-height:1.45;margin-bottom:12px;min-height:15px}
+  #onboard-overlay .ob-hint.err{color:#e07070}
+  #onboard-overlay .ob-hint.ok{color:#5dba7e}
+  #onboard-overlay .ob-primary{width:100%;padding:12px;border:0;border-radius:9px;cursor:pointer;
+    background:linear-gradient(135deg,#D1A705,#b29149);color:#141c24;font-weight:700;font-size:13px;
+    font-family:inherit;transition:filter .15s}
+  #onboard-overlay .ob-primary:hover{filter:brightness(1.06)}
+  #onboard-overlay .ob-primary:disabled{opacity:.45;cursor:not-allowed;filter:none}
+  #onboard-overlay .ob-foot{display:flex;align-items:center;gap:10px;margin-top:10px;
+    font-size:10px;color:#7d7a72;flex-wrap:wrap}
+  #onboard-overlay .ob-foot a{color:#b29149;text-decoration:none}
+  #onboard-overlay .ob-done{display:none;text-align:center;padding:8px 0 4px}
+  #onboard-overlay .ob-done .big{font-size:34px;margin-bottom:6px}
+  #onboard-overlay .ob-done b{display:block;font-size:15px;margin-bottom:5px}
+  #onboard-overlay .ob-done p{font-size:11.5px;color:#9a9790;line-height:1.5;margin:0}
+  @media(max-width:560px){
+    #onboard-overlay{padding:10px}
+    #onboard-overlay .ob-card{padding:20px 16px;border-radius:13px}
+    #onboard-overlay .ob-grid{grid-template-columns:1fr}
+    #onboard-overlay h2{font-size:17px}
+    #onboard-overlay .ob-input{font-size:16px}
+  }
+</style>
+
+<div id="onboard-overlay" role="dialog" aria-modal="true" aria-label="Configurar provedor de IA">
+  <div class="ob-card">
+    <div class="ob-top">
+      <span class="ob-brand"><b>UFV</b><em>AI</em></span>
+      <span class="ob-kicker">Primeiro uso</span>
+      <button class="ob-x" id="ob-close" title="Configurar depois" aria-label="Configurar depois">✕</button>
+    </div>
+
+    <!-- Passo 0 — tem ou não tem provedor -->
+    <div class="ob-step" id="ob-step0">
+      <h2>Para usar o UFVAI você precisa de um provedor de IA</h2>
+      <p class="ob-sub">O provedor é quem executa o modelo de linguagem. A chave de API é sua:
+        o UFVAI apenas guarda o acesso, cifrado, no seu Drive.</p>
+      <button class="ob-choice" id="ob-have">
+        <span class="ob-ico">🔑</span>
+        <span><b>Já tenho um provedor de IA</b>
+          <small>Abrir “Conectar Provedor de IA” e colar minha chave</small></span>
+        <span class="ob-arrow">→</span>
+      </button>
+      <button class="ob-choice" id="ob-nohave">
+        <span class="ob-ico">🆓</span>
+        <span><b>Não tenho um provedor de IA / não sei o que é isso</b>
+          <small>Ver opções gratuitas (e uma paga) e um passo a passo</small></span>
+        <span class="ob-arrow">→</span>
+      </button>
+      <p class="ob-note">Você pode trocar de provedor depois em <b>🔌 Provedores</b>.</p>
+    </div>
+
+    <!-- Passo 1 — opções -->
+    <div class="ob-step" id="ob-step1">
+      <button class="ob-back" id="ob-back1">← voltar</button>
+      <h2>Comece grátis</h2>
+      <p class="ob-sub">Escolha um provedor. Em todos, você cria a chave no site do provedor e cola aqui —
+        leva cerca de 1 minuto.</p>
+      <div class="ob-grid" id="ob-grid"></div>
+      <p class="ob-note">🔒 A chave é gravada <b>cifrada</b> em <code>backups/</code> no seu Drive.
+        As chaves são de sua responsabilidade e não têm vínculo com a plataforma UFVAI.</p>
+    </div>
+
+    <!-- Passo 2 — tutorial + colar -->
+    <div class="ob-step" id="ob-step2">
+      <button class="ob-back" id="ob-back2">← trocar provedor</button>
+      <h2 id="ob-title">Conectar</h2>
+      <div id="ob-body"></div>
+    </div>
+
+    <!-- Sucesso -->
+    <div class="ob-done" id="ob-done">
+      <div class="big">✅</div>
+      <b id="ob-done-title">Chave salva</b>
+      <p id="ob-done-text">Reiniciando o terminal com o provedor novo…</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var OV = document.getElementById("onboard-overlay");
+  if (!OV) return;
+  var STEPS = ["ob-step0", "ob-step1", "ob-step2"];
+  var DATA = null, CHOSEN = "", BUSY = false;
+
+  function $(id){ return document.getElementById(id); }
+  function showStep(which){
+    STEPS.forEach(function(id){
+      var el = $(id); if (el) el.style.display = (id === which) ? "block" : "none";
+    });
+    var done = $("ob-done"); if (done) done.style.display = "none";
+  }
+  function close(){
+    OV.style.display = "none";
+    try { sessionStorage.setItem("ufvai_ob_skip", "1"); } catch(e){}
+  }
+  function visible(el){
+    if (!el) return false;
+    var cs = window.getComputedStyle ? getComputedStyle(el) : el.style;
+    return cs.display !== "none" && cs.visibility !== "hidden";
+  }
+
+  // ── cards de provedor (passo 1) ──────────────────────────────
+  function renderProviders(){
+    var grid = $("ob-grid");
+    if (!grid || !DATA) return;
+    var html = "";
+    (DATA.providers || []).forEach(function(p){
+      var cls = "ob-prov" + (p.recommended ? " rec" : "");
+      var badge = p.recommended ? '<span class="p-badge rec">recomendado</span>'
+                : (p.paid ? '<span class="p-badge paid">pago</span>'
+                          : '<span class="p-badge free">grátis</span>');
+      html += '<button class="' + cls + '" data-prov="' + p.id + '">' + badge +
+              '<span class="p-name">' + p.label + '</span>' +
+              '<span class="p-tag">' + p.tagline + '</span></button>';
+    });
+    grid.innerHTML = html;
+    [].forEach.call(grid.querySelectorAll("[data-prov]"), function(btn){
+      btn.addEventListener("click", function(){ pick(btn.getAttribute("data-prov")); });
+    });
+  }
+
+  // ── "print" da tela de cada provedor (reprodução declarada) ──
+  function shot(provider){
+    if (provider === "google"){
+      return '<div class="ob-shot">' +
+        '<div class="ob-shot-bar"><i></i><i></i><i></i> aistudio.google.com/api-keys</div>' +
+        '<div class="ob-print">' +
+          '<img class="ob-shot-img" src="/assets/print-google-apikey.png" ' +
+            'alt="Tela real do Google AI Studio — Chaves de API (o ícone de copiar está destacado)">' +
+          '<span class="ob-ring" aria-hidden="true"></span>' +
+          '<span class="ob-call">clique aqui para copiar</span>' +
+        '</div>' +
+        '<span class="ob-shot-tag">tela real</span></div>';
+    }
+    if (provider === "nvidia"){
+      return '<div class="ob-shot">' +
+        '<div class="ob-shot-bar"><i></i><i></i><i></i> build.nvidia.com</div>' +
+        '<div class="ob-d">' +
+          '<div style="font-size:10px;color:#8b97a3;margin-bottom:8px">Modelo do catálogo · API</div>' +
+          '<div class="ob-d-row"><span class="k">nvapi-••••••••••••••••</span>' +
+            '<span class="ob-d-btn">Get API Key</span></div>' +
+        '</div><span class="ob-shot-tag">reprodução da tela</span></div>';
+    }
+    if (provider === "openrouter"){
+      return '<div class="ob-shot light">' +
+        '<div class="ob-shot-bar"><i></i><i></i><i></i> openrouter.ai/keys</div>' +
+        '<div class="ob-g">' +
+          '<div class="ob-g-title">API Keys</div>' +
+          '<div class="ob-g-desc">Manage the keys your applications use.</div>' +
+          '<div class="ob-g-row"><span class="n">ufvai</span>' +
+            '<span class="k">sk-or-v1-••••••••••••</span><span class="ob-g-copy">Copiar</span></div>' +
+          '<div class="ob-g-btn">+ Create Key</div>' +
+        '</div><span class="ob-shot-tag">reprodução da tela</span></div>';
+    }
+    return "";
+  }
+
+  function tutorial(provider){
+    var p = (DATA.providers || []).filter(function(x){ return x.id === provider; })[0] || {};
+    var steps = "", extra = "";
+    if (provider === "google"){
+      steps = '<li>Abra a página <b>Chaves de API</b> do Google AI Studio (botão abaixo).</li>' +
+              '<li>Clique em <b>Criar chave de API</b> (canto superior direito) e confirme.</li>' +
+              '<li>Na linha da chave, clique no <b>ícone de copiar</b>, volte para esta janela e cole no campo.</li>';
+      extra = '<p class="ob-note">A chave começa com <b>AIza</b>. Ao salvar, o modelo padrão vira o ' +
+              '<b>Gemini Flash-Lite Latest</b> com esforço <b>high</b> — e continua nos próximos usos.</p>';
+    } else if (provider === "nvidia"){
+      steps = '<li>Entre em <b>build.nvidia.com</b> com sua conta NVIDIA.</li>' +
+              '<li>Escolha um modelo, abra a opção de <b>API</b> e clique em <b>Get API Key</b>.</li>' +
+              '<li>Copie a chave (<b>nvapi-</b>) e cole no campo abaixo.</li>';
+    } else if (provider === "openrouter"){
+      steps = '<li>Crie a conta em <b>openrouter.ai</b>.</li>' +
+              '<li>Abra <b>openrouter.ai/keys</b> e clique em <b>Create Key</b>.</li>' +
+              '<li>Copie a chave (<b>sk-or-</b>) — ela aparece uma única vez — e cole abaixo.</li>';
+    } else {
+      steps = '<li>O <b>OpenCode Go</b> é a opção <b>paga</b> do ecossistema (assinatura à parte).</li>' +
+              '<li>Assine em <b>opencode.ai/go</b> e copie a chave do painel.</li>' +
+              '<li>Cole a chave abaixo. O UFVAI não intermedeia pagamento nem cobra por isso.</li>';
+    }
+    var label = provider === "opencode_go" ? "Abrir opencode.ai/go" : "Abrir " + p.url_label;
+    var ph = provider === "google" ? "AIza…" : (provider === "nvidia" ? "nvapi-…" : "sk-…");
+    return '<p class="ob-sub">' + (p.paid ? 'Esta opção é paga. ' : 'Grátis. ') +
+        'Crie a chave no site do provedor e cole aqui — o UFVAI guarda cifrado.</p>' +
+      '<ol class="ob-steps">' + steps + '</ol>' +
+      '<a class="ob-open" href="' + p.url + '" target="_blank" rel="noopener">' +
+        '🔗 ' + label + ' ↗</a>' +
+      (provider === "opencode_go" ? "" : shot(provider)) +
+      '<label class="ob-label" for="ob-key">Cole a chave do ' + p.label + '</label>' +
+      '<input class="ob-input" id="ob-key" type="password" autocomplete="off" spellcheck="false" ' +
+        'placeholder="' + ph + '">' +
+      '<div class="ob-hint" id="ob-hint">🔒 Fica cifrada no seu Drive. Nunca é enviada a terceiros pela UFVAI.</div>' +
+      '<button class="ob-primary" id="ob-save">Salvar e usar</button>' +
+      '<div class="ob-foot"><span>Guia completo:</span>' +
+        '<a href="' + (DATA.guide || "#") + '" target="_blank" rel="noopener">tutorial com as telas</a>' +
+        '<span>·</span><a href="' + (DATA.docs || "#") + '" target="_blank" rel="noopener">CHAVES_API.md</a></div>' +
+      extra;
+  }
+
+  function pick(provider){
+    CHOSEN = provider;
+    var p = (DATA.providers || []).filter(function(x){ return x.id === provider; })[0] || {};
+    $("ob-title").textContent = "Conectar " + (p.label || provider);
+    $("ob-body").innerHTML = tutorial(provider);
+    showStep("ob-step2");
+    var btn = $("ob-save"); if (btn) btn.addEventListener("click", save);
+    var inp = $("ob-key");
+    if (inp){
+      inp.addEventListener("keydown", function(e){
+        if (e.key === "Enter"){ e.preventDefault(); save(); }
+      });
+      setTimeout(function(){ try { inp.focus(); } catch(e){} }, 120);
+    }
+    OV.scrollTop = 0;
+  }
+
+  function fail(msg){
+    var hint = $("ob-hint");
+    if (hint){ hint.className = "ob-hint err"; hint.textContent = msg; }
+  }
+
+  function save(){
+    if (BUSY) return;
+    var inp = $("ob-key");
+    var key = (inp && inp.value || "").trim();
+    if (!key){ fail("Cole a chave para continuar."); return; }
+    BUSY = true;
+    var btn = $("ob-save");
+    if (btn){ btn.disabled = true; btn.textContent = "Salvando…"; }
+    var hint = $("ob-hint");
+    if (hint){ hint.className = "ob-hint"; hint.textContent = "Gravando cifrado e reiniciando o terminal…"; }
+    fetch("/api/onboarding/key", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({provider: CHOSEN, apikey: key})
+    }).then(function(r){ return r.json()["catch"](function(){ return {}; }); })
+      .then(function(d){
+        if (!d || !d.ok){
+          BUSY = false;
+          if (btn){ btn.disabled = false; btn.textContent = "Salvar e usar"; }
+          fail((d && d.error) || "Não foi possível salvar a chave.");
+          return;
+        }
+        STEPS.forEach(function(id){ var el = $(id); if (el) el.style.display = "none"; });
+        $("ob-done").style.display = "block";
+        $("ob-done-title").textContent = "Chave salva — " + (d.masked || "");
+        $("ob-done-text").textContent = d.model
+          ? ("Modelo padrão: " + String(d.model).replace("#", " · ") + ". Reiniciando…")
+          : "Reiniciando o terminal…";
+        setTimeout(function(){ try { location.reload(); } catch(e){} }, 1600);
+      })["catch"](function(e){
+        BUSY = false;
+        if (btn){ btn.disabled = false; btn.textContent = "Salvar e usar"; }
+        fail("Falha de conexão: " + (e && e.message ? e.message : "tente de novo"));
+      });
+  }
+
+  // ── navegação ───────────────────────────────────────────────
+  $("ob-have").addEventListener("click", function(){
+    // v0.7.10: o onboarding continua atrás do modal; se o usuário fechar o
+    // modal sem salvar, ele volta a ver esta tela (o terminal ainda não existe).
+    if (typeof connectProvider === "function") { connectProvider(); }
+  });
+  $("ob-nohave").addEventListener("click", function(){ renderProviders(); showStep("ob-step1"); });
+  $("ob-back1").addEventListener("click", function(){ showStep("ob-step0"); });
+  $("ob-back2").addEventListener("click", function(){ showStep("ob-step1"); });
+  $("ob-close").addEventListener("click", close);
+
+  // ── quando abrir ────────────────────────────────────────────
+  // Espera Termos e "Bem-vindo de volta" saírem da frente: o onboarding é a
+  // ÚLTIMA etapa da abertura. Sem chave, aparece; com chave, nunca.
+  function arm(){
+    var tries = 0;
+    var timer = setInterval(function(){
+      tries++;
+      var skip = false;
+      try { skip = sessionStorage.getItem("ufvai_ob_skip") === "1"; } catch(e){}
+      if (skip){ clearInterval(timer); return; }
+      if (visible($("terms-overlay")) || visible($("welcome-overlay"))) {
+        if (tries > 480) clearInterval(timer);   // ~4 min de tolerância
+        return;
+      }
+      clearInterval(timer);
+      OV.style.display = "flex";
+      showStep("ob-step0");
+    }, 500);
+  }
+
+  fetch("/api/onboarding", {cache: "no-store"})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      DATA = d || {};
+      if (!DATA.needs) return;
+      renderProviders();
+      arm();
+      // v0.7.10: se a chave entrar por outro caminho (modal de provedores),
+      // recarrega para o terminal subir já com o provedor e o modelo certos.
+      var _watch = setInterval(function(){
+        if (OV.style.display === "none") return;
+        fetch("/api/onboarding", {cache: "no-store"})
+          .then(function(r){ return r.json(); })
+          .then(function(x){
+            if (x && x.needs === false){
+              clearInterval(_watch);
+              try { location.reload(); } catch(e){}
+            }
+          })["catch"](function(){});
+      }, 3000);
+    })["catch"](function(){});
+})();
+</script>
+
 <script>
 (function(){
   // v0.6.14: captura IP público via ipify (CORS) — corrige Colab localhost (proxy sem XFF)

@@ -290,6 +290,27 @@ def merge_drive_guard(
     return merged
 
 
+def merge_plugin(existing: dict[str, Any], plugin_path: str) -> dict[str, Any]:
+    """Registra UM plugin (caminho absoluto) preservando o restante (v0.7.10).
+
+    Idempotente: não duplica entradas nem toca em ``plugins`` de formato
+    inesperado (nesse caso a lista do usuário é preservada como está).
+    """
+    merged = dict(existing)
+    plugins = merged.get("plugins")
+    items: list[Any] = list(plugins) if isinstance(plugins, list) else []
+    already = any(
+        item == plugin_path
+        or (isinstance(item, dict) and item.get("package") == plugin_path)
+        for item in items
+    )
+    if not already:
+        items.append(plugin_path)
+    merged["plugins"] = items
+    merged.setdefault("$schema", CONFIG_SCHEMA_URL)
+    return merged
+
+
 def merge_cli_plugins(existing: dict[str, Any], plugin_path: str) -> dict[str, Any]:
     """Habilita um plugin de CLI (TUI) em ``cli.json`` sem duplicar entradas.
 

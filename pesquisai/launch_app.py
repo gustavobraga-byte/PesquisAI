@@ -240,6 +240,57 @@ def set_drive_info(folder_path: str, drive_url: str) -> None:
     _folder_path = folder_path
 
 
+def _write_default_model(model_id: str, variant: str = "") -> str:
+    """Grava ``model`` (+ variante no agente UFVAI) preservando o resto.
+
+    v0.7.10: o motor V2 não retém variante no ``model`` raiz, então a variante
+    (ex.: ``high``) vai em ``agents.UFVAI.model`` — é o que a TUI mostra como
+    "Gemini Flash-Lite Latest Google · high".
+
+    Devolve a referência gravada (``provider/modelo#variante``), ou ``""``
+    quando não havia o que gravar / o arquivo não pôde ser lido.
+    """
+    from . import onboarding as _ob
+    from .opencode_config import load_json_config, write_json_atomic
+
+    mid = str(model_id or "").strip()
+    if not mid:
+        return ""
+    path = os.path.expanduser("~/.config/opencode/opencode.json")
+    try:
+        can_write, cfg = load_json_config(path)
+        if not can_write:
+            logger.warning("onboarding: opencode.json ilegível; modelo não alterado")
+            return ""
+        selector = f"{mid}#{variant}" if str(variant or "").strip() else mid
+        _agent_model = ((cfg.get("agents") or {}).get("UFVAI") or {}).get("model", "")
+        if cfg.get("model") == mid and (not selector.count("#") or _agent_model == selector):
+            return selector
+        write_json_atomic(path, _ob.merge_model(cfg, mid, variant=variant))
+        logger.info("onboarding: modelo padrão = %s", selector)
+        return selector
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("onboarding: falha ao gravar modelo padrão (%s)", exc)
+        return ""
+
+
+def _ensure_google_default_model() -> str:
+    """Com chave do Google presente, o padrão é o Gemini configurado.
+
+    Regra da v0.7.10 (pedido do autor): "se o usuário tem uma key do google o
+    modelo padrão é o gemini 3.5 flash" — inclusive nos próximos usos. Para
+    não brigar com quem escolheu outro provedor de propósito, o override fica
+    em ``UFVAI_GOOGLE_MODEL`` e o desligamento em ``UFVAI_GOOGLE_MODEL_LOCK=0``.
+    """
+    from . import onboarding as _ob
+
+    if str(os.environ.get("UFVAI_GOOGLE_MODEL_LOCK", "1")).strip() in ("0", "false", "no"):
+        return ""
+    if not _ob.google_key_present(_env):
+        return ""
+    return _write_default_model(_ob.google_model(), _ob.google_variant())
+
+
 def load_keys_from_drive(
     backup_dir: str, env_dict: dict, write_bashrc: bool = True
 ) -> list[str]:
@@ -282,6 +333,14 @@ def load_keys_from_drive(
                         _wf.writelines(lines)
                 except Exception:
                     pass
+    # v0.7.10: com chave do Google, o modelo padrão é o Gemini configurado —
+    # no boot e em qualquer recarga de chaves (inclusive /api/apikey/apply).
+    try:
+        from . import onboarding as _onb
+        if _onb.google_key_present(env_dict) or saved_keys.get("google"):
+            _ensure_google_default_model()
+    except Exception as _exc:  # noqa: BLE001
+        logger.debug("modelo padrão do Google não aplicado: %s", _exc)
     return loaded
 
 
@@ -2874,6 +2933,22 @@ def _keys_backup_dir() -> str:
     return os.path.join(os.path.expanduser("~"), "PesquisAI", "backups")
 
 
+def needs_onboarding_now() -> bool:
+    """True quando ainda não existe chave utilizável (v0.7.10).
+
+    Nesse estado o boot NÃO inicia o motor/terminal: o usuário precisa
+    escolher um provedor e colar a chave primeiro.
+    """
+    from . import onboarding as _ob
+    try:
+        store = load_encrypted_keys(_keys_backup_dir())
+    except Exception:  # noqa: BLE001
+        store = {}
+    env = dict(os.environ)
+    env.update(_env)
+    return _ob.needs_onboarding(store, env)
+
+
 def _start_opencode_service_with_keys(timeout_s: float = 20.0) -> bool:
     """Sobe o serviço do motor já com as chaves decifradas do Drive.
 
@@ -2899,28 +2974,45 @@ def _start_opencode_service_with_keys(timeout_s: float = 20.0) -> bool:
     )
 
 
-def _apply_opencode_env_change_async() -> None:
-    """Após salvar/remover chave: reergue o serviço com o ambiente novo.
+def _hard_restart_engine(reason: str = "key") -> None:
+    """Encerra o motor e TODAS as sessões e sobe tudo de novo (v0.7.10).
 
-    Paramos o serviço em background, subimos de novo JÁ com as chaves
-    decifradas (v0.7.8) e reiniciamos o terminal. Roda em thread para não
-    atrasar a resposta HTTP.
+    Pedido do autor: *"quando inserir a key, finalizar o opencode e todas as
+    sessões e iniciar novamente com o código correto"*. Ordem:
+
+    1. mata o terminal (ttyd + bash + TUI — árvore inteira, v0.6.5);
+    2. derruba o serviço do motor (sessões em memória incluídas);
+    3. sobe o serviço JÁ com as chaves decifradas;
+    4. abre um terminal novo (sessão nova) com o modelo padrão correto.
     """
-    def _worker() -> None:
-        try:
-            _shutdown_stop_opencode_service()
-        except Exception:  # noqa: BLE001
-            pass
-        try:
-            _start_opencode_service_with_keys()
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Serviço não voltou com as chaves novas: %s", exc)
-        try:
-            restart_ttyd_with_lang(_current_lang or "pt_BR")
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Reinício do terminal após troca de chave falhou: %s", exc)
+    try:
+        _stop_terminal()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Restart duro (%s): terminal não encerrou (%s)", reason, exc)
+    try:
+        _shutdown_stop_opencode_service()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Restart duro (%s): serviço não encerrou (%s)", reason, exc)
+    try:
+        _start_opencode_service_with_keys()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Restart duro (%s): serviço não subiu (%s)", reason, exc)
+    try:
+        restart_ttyd_with_lang(_current_lang or "pt_BR")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Restart duro (%s): terminal não reabriu (%s)", reason, exc)
 
-    threading.Thread(target=_worker, daemon=True, name="ufvai-apply-keys").start()
+
+def _apply_opencode_env_change_async() -> None:
+    """Após salvar/remover chave: reinício DURO (motor + todas as sessões).
+
+    Roda em thread para não atrasar a resposta HTTP.
+    """
+    threading.Thread(
+        target=lambda: _hard_restart_engine("env-change"),
+        daemon=True,
+        name="ufvai-apply-keys",
+    ).start()
 
 
 def start_wrapper_server():
@@ -3101,6 +3193,8 @@ def start_wrapper_server():
                 if _name in (
                     "logo-oficial-288.jpg", "logo.svg", "ico.svg",
                     "icon.png", "ufvai-256.png", "ufvai-128.png", "ufvai-64.png",
+                    # v0.7.10: print real do Google AI Studio usado no onboarding
+                    "print-google-apikey.png",
                 ):
                     _roots = [
                         Path(__file__).resolve().parent.parent / "assets",
@@ -3157,6 +3251,31 @@ def start_wrapper_server():
                 self.wfile.write(content)
                 return
             
+            if p == "/api/free_models":
+                # v0.7.9: modelos GRATUITOS (OpenRouter :free e NVIDIA) do
+                # catálogo do motor, para o seletor de gratuitos. Cache de 10 min.
+                from . import free_models as _fm
+                _cache = globals().setdefault("_FREE_MODELS_CACHE", {"items": [], "ts": 0.0})
+                if not _cache["items"] or time.time() - _cache["ts"] > 600:
+                    _lines: list = []
+                    try:
+                        _r = subprocess.run(
+                            [_opencode_bin or "opencode", "models"],
+                            capture_output=True, text=True, timeout=30, env=_env,
+                        )
+                        _lines = (_r.stdout or "").splitlines()
+                    except Exception as exc:
+                        logger.warning("Falha ao listar modelos gratuitos: %s", exc)
+                    _items = _fm.filter_free_models(_lines)
+                    if _items:
+                        _cache.update(items=_items, ts=time.time())
+                self._json(200, {
+                    "models": _cache["items"],
+                    "key_links": _fm.KEY_LINKS,
+                    "docs": _fm.CHAVES_DOC_URL,
+                })
+                return
+
             if p == "/api/sessions":
                 # v0.6.25: a listagem vai para o SERVIDOR do motor
                 # (`opencode api session.list`). A listagem por CLI
@@ -3413,6 +3532,19 @@ def start_wrapper_server():
                 })
                 return
             
+            if p == "/api/onboarding":
+                # v0.7.10: a tela de primeiro uso aparece sempre que NÃO há
+                # chave utilizável (store cifrado ou ambiente) — inclusive
+                # para quem já usa o UFVAI e perdeu a chave.
+                from . import onboarding as _ob
+                try:
+                    _store = load_encrypted_keys(DRIVE_BACKUP_DIR)
+                except Exception as _exc:  # noqa: BLE001
+                    logger.warning("onboarding: store de chaves ilegível (%s)", _exc)
+                    _store = {}
+                self._json(200, _ob.onboarding_state(_store, _env))
+                return
+
             if p == "/api/apikey":
                 qs = parse_qs(urlparse(self.path).query)
                 provider = qs.get("provider", [""])[0].strip()
@@ -4128,6 +4260,57 @@ def start_wrapper_server():
                     self._json(500, {"ok": False, "error": f"Erro: {e!r}"})
                 return
 
+            if p == "/api/onboarding/key":
+                # v0.7.10: salva a chave escolhida no onboarding, já cifrada,
+                # define o modelo padrão do provedor (Google → gemini 3.5 flash)
+                # e reergue o serviço com o ambiente novo. Nunca loga a chave.
+                from . import onboarding as _ob
+                provider = str(body.get("provider", "") or "").strip().lower()
+                key = _ob.normalize_key(body.get("apikey", ""))
+                if not _ob.is_supported(provider):
+                    self._json(400, {"ok": False, "error": "Provedor não suportado."})
+                    return
+                _ok_fmt, _msg_fmt = _ob.validate_key_format(provider, key)
+                if not _ok_fmt:
+                    self._json(400, {"ok": False, "error": _msg_fmt})
+                    return
+                _prov = _ob.get_provider(provider) or {}
+                _env_var = str(_prov.get("env") or "")
+                try:
+                    _existing = load_encrypted_keys(DRIVE_BACKUP_DIR)
+                except Exception:  # noqa: BLE001
+                    _existing = {}
+                _existing[provider] = key
+                if _env_var:
+                    _existing[f"_env_{provider}"] = _env_var
+                if not save_encrypted_keys(DRIVE_BACKUP_DIR, _existing):
+                    self._json(500, {
+                        "ok": False,
+                        "error": "Falha ao gravar a chave cifrada no Drive.",
+                    })
+                    return
+                if _env_var:
+                    os.environ[_env_var] = key
+                    _env[_env_var] = key
+                _model = ""
+                if provider == "google":
+                    _model = _ensure_google_default_model()
+                else:
+                    _model = _write_default_model(_ob.default_model_for(provider))
+                try:
+                    _tel_event("onboarding_provider", {"provider": provider[:24]})
+                except Exception:  # noqa: BLE001
+                    pass
+                _apply_opencode_env_change_async()
+                self._json(200, {
+                    "ok": True,
+                    "provider": provider,
+                    "env": _env_var,
+                    "masked": _ob.mask_key(key),
+                    "model": _model,
+                })
+                return
+
             if p == "/api/apikey":
                 provider = body.get("provider", "").strip()
                 action   = body.get("action", "save").strip().lower()
@@ -4728,6 +4911,28 @@ def start_wrapper_server():
                 # listing (GET) foi movido para o do_GET e aqui fica so
                 # a gravacao (POST).
                 os.makedirs(AUTOSAVE_DIR, exist_ok=True)
+                # v0.7.9: autosave das conversas ESCOLHIDAS (botão ⚙ Autosave).
+                # Quando há `session_ids`, grava SOMENTE essas, sem o autosave
+                # da sessão ativa.
+                _sel_ids = [str(x).strip() for x in (body.get("session_ids") or []) if str(x).strip()]
+                if _sel_ids:
+                    try:
+                        _all_sess = _session_restore.list_sessions(_opencode_bin or "opencode", env=_env)
+                    except Exception:
+                        _all_sess = []
+                    _chosen = [s for s in _all_sess if str(s.get("id", "")) in _sel_ids]
+                    try:
+                        _per = _session_restore.save_all_sessions(
+                            _opencode_bin or "opencode", _chosen, AUTOSAVE_DIR,
+                            env=_env, project_dir=_project_dir(),
+                        )
+                    except Exception as exc:
+                        logger.warning("Autosave das conversas escolhidas falhou: %s", exc)
+                        _per = {"ok": False, "error": str(exc)[:200]}
+                    _per["scope"] = "selected"
+                    _invalidate_backups_cache()
+                    self._json(200, {"ok": bool(_per.get("ok", True)), "sessions_saved": _per})
+                    return
                 session_id = str(body.get("session_id", "") or "").strip()
                 if not session_id:
                     try:
@@ -4799,6 +5004,28 @@ def start_wrapper_server():
                     pass
                 _invalidate_backups_cache()  # autosave novo no Drive
                 self._json(200, {"ok": True, **info, "sessions_saved": per_session})
+                return
+
+            if p == "/api/default_model":
+                # v0.7.9: define o modelo PADRÃO do motor (campo `model` do
+                # opencode.json global). Só aceita modelos gratuitos suportados.
+                from . import free_models as _fm
+                from .opencode_config import load_json_config, write_json_atomic
+                _model_id = str(body.get("model", "") or "").strip()
+                if not _fm.is_free_model(_model_id):
+                    self._json(400, {"ok": False, "error": "Escolha um modelo gratuito (OpenRouter :free ou NVIDIA)."})
+                    return
+                _cfg_path = os.path.expanduser("~/.config/opencode/opencode.json")
+                try:
+                    _can_write, _existing = load_json_config(_cfg_path)
+                    if not _can_write:
+                        self._json(500, {"ok": False, "error": "opencode.json ilegível; não foi alterado."})
+                        return
+                    write_json_atomic(_cfg_path, _fm.merge_default_model(_existing, _model_id))
+                except Exception as exc:  # noqa: BLE001
+                    self._json(500, {"ok": False, "error": f"Falha ao gravar o modelo padrão: {exc}"[:300]})
+                    return
+                self._json(200, {"ok": True, "model": _model_id})
                 return
 
             if p == "/api/theme":
@@ -5907,7 +6134,12 @@ def launch():
         boot.done(95)
         
         boot.active("Iniciando terminal interativo", 96)
-        start_ttyd()
+        if needs_onboarding_now():
+            # v0.7.10: primeiro uso sem chave — o motor só nasce depois que
+            # o usuário escolher o provedor e colar a chave no onboarding.
+            logger.info("Onboarding pendente: terminal não iniciado (sem chave).")
+        else:
+            start_ttyd()
         boot.done(97)
         
         if IN_COLAB and output:
