@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UFVAI · Como obter sua chave de API (guia visual)</title>
+<meta name="description" content="Guia visual do UFVAI v0.7.9: como obter uma chave gratuita no OpenRouter e na NVIDIA, colar no UFVAI, escolher o modelo padrão e configurar o autosave.">
+<meta name="color-scheme" content="dark light">
+<style>
+  /* ══════════════════════════════════════════════════════════════════
+     Paleta idêntica ao wrapper do UFVAI (pesquisai / pesquisai-light)
+     ══════════════════════════════════════════════════════════════════ */
+  :root{
+    --ink:#e8e6e0; --ink-muted:#9a9790;
+    --surface:#141c24; --rail:#1f2831;
+    --line:rgba(255,255,255,.07);
+    --accent:#b29149; --accent-rgb:178,145,73;
+    --accent-dim:rgba(var(--accent-rgb),.12);
+    --accent-glow:rgba(var(--accent-rgb),.22);
+    --green:#5dba7e; --green-dim:rgba(93,186,126,.12);
+    --amber:#D1A705; --amber-dim:rgba(209,167,5,.14);
+    --red:#e07070; --red-dim:rgba(224,112,112,.12);
+    --radius:5px; --radius-lg:10px;
+    --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,"Helvetica Neue",Arial,sans-serif;
+    --font-mono:"DM Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+    --shadow:0 28px 72px rgba(0,0,0,.55);
+  }
+  html[data-theme="light"]{
+    --ink:#1f262a; --ink-muted:#4a5a62;
+    --surface:#f5f6f7; --rail:#ffffff;
+    --line:rgba(0,0,0,.1);
+    --accent:#8a6d33; --accent-rgb:138,109,51;
+    --accent-dim:rgba(var(--accent-rgb),.10);
+    --accent-glow:rgba(var(--accent-rgb),.18);
+    --green:#2e7d32; --green-dim:rgba(46,125,50,.1);
+    --amber:#a67c00; --amber-dim:rgba(166,124,0,.12);
+    --red:#c62828; --red-dim:rgba(198,40,40,.1);
+    --shadow:0 24px 60px rgba(20,28,36,.18);
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--surface); color:var(--ink);
+    font-family:var(--font-sans); font-size:15px; line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,kbd,pre{font-family:var(--font-mono)}
+
+  /* ── Topbar (mesma altura/estrutura do app) ───────────────────── */
+  .topbar{
+    position:sticky; top:0; z-index:50; height:50px;
+    background:var(--rail); border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:14px; padding:0 18px;
+    backdrop-filter:blur(8px);
+  }
+  .logo{display:flex;align-items:baseline;gap:2px;letter-spacing:-.02em}
+  .logo-p{font-weight:700;font-size:17px}
+  .logo-ai{font-weight:600;font-size:17px;color:var(--accent)}
+  .logo-tag{
+    margin-left:9px;font-size:10px;color:var(--ink-muted);letter-spacing:.07em;
+    padding:1px 6px;border:1px solid var(--line);border-radius:3px;align-self:center;
+  }
+  .topbar-spacer{flex:1}
+  .tb-btn{
+    display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;
+    background:transparent;border:1px solid var(--line);border-radius:var(--radius);
+    color:var(--ink-muted);font-family:var(--font-sans);font-size:11.5px;
+    cursor:pointer;white-space:nowrap;
+  }
+  .tb-btn:hover{color:var(--ink);border-color:rgba(var(--accent-rgb),.45);background:var(--accent-dim)}
+
+  /* ── Layout ───────────────────────────────────────────────────── */
+  .wrap{max-width:1180px;margin:0 auto;padding:34px 20px 80px;display:grid;grid-template-columns:236px minmax(0,1fr);gap:44px}
+  @media(max-width:980px){.wrap{grid-template-columns:1fr;gap:26px;padding-top:24px}}
+  .toc{position:sticky;top:78px;align-self:start;font-size:12.5px}
+  @media(max-width:980px){.toc{position:static;order:2;margin-top:8px}}
+  .toc-title{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-muted);margin-bottom:10px}
+  .toc ol{list-style:none;counter-reset:t}
+  .toc li{counter-increment:t;margin-bottom:2px}
+  .toc a{display:block;padding:5px 9px;border-radius:4px;color:var(--ink-muted);border-left:2px solid transparent}
+  .toc a::before{content:counter(t) ". ";color:var(--accent);font-family:var(--font-mono);font-size:10.5px}
+  .toc a:hover{background:var(--accent-dim);color:var(--ink);text-decoration:none;border-left-color:rgba(var(--accent-rgb),.5)}
+
+  /* ── Hero ─────────────────────────────────────────────────────── */
+  .hero{margin-bottom:38px}
+  .eyebrow{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+  h1{font-size:clamp(26px,4vw,38px);line-height:1.15;letter-spacing:-.02em;font-weight:700;margin-bottom:12px}
+  h1 em{font-style:normal;color:var(--accent)}
+  .lede{font-size:15.5px;color:var(--ink-muted);max-width:62ch}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;
+    border:1px solid var(--line);font-size:11px;color:var(--ink-muted);background:var(--rail);
+  }
+  .pill.gold{border-color:rgba(var(--accent-rgb),.4);color:var(--accent);background:var(--accent-dim)}
+  .pill.green{border-color:var(--green-dim);color:var(--green);background:var(--green-dim)}
+
+  /* ── Seções ───────────────────────────────────────────────────── */
+  section{margin-bottom:44px;scroll-margin-top:76px}
+  h2{font-size:21px;letter-spacing:-.01em;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+  .step-n{
+    flex:0 0 28px;width:28px;height:28px;border-radius:50%;
+    display:inline-flex;align-items:center;justify-content:center;
+    background:var(--accent-dim);border:1px solid rgba(var(--accent-rgb),.4);
+    color:var(--accent);font-size:12.5px;font-weight:700;font-family:var(--font-mono);
+  }
+  h3{font-size:15.5px;margin:22px 0 8px;color:var(--ink)}
+  p{margin-bottom:12px}
+  p:last-child{margin-bottom:0}
+  .muted{color:var(--ink-muted)}
+  .small{font-size:12.5px}
+  ul,ol{margin:0 0 12px 20px}
+  li{margin-bottom:6px}
+  ol.steps{counter-reset:s;list-style:none;margin-left:0}
+  ol.steps>li{counter-increment:s;position:relative;padding-left:34px;margin-bottom:12px}
+  ol.steps>li::before{
+    content:counter(s);position:absolute;left:0;top:1px;width:22px;height:22px;
+    border-radius:50%;background:var(--rail);border:1px solid rgba(var(--accent-rgb),.45);
+    color:var(--accent);font-family:var(--font-mono);font-size:11px;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* ── Callouts ─────────────────────────────────────────────────── */
+  .callout{
+    border:1px solid var(--line);border-left:3px solid var(--accent);
+    background:var(--accent-dim);border-radius:var(--radius);
+    padding:12px 15px;margin:16px 0;font-size:13.5px;
+  }
+  .callout.warn{border-left-color:var(--amber);background:var(--amber-dim)}
+  .callout.danger{border-left-color:var(--red);background:var(--red-dim)}
+  .callout.ok{border-left-color:var(--green);background:var(--green-dim)}
+  .callout b{color:var(--ink)}
+  .callout>*:last-child{margin-bottom:0}
+
+  /* ── "Prints" (reproduções da interface) ──────────────────────── */
+  figure{margin:18px 0 24px}
+  .frame{
+    border:1px solid var(--line);border-radius:var(--radius-lg);overflow:hidden;
+    background:var(--rail);box-shadow:var(--shadow);
+  }
+  .frame-bar{
+    display:flex;align-items:center;gap:6px;padding:8px 12px;
+    border-bottom:1px solid var(--line);background:rgba(0,0,0,.14);
+    font-size:10.5px;color:var(--ink-muted);font-family:var(--font-mono);
+  }
+  html[data-theme="light"] .frame-bar{background:rgba(0,0,0,.03)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--line)}
+  .dot.r{background:#e07070}.dot.y{background:#D1A705}.dot.g{background:#5dba7e}
+  .frame-url{margin-left:8px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .frame-body{padding:0}
+  figcaption{font-size:11.5px;color:var(--ink-muted);margin-top:7px;display:flex;gap:8px;align-items:baseline}
+  .tag-repro{
+    flex:0 0 auto;font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--amber);border:1px solid var(--amber-dim);background:var(--amber-dim);
+    padding:1px 5px;border-radius:3px;
+  }
+
+  /* reproduções: página externa clara (OpenRouter) */
+  .ext{background:#fff;color:#111;font-size:12px;padding:0}
+  .ext-dark{background:#0b0f14;color:#e8e6e0}
+  .ext *{font-family:var(--font-sans)}
+  .ext .nav{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.08);font-size:11px}
+  .ext-dark .nav{border-bottom:1px solid rgba(255,255,255,.08)}
+  .ext .nav .brand{font-weight:700;font-size:12px}
+  .ext .nav .sp{flex:1}
+  .ext .nav .at{color:#6b7280}
+  .ext-dark .nav .at{color:#8b97a3}
+  .ext .body{padding:16px}
+  .ext h4{font-size:15px;margin-bottom:3px}
+  .ext .sub{font-size:11px;color:#6b7280;margin-bottom:14px}
+  .ext-dark .sub{color:#8b97a3}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;
+       border:1px solid rgba(0,0,0,.09);border-radius:7px;padding:9px 11px;margin-bottom:7px;background:#fff}
+  .ext-dark .row{background:#131a22;border-color:rgba(255,255,255,.08)}
+  .row .k{font-family:var(--font-mono);font-size:11px;color:#374151}
+  .ext-dark .row .k{color:#b9c4cf}
+  .row .d{font-size:10px;color:#9ca3af}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    padding:6px 11px;border-radius:6px;font-size:11px;font-weight:600;
+    border:1px solid transparent;cursor:default;white-space:nowrap;
+  }
+  .btn-dark{background:#111;color:#fff}
+  .ext-dark .btn-dark{background:#e8e6e0;color:#0b0f14}
+  .btn-lite{background:#f3f4f6;color:#111;border-color:rgba(0,0,0,.1)}
+  .btn-nv{background:#76b900;color:#0b0f14;border-color:#76b900}
+  .btn-gold{background:var(--accent-dim);color:var(--accent);border-color:rgba(var(--accent-rgb),.4)}
+  .btn-red{background:#dc2626;color:#fff}
+  .input{
+    width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(0,0,0,.15);
+    background:#fff;font-size:11px;font-family:var(--font-mono);color:#111;
+  }
+  .ext-dark .input{background:#0b0f14;border-color:rgba(255,255,255,.15);color:#e8e6e0}
+  .field{font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:#6b7280;margin-bottom:4px}
+  .ext-dark .field{color:#8b97a3}
+  .dialog{
+    border:1px solid rgba(0,0,0,.12);border-radius:9px;background:#fff;
+    padding:14px;margin-top:10px;box-shadow:0 12px 30px rgba(0,0,0,.12);
+  }
+  .ext-dark .dialog{background:#131a22;border-color:rgba(255,255,255,.1);box-shadow:0 12px 30px rgba(0,0,0,.5)}
+  .keybox{
+    display:flex;align-items:center;gap:8px;margin:8px 0;
+    background:#0f172a;color:#e2e8f0;border-radius:6px;padding:7px 9px;
+    font-family:var(--font-mono);font-size:11px;
+  }
+  .keybox .reveal{margin-left:auto;font-size:9.5px;color:#94a3b8}
+  .hint{font-size:10px;color:#6b7280;margin-top:6px}
+  .ext-dark .hint{color:#8b97a3}
+
+  /* reproduções: app UFVAI (tema escuro real) */
+  .app{background:var(--surface);color:var(--ink);font-size:12px}
+  html[data-theme="light"] .app{background:#eef0f2}
+  .app .chrome{
+    display:flex;align-items:center;gap:10px;height:38px;padding:0 12px;
+    background:var(--rail);border-bottom:1px solid var(--line);
+  }
+  .app .chrome .logo-p,.app .chrome .logo-ai{font-size:13px}
+  .app .chrome .sp{flex:1}
+  .app .chrome .tool{font-size:10.5px;color:var(--ink-muted);display:inline-flex;align-items:center;gap:4px}
+  .app .chrome .tool.hot{color:var(--accent)}
+  .app .stage{padding:18px 16px 22px;display:flex;justify-content:center;background:
+     radial-gradient(circle at 50% 0,rgba(var(--accent-rgb),.07),transparent 60%)}
+  .modal{
+    width:100%;max-width:470px;background:var(--rail);border:1px solid var(--line);
+    border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow);
+  }
+  .modal-title{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:7px;margin-bottom:12px}
+  .howto{
+    border:1px solid rgba(var(--accent-rgb),.35);border-radius:var(--radius);
+    padding:11px;margin-bottom:13px;background:rgba(var(--accent-rgb),.06);
+  }
+  .howto .t{font-size:12px;font-weight:600;margin-bottom:5px}
+  .howto p{font-size:10.5px;color:var(--ink-muted);line-height:1.5;margin-bottom:9px}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px}
+  .chip{
+    font-size:10px;padding:3px 7px;border-radius:4px;border:1px solid var(--line);
+    color:var(--ink-muted);background:rgba(255,255,255,.03);
+  }
+  .chip.gold{color:var(--accent);border-color:rgba(var(--accent-rgb),.4);background:var(--accent-dim)}
+  .paid{font-size:10px;color:var(--ink-muted)}
+  .saved{
+    border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px;margin-bottom:13px;
+  }
+  .saved .rowline{
+    display:flex;align-items:center;gap:8px;padding:5px 0;font-size:11px;
+    border-bottom:1px dashed var(--line);
+  }
+  .saved .rowline:last-child{border-bottom:0}
+  .badge-ok{font-size:9px;color:var(--green);border:1px solid var(--green-dim);background:var(--green-dim);border-radius:3px;padding:0 4px}
+  .freebox{border:1px solid var(--line);border-radius:var(--radius);padding:10px;margin-bottom:13px}
+  .freebox .t{font-size:11.5px;font-weight:600;margin-bottom:8px}
+  .selrow{display:flex;gap:6px;margin-bottom:8px}
+  .sel{
+    background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);
+    color:var(--ink);font-size:11px;padding:5px 7px;font-family:var(--font-sans);
+  }
+  .sel.grow{flex:1;min-width:0}
+  .modal-actions{display:flex;gap:7px}
+  .mbtn{
+    padding:7px 11px;border-radius:var(--radius);font-size:11px;font-family:var(--font-sans);
+    border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--ink-muted);
+  }
+  .mbtn.primary{flex:1;color:var(--accent);background:var(--accent-dim);border-color:rgba(var(--accent-rgb),.3)}
+  .form label{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-muted);margin:10px 0 4px}
+  .form input{
+    width:100%;padding:7px 9px;border-radius:var(--radius);border:1px solid var(--line);
+    background:rgba(255,255,255,.04);color:var(--ink);font-family:var(--font-mono);font-size:11px;
+  }
+  .term{
+    background:#0b1016;color:#cfd6dd;border-radius:var(--radius);padding:10px 12px;
+    font-family:var(--font-mono);font-size:11px;line-height:1.6;
+  }
+  html[data-theme="light"] .term{background:#111820;color:#d7dee6}
+  .term .g{color:#7fbf8f}.term .c{color:#6f7d8a}.term .y{color:#d4b56a}
+
+  /* ── Tabelas ──────────────────────────────────────────────────── */
+  .tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin:14px 0}
+  .tbl th,.tbl td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  .tbl th{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted);font-weight:600}
+  .tbl tr:last-child td{border-bottom:0}
+  .tbl-wrap{border:1px solid var(--line);border-radius:var(--radius-lg);overflow:hidden;background:var(--rail)}
+
+  /* ── Detalhes / FAQ ───────────────────────────────────────────── */
+  details{border:1px solid var(--line);border-radius:var(--radius-lg);padding:12px 15px;margin-bottom:8px;background:var(--rail)}
+  details summary{cursor:pointer;font-size:13.5px;font-weight:600;list-style:none;display:flex;align-items:center;gap:8px}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:"＋";color:var(--accent);font-family:var(--font-mono);font-size:12px}
+  details[open] summary::before{content:"－"}
+  details .ans{padding-top:10px;font-size:13px;color:var(--ink-muted)}
+
+  /* ── Rodapé ───────────────────────────────────────────────────── */
+  footer{border-top:1px solid var(--line);padding:22px 20px 40px;text-align:center;font-size:11.5px;color:var(--ink-muted)}
+  footer .brandline{margin-bottom:6px;letter-spacing:-.02em}
+  footer a{color:var(--accent)}
+  hr.sep{border:0;border-top:1px solid var(--line);margin:34px 0}
+
+  @media print{
+    .topbar,.toc,.tb-btn{display:none!important}
+    body{background:#fff;color:#111;font-size:10.5pt}
+    .wrap{display:block;max-width:none;padding:0}
+    .frame{box-shadow:none;break-inside:avoid}
+    figure,section{break-inside:avoid}
+    a{color:#111;text-decoration:underline}
+    .callout{border:1px solid #ccc;background:#fafafa}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <span class="logo" aria-label="UFVAI">
+    <span class="logo-p">UFV</span><span class="logo-ai">AI</span>
+  </span>
+  <span class="logo-tag">GUIA · CHAVES DE API</span>
+  <span class="topbar-spacer"></span>
+  <button class="tb-btn" id="themeBtn" type="button" aria-label="Alternar tema">
+    <span id="themeIcon">◐</span><span id="themeLabel">Tema claro</span>
+  </button>
+  <a class="tb-btn" href="CHAVES_API.md">Versão .md</a>
+</header>
+
+<div class="wrap">
+
+  <nav class="toc" aria-label="Sumário">
+    <div class="toc-title">Neste guia</div>
+    <ol>
+      <li><a href="#antes">Antes de começar</a></li>
+      <li><a href="#abrir">Abrir os Provedores</a></li>
+      <li><a href="#openrouter">Chave OpenRouter</a></li>
+      <li><a href="#nvidia">Chave NVIDIA</a></li>
+      <li><a href="#colar">Colar e salvar no UFVAI</a></li>
+      <li><a href="#padrao">Modelo gratuito padrão</a></li>
+      <li><a href="#conferir">Conferir se funcionou</a></li>
+      <li><a href="#autosave">Autosave (bônus)</a></li>
+      <li><a href="#seguranca">Onde a chave fica</a></li>
+      <li><a href="#problemas">Problemas comuns</a></li>
+      <li><a href="#pago">Opção paga</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <div class="hero">
+      <div class="eyebrow">UFVAI v0.7.9 · guia visual</div>
+      <h1>Como obter sua <em>chave de API</em> — do zero ao primeiro modelo gratuito</h1>
+      <p class="lede">
+        Passo a passo ilustrado para criar uma chave no <b>OpenRouter</b> ou na <b>NVIDIA</b>,
+        colar no UFVAI, definir o <b>modelo gratuito padrão</b> e deixar o terminal pronto para conversar.
+        Nenhuma etapa exige cartão de crédito.
+      </p>
+      <div class="meta">
+        <span class="pill gold">🔑 2 provedores gratuitos</span>
+        <span class="pill">⏱️ ~5 minutos</span>
+        <span class="pill green">🔒 chave cifrada no Drive</span>
+        <span class="pill">🖥️ funciona no Colab e no .deb</span>
+      </div>
+    </div>
+
+    <div class="callout warn">
+      <b>Aviso de responsabilidade.</b> As chaves de API são <b>de sua responsabilidade</b> e são emitidas
+      diretamente pelo provedor. O UFVAI <b>não tem qualquer vínculo</b> com OpenRouter, NVIDIA ou OpenCode:
+      não emite, não cobra e não garante limites nem disponibilidade. Os limites gratuitos são definidos por
+      cada provedor e podem mudar sem aviso. <b>Nunca compartilhe sua chave.</b>
+    </div>
+
+    <div class="callout">
+      <b>Sobre as imagens deste guia.</b> As telas abaixo são <b>reproduções fiéis do layout</b>
+      (HTML/CSS), não capturas de tela: as páginas de OpenRouter e NVIDIA exigem login, e o ambiente onde
+      este guia foi gerado não tem navegador. Cada figura traz a etiqueta
+      <span class="tag-repro">reprodução</span>. Para trocar por capturas reais, veja o comentário
+      <code>&lt;!-- TROQUE POR PRINT REAL --&gt;</code> no código-fonte do arquivo.
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <section id="antes">
+      <h2><span class="step-n">1</span>Antes de começar</h2>
+      <p>Você precisa de três coisas:</p>
+      <ul>
+        <li>O <b>UFVAI aberto</b> (Colab ou instalação local — a interface web em <code>localhost:8001</code>).</li>
+        <li>Uma <b>conta gratuita</b> no provedor escolhido (e-mail basta).</li>
+        <li>Um lugar seguro para colar a chave por alguns segundos — ela começa com
+            <code>sk-or-</code> (OpenRouter) ou <code>nvapi-</code> (NVIDIA).</li>
+      </ul>
+      <div class="callout ok">
+        <b>Qual escolher?</b> O <b>OpenRouter</b> é o caminho mais direto: uma única chave dá acesso a vários
+        modelos com sufixo <code>:free</code>, incluindo o roteador <code>openrouter/free</code>.
+        A <b>NVIDIA</b> é uma boa segunda opção (ou reserva) — os modelos aparecem como <code>nvidia/…</code>.
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <section id="abrir">
+      <h2><span class="step-n">2</span>Abra o painel de Provedores</h2>
+      <p>Na barra superior do UFVAI, clique no ícone <b>🔌</b> (<i>Provedores</i>). É por essa janela que
+      todas as chaves entram e saem — em qualquer modo (Colab ou offline).</p>
+
+      <figure>
+        <div class="frame">
+          <div class="frame-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="frame-url">localhost:8001</span></div>
+          <div class="frame-body app">
+            <div class="chrome">
+              <span class="logo"><span class="logo-p">UFV</span><span class="logo-ai">AI</span></span>
+              <span class="sp"></span>
+              <span class="tool">💾</span><span class="tool">🕘</span><span class="tool">🧠</span>
+              <span class="tool hot">🔌 Provedores</span>
+              <span class="tool">📘</span><span class="tool">🌐 PT</span>
+            </div>
+            <div class="stage" style="min-height:76px;align-items:center;color:var(--ink-muted);font-size:11px">
+              ← o botão 🔌 fica na barra superior, ao lado de Memória e Manual
+            </div>
+          </div>
+        </div>
+        <figcaption><span class="tag-repro">reprodução</span> Barra superior do UFVAI com o botão 🔌 Provedores em destaque.</figcaption>
+      </figure>
+
+      <div class="callout">
+        <b>Sem nenhuma chave salva?</b> O próprio modal já abre com o bloco
+        <b>“🆓 Comece grátis — obtenha uma chave gratuita”</b>, com os atalhos para OpenRouter, NVIDIA
+        e para este guia. Você não precisa procurar a documentação.
+      </div>
+
+      <figure>
+        <div class="frame">
+          <div class="frame-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="frame-url">localhost:8001 · modal Provedores</span></div>
+          <div class="frame-body app">
+            <div class="stage">
+              <div class="modal">
+                <div class="modal-title">🔌 Conectar Provedor de IA</div>
+
+                <div class="howto">
+                  <div class="t">🆓 Comece grátis — obtenha uma chave gratuita</div>
+                  <p>As chaves de API são <b>de sua responsabilidade</b> e não têm qualquer vínculo com
+                     esta plataforma (UFVAI). Os limites gratuitos são definidos por cada provedor.</p>
+                  <div class="chips">
+                    <span class="chip gold">Chave OpenRouter (grátis)</span>
+                    <span class="chip gold">Chave NVIDIA (grátis)</span>
+                    <span class="chip">📘 Instruções passo a passo</span>
+                  </div>
+                  <div class="paid">💳 Opção paga: <span style="color:var(--accent)">OpenCode Go</span></div>
+                </div>
+
+                <p class="small muted" style="font-size:11px;margin-bottom:6px">Chaves salvas no Drive:</p>
+                <div class="saved">
+                  <div class="rowline">
+                    <span>OpenRouter</span>
+                    <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-muted)">sk-or-••••••7f2a</span>
+                    <span class="badge-ok">ok</span>
+                  </div>
+                </div>
+
+                <div class="freebox">
+                  <div class="t">🎛️ Modelo gratuito padrão</div>
+                  <div class="selrow">
+                    <span class="sel">OpenRouter ▾</span>
+                    <span class="sel grow">openrouter/free ▾</span>
+                  </div>
+                  <span class="mbtn primary" style="display:inline-block">Definir como padrão</span>
+                </div>
+
+                <div class="modal-actions">
+                  <span class="mbtn primary">+ Novo provedor</span>
+                  <span class="mbtn">Fechar</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><span class="tag-repro">reprodução</span> Modal de Provedores com o bloco de chave gratuita (v0.7.9) e o seletor de modelo padrão.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <section id="openrouter">
+      <h2><span class="step-n">3</span>OpenRouter — chave gratuita (<code>sk-or-…</code>)</h2>
+
+      <ol class="steps">
+        <li><b>Crie a conta</b> em <a href="https://openrouter.ai" target="_blank" rel="noopener">openrouter.ai</a>.</li>
+        <li><b>Abra</b> <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>
+            e clique em <b>Create Key</b>.</li>
+        <li>Dê um nome (ex.: <code>ufvai</code>), confirme e <b>copie a chave</b> — ela aparece uma única vez.</li>
+        <li>Cole no UFVAI em <b>🔌 Provedores → OpenRouter</b> (próxima seção).</li>
+      </ol>
+
+      <figure>
+        <!-- TROQUE POR PRINT REAL: substitua este bloco .frame por
+             <img src="prints/openrouter-keys.png" alt="Página de chaves do OpenRouter"> -->
+        <div class="frame">
+          <div class="frame-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="frame-url">openrouter.ai/keys</span></div>
+          <div class="frame-body ext">
+            <div class="nav">
+              <span class="brand">OpenRouter</span>
+              <span class="at">Models</span><span class="at">Chat</span><span class="at">Rankings</span>
+              <span class="sp"></span>
+              <span class="btn btn-lite">Docs</span>
+              <span class="btn btn-dark">Sign in</span>
+            </div>
+            <div class="body">
+              <h4>API Keys</h4>
+              <div class="sub">Manage the keys that let your applications use OpenRouter.</div>
+              <div class="row">
+                <span class="k">ufvai</span>
+                <span class="d">created just now · never used</span>
+                <span class="btn btn-dark">Create Key</span>
+              </div>
+              <div class="row">
+                <span class="k">sk-or-v1-••••••••••••••••7f2a</span>
+                <span class="d">$0.00</span>
+              </div>
+              <div class="hint">Only the first characters are shown after you close the dialog.</div>
+            </div>
+          </div>
+        </div>
+        <figcaption><span class="tag-repro">reprodução</span> Página de chaves do OpenRouter: <b>Create Key</b> e a chave já criada (mascarada).</figcaption>
+      </figure>
+
+      <figure>
+        <div class="frame">
+          <div class="frame-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="frame-url">openrouter.ai/keys · Create Key</span></div>
+          <div class="frame-body ext">
+            <div class="body" style="background:#f9fafb">
+              <div class="dialog" style="margin-top:0">
+                <h4 style="font-size:13px;margin-bottom:10px">Create API Key</h4>
+                <div class="field">Name</div>
+                <input class="input" value="ufvai" readonly>
+                <div class="field" style="margin-top:10px">Key</div>
+                <div class="keybox"><span>sk-or-v1-8c41d2e0b7a95f36c1d8472e0b6f7a9c7f2a</span><span class="reveal">Copy</span></div>
+                <div class="hint">⚠️ Copy it now — it will not be shown again.</div>
+                <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:12px">
+                  <span class="btn btn-lite">Cancel</span><span class="btn btn-dark">Create</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><span class="tag-repro">reprodução</span> Diálogo de criação: a chave aparece <b>uma única vez</b> — copie antes de fechar.</figcaption>
+      </figure>
+
+      <div class="callout warn">
+        <b>Chave perdida?</b> Não é possível “ver de novo” no painel do provedor: apague a antiga
+        (<b>Delete</b>) e crie outra. Depois é só atualizar no UFVAI.
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <section id="nvidia">
+      <h2><span class="step-n">4</span>NVIDIA — chave gratuita (<code>nvapi-…</code>)</h2>
+
+      <ol class="steps">
+        <li><b>Crie a conta</b> em <a href="https://build.nvidia.com" target="_blank" rel="noopener">build.nvidia.com</a>.</li>
+        <li><b>Escolha um modelo</b> no catálogo e abra a aba/opção de <b>API</b>.</li>
+        <li>Clique em <b>Get API Key</b> e copie o valor — começa com <code>nvapi-</code>.</li>
+        <li>Cole no UFVAI em <b>🔌 Provedores → NVIDIA</b>.</li>
+      </ol>
+
+      <figure>
+        <!-- TROQUE POR PRINT REAL: <img src="prints/nvidia-model.png" alt="Página de modelo do build.nvidia.com"> -->
+        <div class="frame">
+          <div class="frame-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="frame-url">build.nvidia.com</span></div>
+          <div class="frame-body ext ext-dark">
+            <div class="nav">
+              <span class="brand" style="color:#76b900">NVIDIA</span>
+              <span class="at">Build</span><span class="at">Models</span><span class="at">Docs</span>
+              <span class="sp"></span>
+              <span class="btn btn-lite" style="background:#1b242e;color:#cfd8e3;border-color:#2a3642">Sign in</span>
+            </div>
+            <div class="body">
+              <h4>Explore Models</h4>
+              <div class="sub">Build with optimized AI models on NVIDIA NIM.</div>
+              <div class="row">
+                <div>
+                  <div class="k" style="font-family:var(--font-sans);font-weight:600">Modelo do catálogo</div>
+                  <div class="d">NIM · API reference</div>
+                </div>
+                <span class="btn btn-nv">Get API Key</span>
+              </div>
+              <div class="hint">A chave é gerada na sua conta e vale para os modelos <code>nvidia/*</code>.</div>
+            </div>
+          </div>
+        </div>
+        <figcaption><span class="tag-repro">reprodução</span> Catálogo do build.nvidia.com com o botão <b>Get API Key</b>.</figcaption>
+      </figure>
+
+      <figure>
+        <div class="frame">
+          <div class="frame-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="frame-url">build.nvidia.com · API Key</span></div>
+          <div class="frame-body ext ext-dark">
+            <div class="body">
+              <div class="dialog" style="margin-top:0">
+                <h4 style="font-size:13px;margin-bottom:10px">Your API Key</h4>
+                <div class="keybox"><span>nvapi-4Qm8xT2rL0pW7vN3sK9dYb1cH6gJ5fA2eZ8u</span><span class="reveal">Copy</span></div>
+                <div class="hint">Guarde em local seguro. Você pode gerar e revogar chaves na sua conta NVIDIA.</div>
+                <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:12px">
+                  <span class="btn btn-nv">Copy Key</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><span class="tag-repro">reprodução</span> Janela com a chave <code>nvapi-…</code> pronta para copiar.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <section id="colar">
+      <h2><span class="step-n">5</span>Cole a chave no UFVAI</h2>
+      <p>Em <b>🔌 Provedores</b>, clique em <b>+ Novo provedor</b>, escolha o provedor na lista
+      (há busca por nome) e cole a chave no campo indicado.</p>
+
+      <figure>
+        <div class="frame">
+          <div class="frame-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="frame-url">localhost:8001 · modal Provedores · etapa 2</span></div>
+          <div class="frame-body app">
+            <div class="stage">
+              <div class="modal" style="max-width:420px">
+                <div class="modal-title">🔑 OpenRouter</div>
+                <div class="form">
+                  <label>API key</label>
+                  <input value="sk-or-v1-8c41d2e0b7a95f36c1d8472e0b6f7a9c7f2a" readonly>
+                  <label>Apelido (opcional)</label>
+                  <input value="ufvai-pessoal" readonly style="font-family:var(--font-sans)">
+                </div>
+                <div class="modal-actions" style="margin-top:14px">
+                  <span class="mbtn primary">Salvar chave</span>
+                  <span class="mbtn">Cancelar</span>
+                </div>
+                <div class="hint" style="color:var(--ink-muted);margin-top:9px">
+                  🔒 Gravada cifrada em <code>backups/</code> — nunca enviada a terceiros pela UFVAI.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><span class="tag-repro">reprodução</span> Formulário de chave do provedor (a chave fica mascarada na lista depois de salva).</figcaption>
+      </figure>
+
+      <div class="callout ok">
+        <b>Salvou, já vale.</b> Ao salvar ou remover uma chave, o UFVAI reergue o serviço do motor
+        <b>já com as chaves novas</b> antes de reiniciar o terminal (correção da v0.7.8). Não é preciso
+        reiniciar o notebook.
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <section id="padrao">
+      <h2><span class="step-n">6</span>Defina o modelo gratuito padrão</h2>
+      <p>Com a chave salva, o bloco <b>🎛️ Modelo gratuito padrão</b> lista apenas modelos gratuitos
+      suportados: <code>openrouter/*:free</code> (incluindo o roteador <code>openrouter/free</code>) e
+      <code>nvidia/*</code>.</p>
+
+      <figure>
+        <div class="frame">
+          <div class="frame-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="frame-url">localStorage · seletor de gratuitos</span></div>
+          <div class="frame-body app">
+            <div class="stage">
+              <div class="modal" style="max-width:420px">
+                <div class="freebox" style="margin:0">
+                  <div class="t">🎛️ Modelo gratuito padrão</div>
+                  <div class="selrow">
+                    <span class="sel">OpenRouter ▾</span>
+                    <span class="sel grow">openrouter/free ▾</span>
+                  </div>
+                  <span class="mbtn primary" style="display:inline-block">Definir como padrão</span>
+                  <div class="hint" style="color:var(--ink-muted);margin-top:8px">
+                    ✅ Modelo padrão: openrouter/free
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><span class="tag-repro">reprodução</span> Seletor de gratuitos e confirmação “✅ Modelo padrão: …”.</figcaption>
+      </figure>
+
+      <p class="small muted">Por baixo, o botão grava o campo <code>model</code> do
+      <code>~/.config/opencode/opencode.json</code> preservando o resto da configuração
+      (<code>POST /api/default_model</code>). Só modelos gratuitos são aceitos — um modelo pago é recusado
+      com “Escolha um modelo gratuito”.</p>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <section id="conferir">
+      <h2><span class="step-n">7</span>Confira se funcionou</h2>
+      <p>Três verificações rápidas, da mais simples para a mais técnica:</p>
+
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Onde</th><th>O que você deve ver</th></tr></thead>
+          <tbody>
+            <tr><td><b>🔌 Provedores</b></td><td>O provedor na lista de “Chaves salvas”, com a chave mascarada e o selo de ok.</td></tr>
+            <tr><td><b>Seletor de modelos no terminal</b></td><td>O provedor aparece na lista; escolha um modelo <code>:free</code> ou <code>nvidia/*</code>.</td></tr>
+            <tr><td><b>Diagnóstico de chaves</b></td><td><code>python3 scripts/diag_keys_v22.py</code> — compara store × processo × serviço sem imprimir segredo.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure>
+        <div class="frame">
+          <div class="frame-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="frame-url">terminal · diagnóstico</span></div>
+          <div class="frame-body">
+            <div class="term">
+<span class="c">$</span> python3 scripts/diag_keys_v22.py
+<span class="g">✓</span> store: 2 chaves decifradas
+<span class="g">✓</span> shell: 2/2 variáveis
+<span class="g">✓</span> serviço: 2/2 variáveis
+<span class="g">✓</span> provedores no motor: openrouter, nvidia
+<span class="y">→</span> tudo certo (exit 0)
+            </div>
+          </div>
+        </div>
+        <figcaption><span class="tag-repro">reprodução</span> Saída esperada do diagnóstico (exit 0). Saída <code>1</code> indica serviço sem as chaves.</figcaption>
+      </figure>
+
+      <p class="small muted">Ainda sem provedor no seletor? Feche e reabra o terminal pelo botão de reinício,
+      ou salve a chave novamente — o serviço é reerguido com o ambiente atualizado.</p>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <section id="autosave">
+      <h2><span class="step-n">8</span>Bônus da v0.7.9 — autosave configurável</h2>
+      <p>O botão <b>⚙</b> no rodapé abre a configuração do autosave: intervalo de <b>1 a 60 minutos</b> e
+      quais conversas salvar (só a ativa, todas, ou uma seleção). O padrão continua econômico: apenas a
+      sessão ativa, e só quando há mudança.</p>
+
+      <figure>
+        <div class="frame">
+          <div class="frame-bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+            <span class="frame-url">localhost:8001 · ⚙ Configurar autosave</span></div>
+          <div class="frame-body app">
+            <div class="stage">
+              <div class="modal" style="max-width:440px">
+                <div class="modal-title">💾 Configurar autosave</div>
+                <div class="form">
+                  <label style="margin-top:0">Intervalo entre salvamentos</label>
+                  <div class="sel" style="display:block">10 minutos ▾</div>
+                  <label>Quais conversas salvar</label>
+                  <div style="font-size:11.5px;line-height:1.9">
+                    <div>◉ Somente a sessão ativa</div>
+                    <div>○ Todas as conversas abertas</div>
+                    <div>○ Escolher conversas</div>
+                  </div>
+                </div>
+                <div class="modal-actions" style="margin-top:12px">
+                  <span class="mbtn">Cancelar</span>
+                  <span class="mbtn primary">Salvar configuração</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><span class="tag-repro">reprodução</span> Modal de configuração do autosave.</figcaption>
+      </figure>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <section id="seguranca">
+      <h2><span class="step-n">9</span>Onde a chave fica e o que a UFVAI faz com ela</h2>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>Pergunta</th><th>Resposta</th></tr></thead>
+          <tbody>
+            <tr><td>A chave é enviada a terceiros pela UFVAI?</td><td><b>Não.</b> Ela vai apenas ao provedor que a emitiu, quando o motor faz a chamada.</td></tr>
+            <tr><td>Onde ela é gravada?</td><td><b>Cifrada</b> em <code>backups/keys_store.json</code> — no Google Drive (Colab) ou em <code>~/PesquisAI</code> (offline).</td></tr>
+            <tr><td>Aparece na tela?</td><td>Só mascarada, depois de salva. No formulário você cola; a lista mostra os primeiros caracteres.</td></tr>
+            <tr><td>Como revogar?</td><td>Apague no painel do provedor <b>e</b> remova no UFVAI (🔌 Provedores) para o motor parar de usá-la.</td></tr>
+            <tr><td>Posso compartilhar o notebook?</td><td>O notebook publicado usa <b>a sua</b> sessão do Colab e o <b>seu</b> Drive. Ainda assim, não cole chaves em células nem em prints.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout danger">
+        <b>Nunca</b> cole a chave em: mensagens de chat, issues do GitHub, capturas de tela, arquivos
+        <code>.md</code> do vault ou variáveis commitadas. Se uma chave vazar, revogue imediatamente no
+        provedor — a UFVAI não tem como “cancelar” uma chave que não emitiu.
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <section id="problemas">
+      <h2><span class="step-n">10</span>Problemas comuns</h2>
+
+      <details open>
+        <summary>“Nenhum modelo gratuito listado (verifique a chave do provedor)”</summary>
+        <div class="ans">
+          O seletor só mostra o que o <b>motor</b> enxerga. Verifique, nesta ordem:
+          (1) a chave daquele provedor está salva? (2) o motor já reiniciou com a chave nova?
+          (3) o catálogo do provedor realmente tem modelos gratuitos naquele momento?
+          Rode <code>python3 scripts/diag_keys_v22.py</code> para ver store × serviço.
+        </div>
+      </details>
+
+      <details>
+        <summary>“Escolha um modelo gratuito (OpenRouter :free ou NVIDIA)”</summary>
+        <div class="ans">
+          O botão de modelo padrão recusa identificadores pagos. Use um id com sufixo <code>:free</code>,
+          o roteador <code>openrouter/free</code>, ou um <code>nvidia/…</code> do catálogo.
+        </div>
+      </details>
+
+      <details>
+        <summary>A chave foi aceita, mas a primeira resposta falha</summary>
+        <div class="ans">
+          Costuma ser <b>limite do provedor</b> (requisições por minuto/dia) ou modelo indisponível na
+          região. Troque para outro modelo gratuito no seletor. Os limites são definidos pelo provedor e
+          a UFVAI não tem como aumentá-los.
+        </div>
+      </details>
+
+      <details>
+        <summary>Erro de chave inválida logo após colar</summary>
+        <div class="ans">
+          Quase sempre é cópia truncada (o campo perde o fim) ou espaços nas pontas. Apague no UFVAI,
+          copie de novo no painel do provedor e cole com <b>Ctrl+Shift+V</b> (colar sem formatação).
+        </div>
+      </details>
+
+      <details>
+        <summary>Troquei de notebook/instalação e as chaves não vieram</summary>
+        <div class="ans">
+          Elas vivem no <code>backups/</code> do <b>seu</b> Drive (ou <code>~/PesquisAI</code>). Se você
+          trocou de conta Google, o store antigo não é encontrado. Refaça o passo 5 — leva menos de um minuto.
+        </div>
+      </details>
+
+      <details>
+        <summary>Quero apagar tudo e começar de novo</summary>
+        <div class="ans">
+          Remova cada provedor em <b>🔌 Provedores</b>. O UFVAI reergue o serviço sem aquelas variáveis.
+          No provedor, revogue as chaves antigas para que não fiquem válidas.
+        </div>
+      </details>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════ -->
+    <section id="pago">
+      <h2><span class="step-n">11</span>Se precisar de mais: a opção paga</h2>
+      <p>Os modelos gratuitos têm limites e podem variar de disponibilidade. Para uso intenso, o
+      <b>OpenCode Go</b> é a opção paga do ecossistema — a chave entra pelo mesmo modal de Provedores.</p>
+      <p><a href="https://opencode.ai/go" target="_blank" rel="noopener">→ opencode.ai/go</a></p>
+      <div class="callout">
+        O UFVAI <b>não intermedeia</b> pagamento, não cobra e não garante o serviço de terceiros.
+        Preço, limites e termos são do provedor.
+      </div>
+    </section>
+
+    <hr class="sep">
+
+    <section id="links">
+      <h2>Links úteis</h2>
+      <ul>
+        <li><a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter — API Keys</a></li>
+        <li><a href="https://build.nvidia.com" target="_blank" rel="noopener">NVIDIA — Build (catálogo e API keys)</a></li>
+        <li><a href="https://opencode.ai/go" target="_blank" rel="noopener">OpenCode Go (pago)</a></li>
+        <li><a href="CHAVES_API.md">CHAVES_API.md — versão curta deste guia</a></li>
+        <li><a href="../MANUAL.md">MANUAL.md — manual completo do UFVAI</a></li>
+      </ul>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  <div class="brandline"><b>UFV<span style="color:var(--accent)">AI</span></b> · v0.7.9 · “Chaves gratuitas, modelo padrão e autosave configurável”</div>
+  Universidade Federal de Viçosa (UFV) · Registro SisPPG/UFV nº 10356285004 · Licença MIT<br>
+  Guia gerado a partir de <code>docs/CHAVES_API.md</code> e da interface da v0.7.9 ·
+  <a href="https://github.com/gustavobraga-byte/PesquisAI" target="_blank" rel="noopener">github.com/gustavobraga-byte/PesquisAI</a>
+</footer>
+
+<script>
+  (function(){
+    var root = document.documentElement;
+    var btn = document.getElementById('themeBtn');
+    var icon = document.getElementById('themeIcon');
+    var label = document.getElementById('themeLabel');
+    function apply(t){
+      root.setAttribute('data-theme', t);
+      var light = t === 'light';
+      icon.textContent = light ? '☾' : '◐';
+      label.textContent = light ? 'Tema escuro' : 'Tema claro';
+      try { localStorage.setItem('ufvai_guide_theme', t); } catch(e){}
+    }
+    var saved = null;
+    try { saved = localStorage.getItem('ufvai_guide_theme'); } catch(e){}
+    apply(saved === 'light' ? 'light' : 'dark');
+    btn.addEventListener('click', function(){
+      apply(root.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+    });
+  })();
+</script>
+</body>
+</html>
