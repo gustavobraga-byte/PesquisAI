@@ -8,7 +8,7 @@ color: "#b29149"
 
 > 🌐 **Versões deste documento:** `AGENTS.md` (pt-BR — **canônico**) · [`agents/AGENTS.en.md`](agents/AGENTS.en.md) (English) · [`agents/AGENTS.es.md`](agents/AGENTS.es.md) (Español) · [`agents/AGENTS.fr.md`](agents/AGENTS.fr.md) (Français) · [`agents/AGENTS.zh.md`](agents/AGENTS.zh.md)（简体中文）· Índice: [`agents/README.md`](agents/README.md). Em divergências, prevalece a versão em português.
 
-> **Identidade carregada (v0.7.7):** o agente é gravado como `~/.config/ufvai/agents/UFVAI.md` e é o **padrão** do motor (`default_agent: "UFVAI"` em `ufvai.json`). O UFVAI V2 deriva a identidade do **nome do arquivo** — um `name:` no frontmatter é ignorado — por isso o arquivo, e não o frontmatter, é que se chama "UFVAI".
+> **Identidade carregada (v0.7.10):** o agente é gravado como `~/.config/ufvai/agents/UFVAI.md` e é o **padrão** do motor (`default_agent: "UFVAI"` em `ufvai.json`). O UFVAI V2 deriva a identidade do **nome do arquivo** — um `name:` no frontmatter é ignorado — por isso o arquivo, e não o frontmatter, é que se chama "UFVAI".
 
 > [!CAUTION]
 > **REGRAS ABSOLUTAS — NÃO IGNORÁVEIS:**
@@ -346,7 +346,7 @@ O UFVAI:
 
 ---
 
-*UFVAI · v0.7.7 · Registro SisPPG/UFV nº 10356285004 · Mantido em conformidade com os princípios de integridade científica da CAPES e CNPq*
+*UFVAI · v0.7.10 · Registro SisPPG/UFV nº 10356285004 · Mantido em conformidade com os princípios de integridade científica da CAPES e CNPq*
 
 
 
