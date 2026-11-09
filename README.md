@@ -1,3 +1,5 @@
+
+
 <div align="center">
 
 ![UFVAI](assets/logo.svg#gh-light-mode-only)
@@ -7,15 +9,15 @@
 
 **Agente de IA para pesquisa científica · Universidade Federal de Viçosa**
 
-[![Site oficial](https://img.shields.io/badge/🌐_Site-ufvaisite-2E3242?style=for-the-badge)](https://gustavobraga-byte.github.io/ufvaisite/)
-[![Abrir no Colab](https://img.shields.io/badge/▶️_Começar_agora-Google_Colab-brightgreen?style=for-the-badge)](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb)
-[![Apresentação](https://img.shields.io/badge/📊_Slides-ver_apresentação-C9A227?style=for-the-badge)](https://gustavobraga-byte.github.io/ufvaisite/#apresentacao)
+[![Site oficial](https://img.shields.io/badge/🌐_Site-ufvaisite-2E3242?style=for-the-badge)](https://der.ufv.br/ufvai/)
+[![Abrir no Colab](https://img.shields.io/badge/▶️_Começar_agora-Google_Colab-brightgreen?style=for-the-badge)](https://colab.research.google.com/github/gustavobraga-byte/versaoteste/blob/main/PesquisAI.ipynb)
+[![Apresentação](https://img.shields.io/badge/📊_Slides-ver_apresentação-C9A227?style=for-the-badge)](https://der.ufv.br/ufvai/#apresentacao)
 
-[![Versão](https://img.shields.io/badge/versão-0.7.7-orange.svg)]() [![Licença MIT](https://img.shields.io/badge/licença-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![SisPPG/UFV](https://img.shields.io/badge/SisPPG-10356285004-blue.svg)](http://sisppg.ufv.br) [![LGPD](https://img.shields.io/badge/LGPD-conforme-success.svg)](PRIVACY.md)
+[![Versão](https://img.shields.io/badge/versão-0.7.11-orange.svg)]() [![Licença MIT](https://img.shields.io/badge/licença-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![SisPPG/UFV](https://img.shields.io/badge/SisPPG-10356285004-blue.svg)](http://sisppg.ufv.br) [![LGPD](https://img.shields.io/badge/LGPD-conforme-success.svg)](PRIVACY.md)
 
 > Consulta dados oficiais do Brasil e literatura validada, cita cada fonte e declara honestamente quando não há evidência suficiente.
 
-[🌐 Site](https://gustavobraga-byte.github.io/ufvaisite/) · [📓 Colab](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb) · [📘 Manual](MANUAL.md) · [📜 Termos v3](docs/TERMS_OF_USE.md) · [🔒 Privacidade v1.1](PRIVACY.md) · [📊 Telemetria](TELEMETRY.md) · [📝 Changelog](CHANGELOG.md)
+[🌐 Site](https://der.ufv.br/ufvai/) · [📓 Colab](https://colab.research.google.com/github/gustavobraga-byte/versaoteste/blob/main/PesquisAI.ipynb) · [📘 Manual](MANUAL.md) · [📜 Termos v3](docs/TERMS_OF_USE.md) · [🔒 Privacidade v1.1](PRIVACY.md) · [📊 Telemetria](TELEMETRY.md) · [📝 Changelog](CHANGELOG.md)
 
 </div>
 
@@ -53,7 +55,7 @@ O **UFVAI** (marca) roda sobre o motor **PesquisAI** (este código, arquitetura 
 
 > 🚨 **Atenção:** ferramenta de apoio — **não substitui** revisão por pares nem o julgamento humano. Sempre revise. Sugira a [Declaração de Uso de IA](declaracao_uso_ia.md) nas entregas finais.
 
-📖 **Conheça em 2 minutos:** [site oficial](https://gustavobraga-byte.github.io/ufvaisite/) (demonstração animada do boot → Termos → tela principal) · [slides](https://gustavobraga-byte.github.io/ufvaisite/#apresentacao) · [vídeo tutorial](https://www.youtube.com/watch?v=8e8spp_7Gq4).
+📖 **Conheça em 2 minutos:** [site oficial](https://der.ufv.br/ufvai/) (demonstração animada do boot → Termos → tela principal) · [slides](https://der.ufv.br/ufvai/#apresentacao) · [vídeo tutorial](https://www.youtube.com/watch?v=8e8spp_7Gq4).
 
 ---
 
@@ -78,7 +80,7 @@ O **UFVAI** (marca) roda sobre o motor **PesquisAI** (este código, arquitetura 
 
 ### Opção 1 — Google Colab (recomendada, ~2 min)
 
-1. Clique em **Começar agora** (badge no topo) ou acesse o [notebook](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb);
+1. Clique em **Começar agora** (badge no topo) ou acesse o [notebook](https://colab.research.google.com/github/gustavobraga-byte/versaoteste/blob/main/PesquisAI.ipynb);
 2. No Colab: **Ambiente de execução → Executar tudo** (`Ctrl+F9`);
 3. Aguarde a tela com a logomarca do UFVAI (~2 min) e clique em **ABRIR O UFVAI**;
 4. Na primeira vez: aceite os **Termos v2.2** informando **nome + e-mail** (LGPD art. 7º, V). Nas próximas: **"Bem-vindo de volta"** → *Continuar* (registra 1 linha `usuario_ativo` por clique).
@@ -86,7 +88,7 @@ O **UFVAI** (marca) roda sobre o motor **PesquisAI** (este código, arquitetura 
 ### Opção 2 — Local (`uv`, desenvolvedores)
 
 ```bash
-git clone https://github.com/gustavobraga-byte/PesquisAI.git
+git clone https://github.com/gustavobraga-byte/versaoteste.git
 cd PesquisAI
 uv sync
 # consulte o MANUAL.md para detalhes
@@ -99,20 +101,29 @@ uv sync
 Funciona **100% offline** em Debian/Ubuntu com LLM local (Ollama). Ideal para sigilo ou sem internet.
 
 ```bash
-wget https://github.com/gustavobraga-byte/PesquisAI/raw/main/debs/pesquisai_0.6.17-offline_amd64.deb -O /tmp/pesquisai.deb && \
+# amd64 (x86_64)
+wget https://github.com/gustavobraga-byte/versaoteste/raw/main/debs/pesquisai_0.7.11-web2_amd64.deb -O /tmp/pesquisai.deb && \
 sudo apt install /tmp/pesquisai.deb -y && rm /tmp/pesquisai.deb
-pesquisai
+
+ufvai --doctor          # confere Python, ttyd, motor e portas
+ufvai --engine-install  # instala o motor OpenCode 2.x (sem sudo)
+ufvai                   # abre a interface em http://localhost:8001
 ```
 
-> ℹ️ **`.deb`:** o pacote publicado no GitHub ainda é o **0.6.17** — o release **0.7.2** ainda não foi empacotado como `.deb`. Para a versão atual, use o boot no Colab ou o pacote do Drive (`UFVAI-v0.7.2/`).
+> ℹ️ **`.deb` 0.7.11 (06/11/2026):** empacotado a partir da árvore **0.7.11** e validado
+> contra o **OpenCode 2.2.5** (motor V2). Há pacotes **amd64** e **arm64**; o ttyd vai
+> embutido e as dependências Python vêm do `apt` (sem `pip` no postinst). O motor
+> **não** é embutido (~240 MB) — instale com `ufvai --engine-install`.
 
 
 
 | Requisito | Especificação |
 |-----------|---------------|
-| **SO** | Debian 10+ / Ubuntu 22.04+ (amd64) |
+| **SO** | Debian 11+ / Ubuntu 22.04+ (amd64 ou arm64) |
+| **Python** | 3.10+ (`python3`, `python3-cryptography`, `python3-requests`, `python3-bs4`, `python3-yaml`) |
+| **Motor** | OpenCode V2 (2.2.x; validado em 2.2.5) |
 | **RAM** | 4 GB mín. · 8 GB+ recomendado (16 GB+ p/ contexto 262k) |
-| **Disco** | 500 MB livres |
+| **Disco** | 500 MB livres (+ ~250 MB do motor) |
 | **Portas** | `8000` (terminal) · `8001` (interface) · `11434` (Ollama) |
 
 ```bash
@@ -150,13 +161,20 @@ O agente opera por *skills* — cada uma conecta a uma fonte ou capacidade.
 
 ## 🆕 Novidades
 
-**v0.7.7 — 🔒 Drive Guard: o agente só acessa “My Drive” dentro de `PesquisAI/` — e a regra vale também com `--auto`** (três camadas: `permissions` com `deny` final no `opencode.json` + hooks `permission.evaluate` e `tool.execute.before`) · 🔗 alias `MyDrive`, `..`, `file://` e comandos de shell resolvidos · 📝 auditoria em `~/.local/state/ufvai/drive-guard.log`.
+**v0.7.11 — 🛡 VPN da UFV no Colab (OpenVPN em namespace isolado)** — o servidor do Colab passa a alcançar a rede da UFV pela VPN institucional sem `CAP_NET_ADMIN`: **OpenVPN dentro de user+net namespace** + `slirp4netns` + **proxy SOCKS5 local** (`socks5h://127.0.0.1:1081`). Na abertura, a tela **“Você é aluno(a) da UFV?”** leva ao painel de **CPF + senha** do portal `vpn.ufvnet.ufv.br`; a senha nunca vai para logs e, se “lembrar”, fica **cifrada no Drive**. Split tunnel (só a rede da UFV), aviso de **1 dispositivo por CPF** e teste de acesso interno (`sistemas.ufv.br`). **Modo total** opcional: com `redirect-gateway`, o serviço do OpenCode + terminal rodam dentro do namespace e todo o agente sai pela UFV; **encaminhador de porta** para um modelo local (Ollama/vLLM) da intranet (`127.0.0.1:11435` → `10.0.0.10:11434`). No onboarding, **Google Gemini** entra no seletor **🎛️ Modelo gratuito padrão** e uma opção **“Outro provedor”** lista **OpenAI, Anthropic, Groq, Mistral, DeepSeek, Together, Fireworks, xAI e Cohere** para colar a própria chave. A pergunta da VPN vem **antes** do provedor/chave. Guia: [`docs/VPN_UFV.md`](docs/VPN_UFV.md).
+
+**v0.7.10 — 🧭 Onboarding de primeiro uso (provedor + chave)** — sem chave, depois dos Termos o usuário escolhe **já tenho** ou **não tenho / não sei**; opções **Google Gemini (recomendado)**, **NVIDIA**, **OpenRouter** e **OpenCode Go (pago)** com tutorial, link e campo de colar; chave do Google → `GOOGLE_GENERATIVE_AI_API_KEY` e modelo padrão **Gemini Flash-Lite Latest · high**; plugin de **retry automático** em 429 (espera ~62 s).
+
 
 <details>
 <summary>Histórico completo (0.7.x → 0.6.0)</summary>
 
 | Versão | Data | Destaques |
 |--------|------|-----------|
+| **0.7.11** | 06/11/2026 | 🛡 **VPN da UFV no Colab** — OpenVPN em **namespace isolado** (`unshare -Urn` + `slirp4netns`) + **SOCKS5** em `127.0.0.1:1081`; tela inicial **“Você é aluno(a) da UFV?”** e painel **CPF/senha**; credenciais cifradas opcionais; split tunnel e aviso de 1 dispositivo por CPF (`GET /api/vpn`, `POST /api/vpn/*`) |
+| **0.7.10** | 05/11/2026 | 🧭 **Onboarding de primeiro uso** — depois dos Termos, o usuário sem chave escolhe **"já tenho provedor"** ou **"não tenho / não sei"**; as opções trazem **Google Gemini (recomendado, grátis)**, **NVIDIA**, **OpenRouter** e **OpenCode Go (pago)**, cada uma com tutorial, link e campo para colar a chave; chave do Google vira `GOOGLE_GENERATIVE_AI_API_KEY` e o padrão é o **Gemini Flash-Lite Latest · high** (`GET /api/onboarding`, `POST /api/onboarding/key`) |
+| **0.7.9** | 04/11/2026 | 🔑 **Chaves de API e free tier** — o modal de Provedores mostra **como obter chave gratuita** (OpenRouter `:free` e NVIDIA) quando não há nenhuma salva; **seletor de gratuitos** e **modelo padrão** (`/api/free_models`, `/api/default_model`); aviso de responsabilidade na abertura ([`docs/CHAVES_API.md`](docs/CHAVES_API.md) · [guia visual em HTML](docs/chaves-api-tutorial.html)) · 💾 **⚙ Autosave** com intervalo (1–60 min) e escopo (ativa / todas / escolhidas) |
+| **0.7.8** | 29/10/2026 | 🔑 **Chaves do Drive no serviço do motor (OpenCode v2.2)** — `ensure_service_project_dir()` injeta as chaves no `env` do `opencode serve` e no boot; **auto-cura** reinicia o serviço nascido sem chaves; salvar/remover chave reergue o serviço já atualizado; `scripts/diag_keys_v22.py` · ⌨️ **Ctrl+C copia / Ctrl+V cola** no terminal (ttyd + xterm.js), com arrasto→seleção sob *mouse reporting* |
 | **0.7.7** | 27/10/2026 | 🔒 **Drive Guard** — o agente não acessa mais “My Drive” fora de `My Drive/PesquisAI` (nem com `--auto`): regras `permissions` com `deny` **final** + hooks `permission.evaluate` e `tool.execute.before`; alias `MyDrive`, `..`, `file://`, `~` e comandos de shell resolvidos; falha fechada em referência ofuscada; auditoria em `~/.local/state/ufvai/drive-guard.log` |
 | **0.7.6** | 24/10/2026 | 🏷️ **Rebrand do agente: opencode → ufvai** — as Diretrizes (`AGENTS.md` + `agents/*` nos 5 idiomas + **novo** `agents/UFVAI.md`) agora se referem ao motor como **UFVAI** em todos os caminhos e comandos (`~/.config/ufvai/`, `ufvai.json`, `~/.local/share/ufvai/`, `ufvai auth export`); novo `scripts/ufvai-alias.sh` cria os symlinks e o comando `ufvai` por cima do motor físico, sem tocar no runtime (banco/crédenciais intactos) |
 | **0.7.5** | 23/10/2026 | 🪟 **Telas de abertura e retomada uma vez por sessão** — a marca "já mostrei" passou a ser gravada em **três camadas** (sessionStorage + localStorage com 12 h + cookie de sessão), **antes** de exibir; recargas internas não a consomem e o botão **↻** reoferece a pergunta · 🧊 **`Cache-Control: no-store`** no HTML (o navegador não reutiliza o JS antigo) |
@@ -188,7 +206,7 @@ O agente opera por *skills* — cada uma conecta a uma fonte ou capacidade.
 
 </details>
 
-Histórico detalhado: [`CHANGELOG.md`](CHANGELOG.md) · Novidades do site: [ufvaisite/#novidades](https://gustavobraga-byte.github.io/ufvaisite/#novidades).
+Histórico detalhado: [`CHANGELOG.md`](CHANGELOG.md) · Novidades do site: [ufvaisite/#novidades](https://der.ufv.br/ufvai/#novidades).
 
 ---
 
@@ -224,8 +242,8 @@ Interface web `:8001` (Colab) com tela de Termos v2.2 (nome+e-mail+IP, opt-out) 
 
 ```
 BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.7.7. Viçosa: Universidade Federal de Viçosa, 2026.
-Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
+científica. Versão 0.7.11. Viçosa: Universidade Federal de Viçosa, 2026.
+Disponível em: https://colab.research.google.com/github/gustavobraga-byte/versaoteste/.
 Acesso em: DD mês. AAAA.
 
 Projeto registrado no SisPPG/UFV sob nº 10356285004.
@@ -240,13 +258,13 @@ Verificar autenticidade em: http://sisppg.ufv.br
   title        = {{UFVAI}: Agente de Intelig{\^e}ncia Artificial
                   para Pesquisa Cient{\'\i}fica},
   year         = {2026},
-  version      = {0.7.7},
+  version      = {0.7.11},
   institution  = {Universidade Federal de Vi{\c{c}}osa (UFV)},
-  url          = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/}
+  url          = {https://colab.research.google.com/github/gustavobraga-byte/versaoteste/}
 }
 ```
 
-Site para divulgar: `https://gustavobraga-byte.github.io/ufvaisite/`. Modelos de declaração de IA: [`declaracao_uso_ia.md`](declaracao_uso_ia.md). Como citar dados: [`citacao_pesquisai.md`](citacao_pesquisai.md).
+Site para divulgar: `https://der.ufv.br/ufvai/`. Modelos de declaração de IA: [`declaracao_uso_ia.md`](declaracao_uso_ia.md). Como citar dados: [`citacao_pesquisai.md`](citacao_pesquisai.md).
 
 ---
 
@@ -307,12 +325,12 @@ Desenvolvido por **Gustavo Bastos Braga** — Universidade Federal de Viçosa (D
 
 - ✉️ gustavo.braga@ufv.br
 - 🐙 [@gustavobraga-byte](https://github.com/gustavobraga-byte)
-- 🌐 [Site oficial](https://gustavobraga-byte.github.io/ufvaisite/)
+- 🌐 [Site oficial](https://der.ufv.br/ufvai/)
 
 ---
 
 <div align="center">
 
-Feito com 💙 para impulsionar a ciência brasileira · UFVAI v0.7.7 · SisPPG/UFV nº 10356285004
+Feito com 💙 para impulsionar a ciência brasileira · UFVAI v0.7.11 · SisPPG/UFV nº 10356285004
 
 </div>

@@ -74,6 +74,7 @@ from .opencode_config import (
 )
 from .opencode_utils import find_opencode, reset_opencode_cache
 from .tui_pt import install_pt_plugin
+from .tui_sync import install_sync_plugin
 
 # Descrição do agente UFVAI (aparece na lista de agentes da V2)
 UFVAI_AGENT_DESCRIPTION = (
@@ -369,7 +370,9 @@ def _service_cwd() -> Optional[str]:
 
 
 def ensure_service_project_dir(
-    project_dir: str, timeout_s: float = 20.0, backup_dir: Optional[str] = None
+    project_dir: str, timeout_s: float = 20.0, backup_dir: Optional[str] = None,
+    netns_pid: int | None = None, service_host: str | None = None,
+    service_port: int | None = None,
 ) -> bool:
     """Garante que o serviço do OpenCode nasça com cwd E chaves do projeto.
 
@@ -402,6 +405,13 @@ def ensure_service_project_dir(
         timeout_s: espera máxima pelo ``service status``.
         backup_dir: pasta das chaves cifradas. Padrão:
             ``<project_dir>/backups`` (com fallback ``~/PesquisAI/backups``).
+        netns_pid: sobe o serviço DENTRO deste network namespace (modo
+            "todo o UFVAI na VPN"). O TUI e o agente passam a sair pela UFV.
+        service_host: endereço de bind do ``opencode serve``. No modo VPN
+            usa-se ``0.0.0.0`` porque o slirp4netns publica a porta no guest
+            IP (10.0.2.100) — ``127.0.0.1`` não é alcançável por ele.
+        service_port: porta fixa do serviço no namespace; o host publica a
+            mesma porta via slirp (``add_hostfwd``) para o wrapper/CLI.
 
     Best-effort: qualquer falha devolve False e o boot segue — os spawns do
     ttyd também passam a usar ``cwd`` explícito (camada 2).
@@ -445,11 +455,40 @@ def ensure_service_project_dir(
         os.environ.update(keys_env)
 
     current = _service_cwd()
+    same_cwd = False
     try:
-        if current and os.path.realpath(current) == os.path.realpath(target) and not missing:
-            return True
+        same_cwd = bool(
+            current and os.path.realpath(current) == os.path.realpath(target)
+        )
     except OSError:
-        pass
+        same_cwd = False
+
+    # v0.7.11: no modo "todo o UFVAI na VPN" o serviço precisa estar no
+    # namespace da VPN, não basta estar no cwd certo. Sem esta checagem, um
+    # serviço do host faria o ensure() retornar cedo e o OpenCode continuaria
+    # fora do túnel.
+    if netns_pid is None:
+        if same_cwd and not missing:
+            return True
+    else:
+        try:
+            target_ns = os.readlink(f"/proc/{int(netns_pid)}/ns/net")
+        except OSError:
+            target_ns = ""
+        pgrep = subprocess.run(
+            ["pgrep", "-f", "opencode serve --service"],
+            capture_output=True, text=True, timeout=5,
+        )
+        in_ns = False
+        for pid in (pgrep.stdout or "").split():
+            try:
+                if os.readlink(f"/proc/{pid}/ns/net") == target_ns:
+                    in_ns = True
+                    break
+            except OSError:
+                continue
+        if in_ns and same_cwd and not missing:
+            return True
 
     if missing:
         logger.info(
@@ -464,19 +503,49 @@ def ensure_service_project_dir(
         logger.debug("ensure_service_project_dir: opencode indisponível (%s)", exc)
         return False
 
+    # v0.7.11: modo "todo o UFVAI na VPN" — o serviço nasce dentro do
+    # namespace (mount+net) da VPN; o TUI, no mesmo namespace, o alcança em
+    # 127.0.0.1 e todo o tráfego dele (LLM + ferramentas) sai pela UFV.
+    _prefix = (
+        ["nsenter", "-t", str(netns_pid), "-m", "-n"] if netns_pid else []
+    )
+
+    # v0.7.11: bind publicado pelo slirp4netns. O `serve` precisa escutar em
+    # 0.0.0.0 para o hostfwd (guest 10.0.2.100:<porta>) alcançar o serviço;
+    # a porta é fixa para o wrapper/CLI do host reutilizarem service.json.
+    serve_cmd = [opencode_bin, "serve", "--service"]
+    if service_host:
+        serve_cmd += ["--hostname", str(service_host)]
+    if service_port:
+        serve_cmd += ["--port", str(int(service_port))]
+
+    # Fora do namespace, o stop é local. Dentro dele, o service.json ainda
+    # aponta para o serviço antigo do host (inacessível pelo guest), então o
+    # stop é feito pelo chamador antes de entrar no namespace.
+    stop_prefix = _prefix if netns_pid is None else []
     try:
         subprocess.run(
-            [opencode_bin, "service", "stop"],
+            stop_prefix + [opencode_bin, "service", "stop"],
             capture_output=True, text=True, timeout=10,
         )
     except Exception as exc:  # noqa: BLE001 — serviço ausente é o caso normal
         logger.debug("ensure_service_project_dir: service stop falhou (%s)", exc)
 
+    env = build_env(keys_env)
+    if netns_pid:
+        # O roteamento é do namespace (tun0). Variáveis de proxy herdadas do
+        # Colab apontariam para portas que não existem lá dentro.
+        for _proxy_key in (
+            "ALL_PROXY", "all_proxy", "HTTP_PROXY", "http_proxy",
+            "HTTPS_PROXY", "https_proxy", "NO_PROXY", "no_proxy",
+        ):
+            env.pop(_proxy_key, None)
+
     try:
         subprocess.Popen(
-            [opencode_bin, "serve", "--service"],
+            _prefix + serve_cmd,
             cwd=target,
-            env=build_env(keys_env),
+            env=env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             start_new_session=True,
@@ -489,7 +558,7 @@ def ensure_service_project_dir(
     while time.monotonic() < deadline:
         try:
             status = subprocess.run(
-                [opencode_bin, "service", "status"],
+                _prefix + [opencode_bin, "service", "status"],
                 capture_output=True, text=True, timeout=3,
             )
             if (status.stdout or "").strip().startswith("http"):
@@ -547,11 +616,17 @@ def _install_opencode_if_missing() -> bool:
         logger.info("Sem rede — pulando instalação do opencode (já ausente, segue sem)")
         return False
 
-    for cmd in [
+    _installers = []
+    # No .deb, o instalador versionado/validado é mais confiável que o
+    # `curl | bash` (baixa para /tmp, confere o binário e não mexe no PATH).
+    if os.path.exists("/usr/bin/ufvai-engine"):
+        _installers.append("/usr/bin/ufvai-engine")
+    _installers += [
         f"curl -fsSL {OPENCODE_INSTALL_V2} | bash",
         # fallback: pacote npm oficial do CLI V2 (@opencode/cli)
         "npm install -g @opencode/cli",
-    ]:
+    ]
+    for cmd in _installers:
         r = _run(cmd, check=False)
         # OpenCode V2: o cache do binário pode apontar para o V1 antigo
         reset_opencode_cache()
@@ -1053,6 +1128,15 @@ def _setup_theme_and_agent() -> None:
         logger.warning(f"Plugin PT da TUI não pôde ser instalado: {exc}")
         pt_plugin_dir = ""
 
+    # ── Plugin de sincronização TUI ↔ web (v0.7.11-web9) ─────────────
+    # A TUI publica a sessão que está exibindo; o proxy faz push à web.
+    # Sem este plugin o proxy cai no modo anterior (eventos + polling).
+    try:
+        sync_plugin_dir = install_sync_plugin()
+    except OSError as exc:
+        logger.warning(f"Plugin de sincronização da TUI não pôde ser instalado: {exc}")
+        sync_plugin_dir = ""
+
     # ── cli.json: nome e modo do tema (preserva a escolha do usuário) ──
     ok_cli, existing_cli = load_json_config(CLI_JSON)
     if ok_cli:
@@ -1073,6 +1157,9 @@ def _setup_theme_and_agent() -> None:
         if pt_plugin_dir:
             # Habilita o plugin PT (idempotente; preserva plugins do usuário).
             merged_cli = merge_cli_plugins(merged_cli, pt_plugin_dir)
+        if sync_plugin_dir:
+            # Habilita o plugin de sincronização (idempotente).
+            merged_cli = merge_cli_plugins(merged_cli, sync_plugin_dir)
         write_json_atomic(CLI_JSON, merged_cli)
     else:
         logger.warning("cli.json não pôde ser lido; tema do terminal mantido como está.")
@@ -1117,7 +1204,11 @@ def _setup_theme_and_agent() -> None:
 def setup_dependencies() -> None:
     """Instala todas as dependências (OpenCode, sistema, Python, tema)."""
     progress(2, 4, "Instalando OpenCode, dependências de sistema e tema...")
-    _install_opencode_if_missing()
+    if not _install_opencode_if_missing():
+        logger.error(
+            "Motor OpenCode 2.x não instalado — a interface sobe, mas o "
+            "terminal só funciona após 'ufvai --engine-install'."
+        )
     _install_system_deps()
     _install_python_deps()
     _setup_theme_and_agent()
@@ -1467,8 +1558,29 @@ def run() -> None:
     # o painel de boot da logomarca (display "ufvai_boot_panel") já comunica
     # marca, versão e progresso desde o primeiro segundo do carregamento.
 
-    folder_path, drive_url = setup_drive()
-    setup_dependencies()
+    # v0.7.11-web9: boot fail-open — uma dependência ausente num computador
+    # novo não pode impedir a interface de subir.
+    try:
+        folder_path, drive_url = setup_drive()
+    except Exception as _drive_exc:  # noqa: BLE001
+        logger.exception("setup_drive falhou (%s); usando ~/PesquisAI", _drive_exc)
+        folder_path = os.path.join(os.path.expanduser("~"), "PesquisAI")
+        drive_url = "https://drive.google.com/drive/my-drive"
+        try:
+            os.makedirs(folder_path, exist_ok=True)
+        except OSError:
+            pass
+    try:
+        setup_dependencies()
+    except Exception as _deps_exc:  # noqa: BLE001
+        logger.exception("setup_dependencies falhou (%s) — seguindo", _deps_exc)
+    # v0.7.11: remove restos de uma conexão VPN de um boot anterior (o
+    # namespace/OpenVPN/SOCKS não sobrevivem ao reinício do runtime).
+    try:
+        from . import vpn as _vpn
+        _vpn.cleanup_stale()
+    except Exception as _vpn_exc:  # noqa: BLE001
+        logger.debug("VPN: cleanup_stale falhou (%s)", _vpn_exc)
     # v0.7.7 (27/10/2026 — SEM bump): o serviço do motor nasce no PesquisAI,
     # não em /root — é dele que as sessões herdam o diretório de projeto.
     # v0.7.10: sem chave, o motor NÃO nasce — o onboarding espera a chave.
@@ -1480,10 +1592,19 @@ def run() -> None:
     if _skip_engine:
         logger.info("Onboarding pendente: serviço do motor não iniciado (sem chave).")
     else:
-        ensure_service_project_dir(folder_path)
-    setup_skills()
-    setup_custom_skills()  # v0.6.18: skills personalizadas do usuário
-    setup_obsidian_vault()
+        try:
+            ensure_service_project_dir(folder_path)
+        except Exception as _svc_exc:  # noqa: BLE001
+            logger.exception("ensure_service_project_dir falhou (%s)", _svc_exc)
+    for _nome, _fn in (
+        ("setup_skills", setup_skills),
+        ("setup_custom_skills", setup_custom_skills),
+        ("setup_obsidian_vault", setup_obsidian_vault),
+    ):
+        try:
+            _fn()
+        except Exception as _step_exc:  # noqa: BLE001
+            logger.exception("%s falhou (%s) — seguindo", _nome, _step_exc)
     banner_url = setup_launch(folder_path, drive_url)
 
     # v0.6.9-5: desliga tela de carregamento após wrapper subir (carência 6s)

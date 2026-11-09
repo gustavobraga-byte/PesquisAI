@@ -77,6 +77,17 @@ LEGACY_THEME_FILES: tuple[str, ...] = ("pesquisai-light.json",)
 # ── Portas ─────────────────────────────────────────────────
 TERMINAL_PORT: int = 8000
 WRAPPER_PORT: int = 8001
+# v0.7.11-web: proxy da SPA do OpenCode (interface web no lugar do ttyd)
+OCWEB_PORT: int = 8002
+# v0.7.11-web3: sessão atual (a SPA abre direto nela)
+CURRENT_SESSION_FILE: str = "/tmp/ufvai-current-session"
+# v0.7.11-web8: sessão em execução ativa (terminal → web em tempo real)
+ACTIVE_SESSION_FILE: str = "/tmp/ufvai-active-session"
+# v0.7.11-web9: a TUI (plugin) publica aqui a sessão que está exibindo;
+# o proxy repassa isso à web por SSE (push em tempo real).
+FOCUS_FILE: str = "/tmp/ufvai-focus.json"
+# Foco escolhido na web; o plugin da TUI segue (web → terminal).
+WEB_FOCUS_FILE: str = "/tmp/ufvai-web-focus.json"
 
 # ── Skills registradas ─────────────────────────────────────
 # Formato: (repo_url, nome_destino, requerida)

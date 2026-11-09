@@ -27,7 +27,7 @@ except ImportError:
 
 from .constants import (
     TERMINAL_PORT, WRAPPER_PORT, WRAPPER_DIR, VERSION, TUI_JSON, CLI_JSON,
-    OPENCODE_DB_PATH, logger,
+    OPENCODE_DB_PATH, OCWEB_PORT, CURRENT_SESSION_FILE, logger,
 )
 from .jokes import next_joke
 from .opencode_config import (
@@ -132,6 +132,187 @@ def _set_lang_only(lang: str, source: str = "browser") -> None:
     _sync_terminal_locale(lang)
 
 
+def _persist_current_session(session_id: str | None) -> None:
+    """Grava a sessão que a interface web deve abrir (lida por ocweb)."""
+    try:
+        sid = str(session_id or "").strip()
+        if sid:
+            tmp = f"{CURRENT_SESSION_FILE}.{os.getpid()}.tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                fh.write(sid)
+            os.replace(tmp, CURRENT_SESSION_FILE)
+        elif os.path.exists(CURRENT_SESSION_FILE):
+            os.remove(CURRENT_SESSION_FILE)
+    except OSError:
+        pass
+
+
+def _engine_api(method: str, path: str, payload: dict | None = None,
+                timeout: float = 4.0):
+    """Chamada autenticada ao serviço local do OpenCode (``None`` em falha)."""
+    import http.client
+    try:
+        from . import ocweb
+        host, port, password = ocweb.service_info()
+        if not port:
+            return None
+        conn = http.client.HTTPConnection(host, port, timeout=timeout)
+        try:
+            body = None if payload is None else json.dumps(payload).encode("utf-8")
+            headers = {"Authorization": ocweb._basic(password)}
+            if body is not None:
+                headers["Content-Type"] = "application/json"
+            conn.request(method, path, body=body, headers=headers)
+            resp = conn.getresponse()
+            data = resp.read()
+            if resp.status >= 300:
+                return None
+            return json.loads(data.decode("utf-8", "replace")) if data else {}
+        finally:
+            conn.close()
+    except (OSError, ValueError):
+        return None
+
+
+def _recover_stale_sessions(max_idle_ms: int = 900_000) -> int:
+    """Interrompe execuções órfãs de um runtime anterior.
+
+    Se o Colab cair no meio de uma resposta, a sessão fica ``busy > idle``
+    para sempre: a SPA mostra "Trabalhando", as mensagens novas entram no
+    inbox e nunca são entregues. Só mexe em execuções com mais de 15 min.
+    """
+    deadline = time.time() + 8.0
+    rows: list = []
+    while time.time() < deadline:
+        listing = _engine_api("GET", "/api/session?limit=50&order=desc")
+        if isinstance(listing, dict) and isinstance(listing.get("data"), list):
+            rows = listing["data"]
+            break
+        time.sleep(0.5)
+    now_ms = int(time.time() * 1000)
+    recovered = 0
+    for row in rows:
+        try:
+            t = row.get("time") or {}
+            busy = int(t.get("busy") or 0)
+            idle = int(t.get("idle") or 0)
+            if busy and busy > idle and now_ms - busy > max_idle_ms:
+                sid = str(row.get("id") or "")
+                if sid and _engine_api(
+                    "POST", f"/api/session/{sid}/interrupt", None
+                ) is not None:
+                    recovered += 1
+        except (TypeError, ValueError):
+            continue
+    if recovered:
+        logger.info("Sessões órfãs interrompidas no boot: %s", recovered)
+    return recovered
+
+
+def _warm_engine_catalog(timeout_s: float = 8.0) -> bool:
+    """Aquece provedores/modelos antes de a SPA abrir a sessão."""
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        try:
+            from . import ocweb
+            data = ocweb.catalog(force=True)
+            if data.get("ready"):
+                logger.info(
+                    "Catálogo do motor pronto: %s modelos, %s provedores",
+                    data.get("models"), data.get("providers"),
+                )
+                return True
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(0.5)
+    logger.warning("Catálogo do motor não ficou pronto em %.0fs", timeout_s)
+    return False
+
+
+def _available_provider_ids() -> set[str]:
+    data = _engine_api("GET", "/api/provider")
+    rows = data.get("data") if isinstance(data, dict) else None
+    return {
+        str(row.get("id"))
+        for row in (rows or [])
+        if isinstance(row, dict) and row.get("id")
+    }
+
+
+def _default_model_ref() -> dict | None:
+    """Modelo padrão do ``opencode.json``; senão o primeiro disponível."""
+    for path in (
+        os.path.expanduser("~/.config/opencode/opencode.json"),
+        os.path.expanduser("~/.config/ufvai/opencode.json"),
+    ):
+        try:
+            cfg = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        model = cfg.get("model")
+        if isinstance(model, str) and "/" in model:
+            provider, model_id = model.split("/", 1)
+            return {"providerID": provider, "modelID": model_id}
+        if isinstance(model, dict) and model.get("providerID") and model.get("modelID"):
+            return {
+                "providerID": str(model["providerID"]),
+                "modelID": str(model["modelID"]),
+            }
+    data = _engine_api("GET", "/api/model")
+    rows = data.get("data") if isinstance(data, dict) else None
+    for row in rows or []:
+        if not isinstance(row, dict) or row.get("enabled") is False:
+            continue
+        if row.get("type") not in (None, "chat"):
+            continue
+        provider = row.get("providerID")
+        model_id = row.get("modelID") or row.get("id")
+        if provider and model_id:
+            return {"providerID": str(provider), "modelID": str(model_id)}
+    return None
+
+
+def _ensure_session_model_available(session_id: str) -> str:
+    """Após um restore, evita sessão presa a provedor que não existe aqui.
+
+    Se o provedor gravado na sessão não está configurado neste ambiente, a
+    lista de modelos fica em branco no seletor. Troca para o modelo padrão.
+    """
+    session = _engine_api("GET", f"/api/session/{session_id}")
+    data = session.get("data") if isinstance(session, dict) else None
+    model = (data or {}).get("model") or {}
+    provider = str(model.get("providerID") or "")
+    if provider and provider in _available_provider_ids():
+        return ""
+    ref = _default_model_ref()
+    if not ref:
+        return ""
+    if _engine_api(
+        "POST", f"/api/session/{session_id}/model", {"model": ref}
+    ) is None:
+        return ""
+    return f"{ref['providerID']}/{ref['modelID']}"
+
+
+def _normalize_session_titles(title: str = "UFVAI") -> int:
+    """Dá nome de marca às sessões sem título (a SPA mostrava "opencode")."""
+    listing = _engine_api("GET", "/api/session?limit=100&order=desc")
+    rows = listing.get("data") if isinstance(listing, dict) else None
+    renamed = 0
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        sid = str(row.get("id") or "")
+        current = str(row.get("title") or "").strip()
+        if not sid or (current and current.lower() != "opencode"):
+            continue
+        if _engine_api("PATCH", f"/api/session/{sid}", {"title": title}) is not None:
+            renamed += 1
+    if renamed:
+        logger.info("Sessões sem título renomeadas para %s: %s", title, renamed)
+    return renamed
+
+
 def _remember_ttyd_session(session_id: str | None) -> None:
     """Registra a sessão que o terminal passou a exibir (restore/comando).
 
@@ -140,6 +321,7 @@ def _remember_ttyd_session(session_id: str | None) -> None:
     global _current_ttyd_session
     sid = str(session_id or "").strip()
     _current_ttyd_session = sid or None
+    _persist_current_session(sid)
     if sid:
         remember_preflight_session(sid)
 
@@ -201,6 +383,11 @@ _RATE: dict[str, list[float]] = {}
 # v0.6.5: handle do ttyd atual — permite matar a ÁRVORE do terminal
 # (ttyd + bash + opencode) por grupo de processo, sem pkill -f global.
 _TTYD_PROC: "subprocess.Popen | None" = None
+# v0.7.11: PID do namespace quando o modo "todo o UFVAI na VPN" está ativo.
+_SYSTEM_MODE_NETNS_PID: "int | None" = None
+# v0.7.11: porta do serviço OpenCode publicada no host pelo slirp quando o
+# modo "todo o UFVAI na VPN" está ativo (hostfwd 127.0.0.1:<porta>).
+_SYSTEM_MODE_SERVICE_PORT: "int | None" = None
 # v0.7.5 (correção 23/10/2026 — SEM bump): sessão que o terminal está
 # exibindo AGORA. Um reinício do ttyd (idioma/chave/keepalive) reabre esta
 # mesma sessão em vez de pré-criar outra — era o que fazia o UFVAI abrir
@@ -425,6 +612,12 @@ def _write_theme(theme_name: str) -> None:
 def install_ttyd() -> None:
     # v0.6.9-5: se ttyd já está bundle no .deb, não tenta apt (evita falha offline)
     import shutil as _shutil
+    # v0.7.11-web9: o .deb instala o ttyd em /opt/pesquisai/bin. Se o app for
+    # iniciado fora do launcher (systemd/atalho), o PATH pode não tê-lo.
+    _bundled_bin = "/opt/pesquisai/bin"
+    if os.path.isfile(os.path.join(_bundled_bin, "ttyd")):
+        if _bundled_bin not in os.environ.get("PATH", "").split(":"):
+            os.environ["PATH"] = _bundled_bin + ":" + os.environ.get("PATH", "")
     if _shutil.which("ttyd") or os.path.isfile("/usr/local/bin/ttyd"):
         print("✅ ttyd já instalado — pulando.")
         return
@@ -1525,7 +1718,9 @@ def _prepare_ttyd_touch_index(env: dict) -> str | None:
         candidates.append(os.path.join(_pesquisai_tmp, "ttyd_touch.html"))
     except Exception:
         pass
-    candidates.append(os.path.join(_tf.gettempdir(), f"ttyd_touch_{os.getuid()}.html"))
+    # v0.7.12: Windows não tem os.getuid() (era AttributeError fora do try).
+    _uid = getattr(os, "getuid", lambda: 0)()
+    candidates.append(os.path.join(_tf.gettempdir(), f"ttyd_touch_{_uid}.html"))
     candidates.append("/tmp/ttyd_touch.html")
     index_path = None
     for _cand in candidates:
@@ -2245,7 +2440,7 @@ def _consume_greeting(session_id: str | None, lang: str) -> bool:
 
 
 def _build_ttyd_cmd(lang: str | None = None, session_id: str | None = None,
-                    seed_greeting: bool = True):
+                    seed_greeting: bool = True, netns_pid: int | None = None):
     """v0.6.5: constrói (args, env) do ttyd com saudação no idioma pedido.
 
     Extraído de start_ttyd para permitir retry determinístico em
@@ -2333,6 +2528,7 @@ def _build_ttyd_cmd(lang: str | None = None, session_id: str | None = None,
             else:
                 _mark_greeting_pending(str(session_id), full_lang)
         _current_ttyd_session = str(session_id)
+        _persist_current_session(str(session_id))
         bash_cmd = f"cd \"{project_dir}\" && {opencode_bin} --session \"{session_id}\" {_yolo} ; exec bash"
     else:
         _current_ttyd_session = None
@@ -2341,10 +2537,19 @@ def _build_ttyd_cmd(lang: str | None = None, session_id: str | None = None,
     # v0.4.2.5: construir args com --index (touch handlers)
     # v0.6.2: --writable restaurado (regressão v0.6.0 deixava o terminal read-only)
     base_args = ["ttyd", "-p", str(TERMINAL_PORT), "--writable", *_ttyd_shell_argv(bash_cmd)]
-    return _build_ttyd_args(base_args, env), env, full_lang
+    args = _build_ttyd_args(base_args, env)
+    if netns_pid:
+        # v0.7.11: ttyd + tmux + TUI dentro do namespace da VPN. O prefixo
+        # entra DEPOIS do _build_ttyd_args (que insere --index após "ttyd").
+        # O host publica a porta 8000 via slirp (publish_port) e o iframe
+        # continua apontando para localhost:8000.
+        args = ["nsenter", "-t", str(netns_pid), "-m", "-n"] + args
+    return args, env, full_lang
 
 
-def start_ttyd(lang: str | None = None):
+def start_ttyd(lang: str | None = None, netns_pid: int | None = None):
+    if netns_pid is None:
+        netns_pid = _SYSTEM_MODE_NETNS_PID
     """Inicia o ttyd com saudação no idioma solicitado.
 
     Args:
@@ -2363,7 +2568,7 @@ def start_ttyd(lang: str | None = None):
     print(f"\n{next_joke('economia')}")
     _ensure_ufvai_agent_before_spawn("start_ttyd")
     ttyd_args, env, full_lang = _build_ttyd_cmd(
-        lang, session_id=_current_ttyd_session)
+        lang, session_id=_current_ttyd_session, netns_pid=netns_pid)
     _spawn_ttyd(ttyd_args, env)
     print(f"🚀 Terminal iniciado (idioma: {full_lang}, touch: {'ON' if '--index' in ttyd_args else 'OFF'}).")
     # v0.7.5: espera ATIVA (curta) em vez de sleep fixo de 0,8 s. A UI já
@@ -2896,7 +3101,16 @@ def restore_opencode_auth_from_drive(backup_dir: "str | None" = None) -> bool:
         return True
 
     if _json_has_items(_opencode_auth_export_text()):
-        return False  # o motor já tem credenciais; não duplicar
+        # O motor já tem credenciais — mas pode ter só as anônimas/padrão.
+        # Importa se o backup trouxer provedores que faltam (sincronização).
+        try:
+            current = json.loads(_opencode_auth_export_text() or "{}")
+            backup = json.loads(raw or "{}")
+            missing = set(backup) - set(current)
+        except ValueError:
+            missing = set()
+        if not missing:
+            return False  # nada novo para importar
     fd, tmp_path = tempfile.mkstemp(prefix="ufvai_oc_auth_", suffix=".json", dir="/tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -2967,9 +3181,16 @@ def _start_opencode_service_with_keys(timeout_s: float = 20.0) -> bool:
         logger.warning("Serviço com chaves: import indisponível (%s)", exc)
         return False
     project = _workspace_dir()
+    _in_ns = _SYSTEM_MODE_NETNS_PID is not None
+    _svc_port = _SYSTEM_MODE_SERVICE_PORT
+    if _in_ns and not _svc_port:
+        _, _svc_port = _opencode_service_endpoint()
     return bool(
         ensure_service_project_dir(
-            project, timeout_s=timeout_s, backup_dir=_keys_backup_dir()
+            project, timeout_s=timeout_s, backup_dir=_keys_backup_dir(),
+            netns_pid=_SYSTEM_MODE_NETNS_PID,
+            service_host="0.0.0.0" if (_in_ns and _svc_port) else None,
+            service_port=int(_svc_port) if (_in_ns and _svc_port) else None,
         )
     )
 
@@ -2993,6 +3214,15 @@ def _hard_restart_engine(reason: str = "key") -> None:
         _shutdown_stop_opencode_service()
     except Exception as exc:  # noqa: BLE001
         logger.warning("Restart duro (%s): serviço não encerrou (%s)", reason, exc)
+    if _SYSTEM_MODE_NETNS_PID:
+        # o serviço do namespace não é visto pelo `service stop` do host
+        try:
+            subprocess.run(
+                ["pkill", "-f", "opencode serve --service"],
+                capture_output=True, timeout=8,
+            )
+        except Exception:  # noqa: BLE001
+            pass
     try:
         _start_opencode_service_with_keys()
     except Exception as exc:  # noqa: BLE001
@@ -3013,6 +3243,238 @@ def _apply_opencode_env_change_async() -> None:
         daemon=True,
         name="ufvai-apply-keys",
     ).start()
+
+
+def _port_accepts(port: int, timeout: float = 0.3) -> bool:
+    import socket as _socket
+    try:
+        with _socket.create_connection(("127.0.0.1", port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _opencode_service_endpoint() -> tuple[str, int]:
+    """(host, porta) do serviço OpenCode, lido de ``service.json``.
+
+    O motor V2 grava ``~/.local/state/opencode/service.json`` com a URL do
+    servidor de background. No modo "todo o UFVAI na VPN" a MESMA porta é
+    reaproveitada dentro do namespace e publicada de volta no host, para o
+    wrapper/CLI continuarem falando com o mesmo endpoint.
+    """
+    import json as _json
+    from urllib.parse import urlparse as _urlparse
+
+    candidates: list[str] = []
+    _xdg = os.environ.get("XDG_STATE_HOME")
+    if _xdg:
+        candidates.append(os.path.join(_xdg, "opencode", "service.json"))
+    candidates.append(os.path.expanduser("~/.local/state/opencode/service.json"))
+    candidates.append("/root/.local/state/opencode/service.json")
+    for path in candidates:
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = _json.load(fh)
+        except (OSError, ValueError):
+            continue
+        parsed = _urlparse(str(data.get("url") or ""))
+        if parsed.port:
+            return (parsed.hostname or "127.0.0.1", int(parsed.port))
+    return ("127.0.0.1", 0)
+
+
+def _wait_service_on_host(port: int, timeout_s: float = 10.0) -> bool:
+    """Espera o serviço publicado responder em 127.0.0.1:<porta>.
+
+    O ``/global/health`` do OpenCode V2 responde sem senha (a autenticação
+    vale para as rotas de API). É a prova de que o hostfwd do slirp está
+    levando o wrapper ao serviço que roda DENTRO da VPN.
+    """
+    import http.client
+
+    deadline = time.monotonic() + max(0.5, float(timeout_s))
+    while time.monotonic() < deadline:
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", int(port), timeout=2)
+            conn.request("GET", "/global/health")
+            resp = conn.getresponse()
+            resp.read(256)
+            conn.close()
+            if resp.status < 500:
+                return True
+        except OSError:
+            pass
+        except Exception:  # noqa: BLE001 — melhor tentar de novo
+            pass
+        time.sleep(0.3)
+    return False
+
+
+def _vpn_system_enable(backup_dir: str) -> dict:
+    """Move o serviço do OpenCode + ttyd para o namespace da VPN.
+
+    v0.7.11: é o modo "todo o UFVAI na VPN". O terminal e o agente passam a
+    usar o namespace da VPN; o wrapper (porta 8001) e o kernel do notebook
+    continuam fora.
+
+    Funciona nos DOIS modos de túnel:
+
+    - **split (padrão):** só a rede da UFV (`100.65.0.0/17`…,
+      `200.235.128.0/17`) sai por `tun0`; a internet comum (LLM, GitHub,
+      PyPI) continua por `tap0`/Colab. É o modo recomendado para LLM em
+      nuvem + sistemas internos.
+    - **total (`redirect-gateway`):** todo o tráfego vai para a UFV, que
+      **bloqueia a saída externa** (medido em 07/11/2026). Só faz sentido
+      para modelos/serviços internos da UFV.
+    """
+    from . import vpn as _vpn
+
+    st = _vpn.status(backup_dir)
+    if st.get("state") != "connected":
+        raise _vpn.VPNError("Conecte a VPN da UFV antes de ativar o modo total.")
+    if st.get("system_mode"):
+        return st
+    ns_pid = (st.get("pids") or {}).get("ns")
+    if not ns_pid:
+        raise _vpn.VPNError("O namespace da VPN não está ativo. Reconecte.")
+
+    try:
+        # 1. derruba o ttyd do host e espera a porta 8000 liberar
+        _stop_terminal()
+        for _ in range(25):
+            if not _port_accepts(TERMINAL_PORT):
+                break
+            time.sleep(0.2)
+
+        # 2. publica a porta 8000 do namespace no host (remove hostfwd antigo)
+        _vpn.unpublish_port(TERMINAL_PORT)
+        _vpn.publish_port(TERMINAL_PORT, TERMINAL_PORT)
+
+        # 3. para o serviço/tmux do host e sobe tudo no namespace
+        _system_enable_steps(backup_dir, int(ns_pid))
+    except Exception:
+        # rollback: volta o terminal/serviço para o host e desconecta
+        try:
+            _vpn_system_disable(backup_dir)
+        except Exception:  # noqa: BLE001
+            pass
+        raise
+    return _vpn.status(backup_dir)
+
+
+def _system_enable_steps(backup_dir: str, ns_pid: int) -> None:
+    """Passos internos do modo total (separados para permitir rollback)."""
+    from . import vpn as _vpn
+    global _SYSTEM_MODE_NETNS_PID, _SYSTEM_MODE_SERVICE_PORT
+
+    try:
+        opencode_bin = find_opencode()
+    except Exception:  # noqa: BLE001
+        opencode_bin = "opencode"
+
+    # A porta atual do serviço no host é reaproveitada dentro do namespace.
+    # Assim o service.json (URL 127.0.0.1:<porta>) continua válido para o
+    # wrapper e para o CLI do host, que a alcançam pelo hostfwd do slirp.
+    _svc_host, _svc_port = _opencode_service_endpoint()
+    if not _svc_port:
+        try:
+            _svc_port = int(_vpn._free_port(4096))
+        except Exception:  # noqa: BLE001
+            _svc_port = 4096
+    _SYSTEM_MODE_SERVICE_PORT = int(_svc_port)
+
+    for cmd in (
+        [opencode_bin, "service", "stop"],
+        ["tmux", "-L", "ufvai", "kill-server"],
+    ):
+        try:
+            subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        except Exception:  # noqa: BLE001
+            pass
+    time.sleep(1.2)
+
+    # 4. sobe o serviço DENTRO do namespace, escutando em 0.0.0.0:<porta>
+    #    (o hostfwd do slirp entrega no guest IP 10.0.2.100, nunca no
+    #    loopback do namespace).
+    from .run_fast import ensure_service_project_dir
+    _ok = ensure_service_project_dir(
+        _workspace_dir(), netns_pid=int(ns_pid), timeout_s=30,
+        service_host="0.0.0.0", service_port=int(_svc_port),
+    )
+    if not _ok:
+        raise _vpn.VPNError(
+            "O serviço do OpenCode não subiu dentro da VPN. O modo total foi "
+            "desfeito para o agente não continuar fora do túnel."
+        )
+
+    # 5. publica a porta do serviço no host. Sem isto, o wrapper/CLI lê
+    #    service.json e tenta 127.0.0.1:<porta> — que existe só no namespace.
+    _vpn.unpublish_port(int(_svc_port))
+    _vpn.publish_port(int(_svc_port), int(_svc_port))
+    if not _wait_service_on_host(int(_svc_port), timeout_s=10):
+        raise _vpn.VPNError(
+            "O serviço subiu na VPN, mas 127.0.0.1:%d não respondeu. "
+            "Verifique o hostfwd do slirp4netns." % int(_svc_port)
+        )
+
+    # 6. terminal (ttyd) também dentro do namespace; a porta 8000 já foi
+    #    publicada por _vpn_system_enable antes deste passo.
+    _SYSTEM_MODE_NETNS_PID = int(ns_pid)
+    start_ttyd(netns_pid=int(ns_pid))
+    _vpn.set_system_mode(True)
+
+
+def _vpn_system_disable(backup_dir: str) -> dict:
+    """Volta o serviço + ttyd para o namespace do host e desconecta a VPN."""
+    from . import vpn as _vpn
+
+    global _SYSTEM_MODE_NETNS_PID, _SYSTEM_MODE_SERVICE_PORT
+    _svc_port = int(_SYSTEM_MODE_SERVICE_PORT or 0)
+    _SYSTEM_MODE_NETNS_PID = None
+    _SYSTEM_MODE_SERVICE_PORT = None
+    _stop_terminal()
+
+    # Ainda há hostfwd ativo: o `service stop` do host alcança o serviço que
+    # roda no namespace e encerra limpo (sessões em memória incluídas).
+    try:
+        opencode_bin = find_opencode()
+    except Exception:  # noqa: BLE001
+        opencode_bin = "opencode"
+    try:
+        subprocess.run(
+            [opencode_bin, "service", "stop"],
+            capture_output=True, text=True, timeout=10,
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        subprocess.run(
+            ["pkill", "-f", "opencode serve --service"],
+            capture_output=True, text=True, timeout=10,
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+    # Remove os hostfwds antes de derrubar o namespace.
+    try:
+        _vpn.unpublish_port(TERMINAL_PORT)
+    except Exception:  # noqa: BLE001
+        pass
+    if _svc_port:
+        try:
+            _vpn.unpublish_port(_svc_port)
+        except Exception:  # noqa: BLE001
+            pass
+
+    _vpn.disconnect(backup_dir)
+    try:
+        from .run_fast import ensure_service_project_dir
+        ensure_service_project_dir(_workspace_dir())
+    except Exception:  # noqa: BLE001
+        pass
+    start_ttyd()
+    _vpn.set_system_mode(False)
+    return _vpn.status(backup_dir)
 
 
 def start_wrapper_server():
@@ -3351,6 +3813,19 @@ def start_wrapper_server():
                 })
                 return
 
+            if p == "/api/ocweb_ready":
+                # v0.7.11-web: o splash da UI espera este endpoint (proxy 8002)
+                try:
+                    from . import ocweb
+                    _st = ocweb.status()
+                    _ready = bool(_st.get("running")) and ocweb.ready(
+                        OCWEB_PORT, timeout=0.25
+                    )
+                except Exception:
+                    _st, _ready = {}, False
+                self._json(200, {"ready": bool(_ready), "port": OCWEB_PORT, **_st})
+                return
+
             if p == "/api/autosave":
                 # v0.7.0 — listagem dos autosaves (usada pela pergunta de
                 # retomada na abertura da interface). A GRAVACAO e' o POST.
@@ -3545,10 +4020,18 @@ def start_wrapper_server():
                 self._json(200, _ob.onboarding_state(_store, _env))
                 return
 
+            if p == "/api/vpn":
+                # v0.7.11: estado da VPN da UFV (OpenVPN em namespace isolado)
+                from . import vpn as _vpn
+                self._json(200, _vpn.status(DRIVE_BACKUP_DIR))
+                return
+
             if p == "/api/apikey":
                 qs = parse_qs(urlparse(self.path).query)
                 provider = qs.get("provider", [""])[0].strip()
                 keys = load_encrypted_keys(DRIVE_BACKUP_DIR)
+                # v0.7.11: credenciais da VPN nunca aparecem na listagem
+                keys = {k: v for k, v in keys.items() if not k.startswith("vpn_ufv_")}
                 if provider:
                     val = keys.get(provider, "")
                     masked = (val[:4] + "…") if val else ""
@@ -4311,6 +4794,134 @@ def start_wrapper_server():
                 })
                 return
 
+            # ════════════════════════════════════════════════════════
+            # v0.7.11 — VPN da UFV (OpenVPN)
+            # ════════════════════════════════════════════════════════
+            if p == "/api/vpn/connect":
+                from . import vpn as _vpn
+                try:
+                    # v0.7.11: o PADRÃO é split tunnel. O serviço do OpenCode
+                    # roda no namespace e usa a VPN para a rede da UFV; a
+                    # internet comum continua pelo Colab (LLM funciona).
+                    # Túnel total é opcional (modelos/serviços internos), mas
+                    # a UFV bloqueia a saída externa nesse modo.
+                    _full = bool(body.get("full_tunnel", False))
+                    _cur = _vpn.status(DRIVE_BACKUP_DIR)
+                    if _cur.get("system_mode"):
+                        # mudar de modo exige devolver terminal/serviço ao host
+                        _vpn_system_disable(DRIVE_BACKUP_DIR)
+                    if (_full and _cur.get("state") == "connected"
+                            and not _cur.get("full_tunnel")):
+                        # já conectado em split tunnel: reconecta em túnel total
+                        _vpn.disconnect(DRIVE_BACKUP_DIR)
+                    _st = _vpn.connect(
+                        cpf=str(body.get("cpf", "") or ""),
+                        password=str(body.get("password", "") or ""),
+                        remember=bool(body.get("remember", False)),
+                        use_saved=bool(body.get("use_saved", False)),
+                        backup_dir=DRIVE_BACKUP_DIR,
+                        full_tunnel=_full,
+                    )
+                    _tel_event("vpn_connect", {"mode": _st.get("mode", "")[:16]})
+                    self._json(200, _st)
+                except _vpn.VPNError as _exc:
+                    self._json(400, {"ok": False, "error": str(_exc)})
+                except Exception as _exc:  # noqa: BLE001
+                    logger.exception("falha ao conectar a VPN")
+                    self._json(500, {"ok": False, "error": f"Erro: {_exc}"})
+                return
+
+            if p == "/api/vpn/disconnect":
+                from . import vpn as _vpn
+                _cur = _vpn.status(DRIVE_BACKUP_DIR)
+                if _cur.get("system_mode"):
+                    # o ttyd/serviço estão DENTRO do namespace: é preciso
+                    # trazê-los de volta ao host antes de derrubar a VPN.
+                    self._json(200, _vpn_system_disable(DRIVE_BACKUP_DIR))
+                else:
+                    self._json(200, _vpn.disconnect(DRIVE_BACKUP_DIR))
+                return
+
+            if p == "/api/vpn/profile":
+                from . import vpn as _vpn
+                try:
+                    _content = str(body.get("content", "") or "")
+                    if _content.strip():
+                        _meta = _vpn.save_profile_text(_content)
+                    else:
+                        _meta = _vpn.fetch_profile(force=bool(body.get("force", False)))
+                    self._json(200, {"ok": True, "profile": _meta})
+                except Exception as _exc:  # noqa: BLE001
+                    self._json(400, {"ok": False, "error": str(_exc)})
+                return
+
+            if p == "/api/vpn/test":
+                from . import vpn as _vpn
+                _url = str(body.get("url", "") or "").strip()
+                _res = _vpn.test(url=_url) if _url else _vpn.test()
+                self._json(200, _res)
+                return
+
+            if p == "/api/vpn/system":
+                # v0.7.11: modo "todo o UFVAI na VPN" (terminal + OpenCode)
+                from . import vpn as _vpn
+                try:
+                    if bool(body.get("enabled", False)):
+                        _st = _vpn_system_enable(DRIVE_BACKUP_DIR)
+                    else:
+                        _st = _vpn_system_disable(DRIVE_BACKUP_DIR)
+                    self._json(200, _st)
+                except _vpn.VPNError as _exc:
+                    self._json(400, {"ok": False, "error": str(_exc)})
+                except Exception as _exc:  # noqa: BLE001
+                    logger.exception("falha no modo total da VPN")
+                    self._json(500, {"ok": False, "error": f"Erro: {_exc}"})
+                return
+
+            if p == "/api/vpn/forward":
+                # v0.7.11: publica um serviço da rede da UFV em 127.0.0.1
+                # (é o caminho para um modelo local Ollama/vLLM da intranet).
+                from . import vpn as _vpn
+                try:
+                    _fwd = _vpn.add_forward(
+                        host=str(body.get("host", "") or ""),
+                        port=int(body.get("port", 0) or 0),
+                        local_port=int(body.get("local_port", 0) or 0),
+                        backup_dir=DRIVE_BACKUP_DIR,
+                    )
+                    self._json(200, {
+                        "ok": True,
+                        "forward": _fwd,
+                        "status": _vpn.status(DRIVE_BACKUP_DIR),
+                    })
+                except _vpn.VPNError as _exc:
+                    self._json(400, {"ok": False, "error": str(_exc)})
+                except Exception as _exc:  # noqa: BLE001
+                    logger.exception("falha ao encaminhar porta da VPN")
+                    self._json(500, {"ok": False, "error": f"Erro: {_exc}"})
+                return
+
+            if p == "/api/vpn/unforward":
+                from . import vpn as _vpn
+                _ok = _vpn.remove_forward(str(body.get("id", "") or ""))
+                self._json(200, {
+                    "ok": bool(_ok),
+                    "status": _vpn.status(DRIVE_BACKUP_DIR),
+                })
+                return
+
+            if p == "/api/vpn/forget":
+                from . import vpn as _vpn
+                self._json(200, {"ok": _vpn.forget_credentials(DRIVE_BACKUP_DIR)})
+                return
+
+            if p == "/api/vpn/answer":
+                # v0.7.11: resposta da tela inicial ("ufv" / "no")
+                from . import vpn as _vpn
+                _vpn.mark_decision(str(body.get("choice", "no") or "no"))
+                self._json(200, _vpn.status(DRIVE_BACKUP_DIR))
+                return
+
             if p == "/api/apikey":
                 provider = body.get("provider", "").strip()
                 action   = body.get("action", "save").strip().lower()
@@ -4791,6 +5402,21 @@ def start_wrapper_server():
                 if session_id:
                     _t_ttyd = time.time()
                     try:
+                        # v0.7.11-web5: sessão restaurada pode apontar para
+                        # provedor que não existe neste ambiente (ex.: criada
+                        # com OpenCode Go em outra máquina). Sem isso o
+                        # seletor de modelos abre vazio.
+                        try:
+                            _switched_model = _ensure_session_model_available(session_id)
+                            if _switched_model:
+                                logger.info(
+                                    "Restore: modelo da sessão ajustado para %s",
+                                    _switched_model,
+                                )
+                        except Exception as _model_exc:  # noqa: BLE001
+                            logger.warning(
+                                "Restore: ajuste de modelo falhou (%s)", _model_exc
+                            )
                         _stop_terminal()
 
                         # Ajuste 14/10/2026 (v0.6.21): garantia antes do
@@ -5013,7 +5639,7 @@ def start_wrapper_server():
                 from .opencode_config import load_json_config, write_json_atomic
                 _model_id = str(body.get("model", "") or "").strip()
                 if not _fm.is_free_model(_model_id):
-                    self._json(400, {"ok": False, "error": "Escolha um modelo gratuito (OpenRouter :free ou NVIDIA)."})
+                    self._json(400, {"ok": False, "error": "Escolha um modelo gratuito (Google, OpenRouter :free ou NVIDIA)."})
                     return
                 _cfg_path = os.path.expanduser("~/.config/opencode/opencode.json")
                 try:
@@ -5930,9 +6556,11 @@ def _shutdown_kill_keepalive() -> bool:
                     os.kill(pid, 0)
                 except OSError:
                     return True
-            os.kill(pid, signal.SIGKILL)
+            # v0.7.12: no Windows o signal.SIGKILL não existe (os.kill só
+            # aceita SIGTERM) — o ValueError aqui derrubava o shutdown.
+            os.kill(pid, getattr(signal, "SIGKILL", signal.SIGTERM))
             return True
-        except OSError:
+        except (OSError, ValueError, AttributeError):
             pass
 
     # Fallback: marcador na cmdline (PID file ausente/inválido)
@@ -6079,6 +6707,16 @@ def launch():
     try:
         boot.active("Localizando o núcleo opencode", 82)
         resolve_opencode()
+        try:
+            from .opencode_utils import opencode_major as _opencode_major
+            _engine_ok = _opencode_major() is not None
+        except Exception:  # noqa: BLE001
+            _engine_ok = False
+        if not _engine_ok:
+            logger.error(
+                "Motor OpenCode 2.x ausente — instale com 'ufvai --engine-install'. "
+                "A interface sobe sem terminal até o motor existir."
+            )
         boot.done(85)
         
         # ═══ CARREGAR CHAVES ANTES DE INICIAR O TERMINAL ═══
@@ -6131,6 +6769,7 @@ def launch():
         
         boot.active("Encerrando sessões anteriores", 94)
         kill_previous()
+        _persist_current_session(None)
         boot.done(95)
         
         boot.active("Iniciando terminal interativo", 96)
@@ -6138,21 +6777,50 @@ def launch():
             # v0.7.10: primeiro uso sem chave — o motor só nasce depois que
             # o usuário escolher o provedor e colar a chave no onboarding.
             logger.info("Onboarding pendente: terminal não iniciado (sem chave).")
-        else:
+        elif _engine_ok:
             start_ttyd()
+        else:
+            logger.info("Terminal não iniciado: motor OpenCode ausente.")
         boot.done(97)
+
+        # v0.7.11-web5: o motor pode subir com uma execução órfã (runtime
+        # anterior morto no meio da resposta). Sem isso a SPA fica em
+        # "Trabalhando" e as mensagens novas nunca saem de "pending".
+        if _engine_ok:
+            try:
+                boot.active("Sincronizando provedores e modelos", 97)
+                _recover_stale_sessions()
+                _warm_engine_catalog()
+                _normalize_session_titles()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Sincronização inicial do motor falhou: %s", exc)
+        boot.done(98)
         
         if IN_COLAB and output:
-            terminal_url = output.eval_js(f"google.colab.kernel.proxyPort({TERMINAL_PORT})")
+            terminal_url = output.eval_js(f"google.colab.kernel.proxyPort({OCWEB_PORT})")
+            ttyd_url = output.eval_js(f"google.colab.kernel.proxyPort({TERMINAL_PORT})")
             banner_url = output.eval_js(f"google.colab.kernel.proxyPort({WRAPPER_PORT})")
         else:
-            terminal_url = f"http://localhost:{TERMINAL_PORT}"
+            terminal_url = f"http://localhost:{OCWEB_PORT}"
+            ttyd_url = f"http://localhost:{TERMINAL_PORT}"
             banner_url = f"http://localhost:{WRAPPER_PORT}"
-        
+
+        # v0.7.11-web: a janela principal mostra a SPA do OpenCode (não o ttyd).
+        # O proxy em 8002 injeta Basic auth + tema UFVAI e repassa SSE/assets.
+        try:
+            from . import ocweb
+            if not ocweb.start(OCWEB_PORT):
+                logger.warning("ocweb: porta %s indisponível; a interface web não subiu", OCWEB_PORT)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("ocweb: falha ao iniciar o proxy (%s)", exc)
+
         boot.active("Preparando a interface web", 98)
         global _SESSION_TOKEN
         _SESSION_TOKEN = secrets.token_urlsafe(32)
-        create_wrapper_html(terminal_url, _drive_url, session_token=_SESSION_TOKEN)
+        create_wrapper_html(
+            terminal_url, _drive_url, session_token=_SESSION_TOKEN,
+            web_mode=True, ttyd_url=ttyd_url,
+        )
         start_wrapper_server()
         try:
             _tel_event("app_started", {"version": VERSION, "lang": _current_lang, "colab": bool(IN_COLAB)})

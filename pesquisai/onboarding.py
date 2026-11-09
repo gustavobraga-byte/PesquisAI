@@ -78,6 +78,85 @@ PROVIDERS: dict[str, dict[str, Any]] = {
 
 ONBOARDING_ORDER: tuple[str, ...] = ("google", "nvidia", "openrouter", "opencode_go")
 
+# v0.7.11: "Outro provedor" — servidores que o usuário já usa e cuja chave
+# ele mesmo cola. A lista é curada; a validação real é sempre no provedor.
+# `model` vazio = NÃO troca o modelo padrão (o usuário escolhe depois no
+# seletor 🎛️, para não gravar um id que o catálogo do motor não tenha).
+OTHER_PROVIDERS: dict[str, dict[str, Any]] = {
+    "openai": {
+        "id": "openai", "label": "OpenAI", "env": "OPENAI_API_KEY",
+        "prefixes": ("sk-", "sk-proj-"),
+        "url": "https://platform.openai.com/api-keys",
+        "url_label": "platform.openai.com/api-keys",
+        "paid": True, "recommended": False,
+        "tagline": "GPT-4o / GPT-5 · chave própria", "model": "",
+    },
+    "anthropic": {
+        "id": "anthropic", "label": "Anthropic", "env": "ANTHROPIC_API_KEY",
+        "prefixes": ("sk-ant-",),
+        "url": "https://console.anthropic.com/settings/keys",
+        "url_label": "console.anthropic.com/settings/keys",
+        "paid": True, "recommended": False,
+        "tagline": "Claude · chave própria", "model": "",
+    },
+    "groq": {
+        "id": "groq", "label": "Groq", "env": "GROQ_API_KEY",
+        "prefixes": ("gsk_",),
+        "url": "https://console.groq.com/keys",
+        "url_label": "console.groq.com/keys",
+        "paid": False, "recommended": False,
+        "tagline": "Llama / Mixtral · free tier", "model": "",
+    },
+    "mistral": {
+        "id": "mistral", "label": "Mistral", "env": "MISTRAL_API_KEY",
+        "prefixes": (),
+        "url": "https://console.mistral.ai/api-keys/",
+        "url_label": "console.mistral.ai/api-keys",
+        "paid": False, "recommended": False,
+        "tagline": "Mistral · free tier", "model": "",
+    },
+    "deepseek": {
+        "id": "deepseek", "label": "DeepSeek", "env": "DEEPSEEK_API_KEY",
+        "prefixes": ("sk-",),
+        "url": "https://platform.deepseek.com/api_keys",
+        "url_label": "platform.deepseek.com/api_keys",
+        "paid": True, "recommended": False,
+        "tagline": "DeepSeek · chave própria", "model": "",
+    },
+    "together": {
+        "id": "together", "label": "Together AI", "env": "TOGETHER_API_KEY",
+        "prefixes": (),
+        "url": "https://api.together.xyz/settings/api-keys",
+        "url_label": "api.together.xyz/settings/api-keys",
+        "paid": True, "recommended": False,
+        "tagline": "Modelos open-source · chave própria", "model": "",
+    },
+    "fireworks": {
+        "id": "fireworks", "label": "Fireworks AI", "env": "FIREWORKS_API_KEY",
+        "prefixes": ("fw_",),
+        "url": "https://fireworks.ai/account/api-keys",
+        "url_label": "fireworks.ai/account/api-keys",
+        "paid": True, "recommended": False,
+        "tagline": "Modelos open-source · chave própria", "model": "",
+    },
+    "xai": {
+        "id": "xai", "label": "xAI", "env": "XAI_API_KEY",
+        "prefixes": ("xai-",),
+        "url": "https://console.x.ai/",
+        "url_label": "console.x.ai",
+        "paid": True, "recommended": False,
+        "tagline": "Grok · chave própria", "model": "",
+    },
+    "cohere": {
+        "id": "cohere", "label": "Cohere", "env": "COHERE_API_KEY",
+        "prefixes": (),
+        "url": "https://dashboard.cohere.com/api-keys",
+        "url_label": "dashboard.cohere.com/api-keys",
+        "paid": False, "recommended": False,
+        "tagline": "Command · free tier", "model": "",
+    },
+}
+
 # Modelo padrão quando existe chave do Google. Pedido do autor (v0.7.10):
 # "se o usuário tem uma key do google o modelo padrão é o gemini 3.5 flash".
 # O id pode ser trocado por `UFVAI_GOOGLE_MODEL` sem mexer no código.
@@ -125,7 +204,8 @@ def provider_ids() -> tuple[str, ...]:
 
 
 def get_provider(provider_id: str) -> dict[str, Any] | None:
-    return PROVIDERS.get((provider_id or "").strip().lower())
+    pid = (provider_id or "").strip().lower()
+    return PROVIDERS.get(pid) or OTHER_PROVIDERS.get(pid)
 
 
 def is_supported(provider_id: str) -> bool:
@@ -144,13 +224,20 @@ def detect_provider(key: str) -> str:
     # OpenRouter antes de qualquer prefixo genérico de "sk-".
     if k.startswith("sk-or-"):
         return "openrouter"
-    for pid in ONBOARDING_ORDER:
+    # Prefixo mais específico vence: "sk-ant-" (Anthropic) > "sk-" (OpenAI).
+    scored: list[tuple[int, str]] = []
+    for pid, prov in {**PROVIDERS, **OTHER_PROVIDERS}.items():
         if pid == "opencode_go":
             continue
-        for prefix in PROVIDERS[pid]["prefixes"]:
+        for prefix in (prov.get("prefixes") or ()):
             if k.startswith(prefix):
-                return pid
-    return ""
+                scored.append((len(prefix), pid))
+    if not scored:
+        return ""
+    best = max(length for length, _pid in scored)
+    winners = {pid for length, pid in scored if length == best}
+    # "sk-" puro é ambíguo (OpenAI, DeepSeek…): o usuário escolhe.
+    return next(iter(winners)) if len(winners) == 1 else ""
 
 
 def validate_key_format(provider_id: str, key: str) -> tuple[bool, str]:
@@ -163,10 +250,10 @@ def validate_key_format(provider_id: str, key: str) -> tuple[bool, str]:
         return False, "Cole a chave para continuar."
     if len(k) < 20:
         return False, "A chave parece incompleta (menos de 20 caracteres)."
-    prefixes = tuple(prov["prefixes"])
-    if provider_id != "opencode_go" and not k.startswith(prefixes):
-        shown = " ou ".join(f"“{p}”" for p in prefixes)
-        return False, f"A chave de {prov['label']} deve começar com {shown}."
+    # v0.7.11-web9: prefixos são apenas heurística de reconhecimento.
+    # Provedores emitem chaves com formatos variados (o Google, por exemplo,
+    # não começa necessariamente com "AIza"); a validação real é feita pelo
+    # próprio provedor na primeira chamada. Não bloqueamos pelo prefixo.
     return True, ""
 
 
@@ -199,7 +286,7 @@ def has_any_key(
     if store_keys(store):
         return True
     env = env or {}
-    for prov in PROVIDERS.values():
+    for prov in {**PROVIDERS, **OTHER_PROVIDERS}.values():
         if str(env.get(prov["env"], "") or "").strip():
             return True
     # Chaves de provedores fora do onboarding também contam.
@@ -321,6 +408,19 @@ def providers_public() -> list[dict[str, Any]]:
             "recommended": bool(prov["recommended"]),
             "tagline": prov["tagline"],
             "model": default_model_for(pid),
+        })
+    for pid, prov in OTHER_PROVIDERS.items():
+        out.append({
+            "id": pid,
+            "label": prov["label"],
+            "env": prov["env"],
+            "url": prov["url"],
+            "url_label": prov["url_label"],
+            "paid": bool(prov["paid"]),
+            "recommended": False,
+            "tagline": prov["tagline"],
+            "model": "",
+            "other": True,
         })
     return out
 

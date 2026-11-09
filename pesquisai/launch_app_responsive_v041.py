@@ -537,6 +537,8 @@ def create_wrapper_html(
     drive_url: str,
     session_token: str | None = None,
     boot_id: str | None = None,
+    web_mode: bool = False,
+    ttyd_url: str | None = None,
 ) -> str:
     """Cria a versão v0.4.1 do wrapper HTML do PesquisAI.
 
@@ -1196,14 +1198,17 @@ def create_wrapper_html(
       <button class="tb-icon" onclick="openManual()" title="Manual do UFVAI" data-i18n-title="manual.title">
         <svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
       </button>
-      <button class="tb-icon" onclick="openSessions()" title="Histórico de Sessões" data-i18n-title="sessions.title">
-        <svg viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+      <button class="tb-icon" onclick="toggleConsole()" id="console-toggle" title="Alternar terminal / versão web" data-i18n-title="console.toggle">
+        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8M12 18v3"/><path d="M7 9l2 2-2 2M12 13h4"/></svg>
       </button>
       <button class="tb-icon" onclick="openShortcuts()" title="Atalhos de Teclado" data-i18n-title="shortcuts.title">
         <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 16h10"/></svg>
       </button>
       <button class="tb-icon" onclick="openAgents()" title="Diretrizes do Agente" data-i18n-title="agents.title">
         <svg viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M9 12h6M9 16h4"/></svg>
+      </button>
+      <button class="tb-icon" onclick="openVpn()" id="vpn-btn" title="VPN da UFV" data-i18n-title="vpn.tooltip">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
       </button>
       <button class="tb-icon" onclick="openMemory()" id="memory-btn" title="Memória UFVAI" data-i18n-title="memory.tooltip">
         <svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 3 1.5 5 3 7l1 1v3a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-3l1-1c1.5-2 3-4 3-7a7 7 0 0 0-7-7z"/><path d="M9 22h6"/><path d="M12 2v20"/></svg>
@@ -1275,9 +1280,10 @@ def create_wrapper_html(
     <div style="height:1px;background:var(--line);margin:8px 0;"></div>
     <button class="modal-close" onclick="openHealth(); toggleMobileMenu();">🩺 <span data-i18n="dashboard.title">Dashboard de Saúde</span></button>
     <button class="modal-close" onclick="openManual(); toggleMobileMenu();">📘 <span data-i18n="manual.title">Manual do UFVAI</span></button>
-    <button class="modal-close" onclick="openSessions(); toggleMobileMenu();">📜 <span data-i18n="sessions.title">Histórico de Sessões</span></button>
+    <button class="modal-close" onclick="toggleConsole(); toggleMobileMenu();">🖥️ <span data-i18n="console.toggle">Alternar terminal / versão web</span></button>
     <button class="modal-close" onclick="openShortcuts(); toggleMobileMenu();">⌨️ <span data-i18n="shortcuts.title">Atalhos de Teclado</span></button>
     <button class="modal-close" onclick="openAgents(); toggleMobileMenu();">📋 <span data-i18n="agents.title">Diretrizes do Agente</span></button>
+    <button class="modal-close" onclick="openVpn(); toggleMobileMenu();">🛡 <span data-i18n="vpn.title">VPN da UFV</span></button>
     <button class="modal-close" onclick="openMemory(); toggleMobileMenu();">🧠 <span data-i18n="memory.title">Memória UFVAI</span></button>
     <button class="modal-close" onclick="toggleTheme(); toggleMobileMenu();">◑ <span data-i18n="theme.toggle">Alternar Tema</span></button>
     <!-- v0.6.25: item "Idioma" REMOVIDO do drawer — o seletor .lang-btn da
@@ -1482,6 +1488,7 @@ def create_wrapper_html(
           <div style="font-size:12.5px;font-weight:600;color:var(--ink);margin-bottom:6px;">🆓 Comece grátis — obtenha uma chave gratuita</div>
           <p style="font-size:11px;color:var(--ink-muted);line-height:1.5;margin-bottom:10px;">As chaves de API são <b>de sua responsabilidade</b> e não têm qualquer vínculo com esta plataforma (UFVAI). Os limites gratuitos são definidos por cada provedor.</p>
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+            <a class="prov-link" href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener">Chave Google (grátis)</a>
             <a class="prov-link" href="https://openrouter.ai/keys" target="_blank" rel="noopener">Chave OpenRouter (grátis)</a>
             <a class="prov-link" href="https://build.nvidia.com/" target="_blank" rel="noopener">Chave NVIDIA (grátis)</a>
             <a class="prov-link" href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/docs/CHAVES_API.md" target="_blank" rel="noopener">📘 Instruções passo a passo</a>
@@ -1496,7 +1503,7 @@ def create_wrapper_html(
           <div style="font-size:11.5px;font-weight:600;color:var(--ink);margin-bottom:8px;">🎛️ Modelo gratuito padrão</div>
           <div style="display:flex;gap:6px;margin-bottom:8px;">
             <select id="free-prov" onchange="loadFreeModels()" style="background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink);font-size:11.5px;padding:6px 8px;">
-              <option value="openrouter">OpenRouter</option><option value="nvidia">NVIDIA</option></select>
+              <option value="google">Google Gemini</option><option value="nvidia">NVIDIA</option><option value="openrouter">OpenRouter</option></select>
             <select id="free-model" style="flex:1;min-width:0;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:var(--radius);color:var(--ink);font-size:11.5px;padding:6px 8px;"></select>
           </div>
           <button onclick="setDefaultModel()" style="padding:6px 12px;font-size:11.5px;background:var(--accent-dim);border:1px solid rgba(var(--accent-rgb),.3);border-radius:var(--radius);color:var(--accent);cursor:pointer;">Definir como padrão</button>
@@ -1825,6 +1832,7 @@ def create_wrapper_html(
     const IS_COLAB = {__IS_COLAB__};
     const LANGS = {__LANGS_JSON__};
     const I18N = {__I18N_JSON__};
+    try { window.UFVAI_I18N = I18N; } catch(e) {}
     const LANG_COOKIE = "pesquisai_lang";
     // v0.7.5+ (sem bump): separa "escolhi no menu" de "foi detectado".
     // Sem isso, um cookie en_US gravado por uma adoção automática antiga
@@ -1997,6 +2005,9 @@ def create_wrapper_html(
           renderRestore();
         }
       } catch (e) {}
+      // v0.7.11: o status da VPN é dinâmico — o applyLang() acima reescreveu
+      // o texto fixo; pede ao painel para redesenhar com o estado real.
+      try { if (window.vpnRefresh) window.vpnRefresh(); } catch (e) {}
     }
 
     async function setLang(lang) {
@@ -2673,7 +2684,7 @@ def create_wrapper_html(
       { id:"bedrock", name:"AWS Bedrock", env:"AWS_ACCESS_KEY_ID", hint:"AKIA…" },
       { id:"azure", name:"Azure OpenAI", env:"AZURE_OPENAI_API_KEY", hint:"…" },
       { id:"deepseek", name:"DeepSeek", env:"DEEPSEEK_API_KEY", hint:"sk-…" },
-      { id:"google", name:"Google Gemini", env:"GOOGLE_GENERATIVE_AI_API_KEY", hint:"AIza…", recommended:true },
+      { id:"google", name:"Google Gemini", env:"GOOGLE_GENERATIVE_AI_API_KEY", hint:"Cole a chave do Google", recommended:true },
       { id:"groq", name:"Groq", env:"GROQ_API_KEY", hint:"gsk_…" },
       { id:"mistral", name:"Mistral", env:"MISTRAL_API_KEY", hint:"…" },
       { id:"nvidia", name:"Nvidia NIM", env:"NVIDIA_API_KEY", hint:"nvapi-…" },
@@ -2819,8 +2830,7 @@ def create_wrapper_html(
       const theme = document.documentElement.getAttribute("data-theme") || "pesquisai";
       // v0.6.5: fonte da verdade agora é data-terminal-url (src pode ser
       // about:blank enquanto o splash aguarda /api/ttyd_ready).
-      let origSrc = "";
-      try { origSrc = (fr.dataset && fr.dataset.terminalUrl) || ""; } catch (e) {}
+      let origSrc = _frameUrl(_console);
       if (!origSrc && fr.src && fr.src.indexOf("about:") !== 0) origSrc = fr.src;
       origSrc = (origSrc || "{__TERMINAL_URL__}").split("?")[0];
       if (!origSrc || origSrc === "about:blank") return;
@@ -4255,7 +4265,12 @@ def create_wrapper_html(
             "info");
 
           const fr = document.getElementById("terminal-frame");
-          if (fr) {
+          if (fr && _console === "web") {
+            // v0.7.11-web6: a SPA não usa ?theme=; o tema vai por postMessage
+            // (o boot.js aplica em data-color-scheme + localStorage).
+            _postThemeToFrame();
+            toast("✅ " + (dict["theme.web_applied"] || "Tema aplicado na versão web"), "ok");
+          } else if (fr) {
             const origSrc = fr.src.split("?")[0];
             fr.src = "about:blank";
             setTimeout(() => {
@@ -4322,6 +4337,7 @@ def create_wrapper_html(
         root.style.setProperty("--ov-dim", "rgba(4,7,11,.8)");
         document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#141c24");
       }
+      _postThemeToFrame();
     }
 
     // Carrega tema inicial: 1) script anti-flash no <head> 2) cookie 3) GET /api/theme
@@ -4363,6 +4379,49 @@ def create_wrapper_html(
     const TERMINAL_URL = (document.getElementById("terminal-frame") || {}).dataset
       ? (document.getElementById("terminal-frame").dataset.terminalUrl || "")
       : "";
+    const WEB_URL = TERMINAL_URL;
+    const TTYD_URL = (function () {
+      var u = "{__TTYD_URL__}";
+      if (u) return u;
+      var o = location.origin || "";
+      if (o.indexOf("://8001-") > 0) return o.replace("://8001-", "://8000-") + "/";
+      if (/:8001$/.test(o)) return o.replace(":8001", ":8000") + "/";
+      return "";
+    })();
+    let _console = localStorage.getItem("ufvai.console") || "web";
+    function _currentTheme() {
+      return (document.documentElement.getAttribute("data-theme") === "pesquisai-light")
+        ? "light" : "dark";
+    }
+    function _postThemeToFrame() {
+      const fr = document.getElementById("terminal-frame");
+      if (!fr || !fr.contentWindow) return;
+      try {
+        fr.contentWindow.postMessage({ type: "ufvai-theme", theme: _currentTheme() }, "*");
+      } catch (e) {}
+    }
+    (function _bindThemeSync() {
+      const fr = document.getElementById("terminal-frame");
+      if (!fr) return;
+      fr.addEventListener("load", function () {
+        setTimeout(_postThemeToFrame, 60);
+      });
+    })();
+    function _frameUrl(mode) {
+      if (mode === "ttyd" && TTYD_URL) return TTYD_URL;
+      const sep = WEB_URL.indexOf("?") < 0 ? "?" : "&";
+      return WEB_URL + sep + "theme=" + _currentTheme();
+    }
+    function applyConsole(mode) {
+      const fr = document.getElementById("terminal-frame");
+      if (!fr) return;
+      _console = (mode === "ttyd" && TTYD_URL) ? "ttyd" : "web";
+      try { localStorage.setItem("ufvai.console", _console); } catch (e) {}
+      const b = document.getElementById("console-toggle");
+      if (b) { b.dataset.mode = _console; b.setAttribute("aria-label", _console); }
+      fr.src = _frameUrl(_console);
+    }
+    function toggleConsole() { applyConsole(_console === "web" ? "ttyd" : "web"); }
 
     function _bootEls() {
       return {
@@ -4408,7 +4467,7 @@ def create_wrapper_html(
       maxMs = maxMs || 30000;
       while (Date.now() - t0 < maxMs) {
         try {
-          const r = await fetch(BASE + "/api/ttyd_ready", { cache: "no-store" });
+          const r = await fetch(BASE + "{__READY_URL__}", { cache: "no-store" });
           if (r.ok) {
             const d = await r.json();
             if (d.ready) { if (d.pid) _ttydPid = d.pid; return true; }
@@ -4441,11 +4500,11 @@ def create_wrapper_html(
       }
       let loaded = false;
       el.frame.onload = () => { loaded = true; hideBootSplash(); };
-      el.frame.src = TERMINAL_URL;
+      el.frame.src = _frameUrl(_console);
       if (!_ttydWatch) {
         _ttydWatch = setInterval(async () => {
           try {
-            const r = await fetch(BASE + "/api/ttyd_ready", { cache: "no-store" });
+            const r = await fetch(BASE + "{__READY_URL__}", { cache: "no-store" });
             if (!r.ok) return;
             const d = await r.json();
             if (!d.ready || !d.pid) return;
@@ -4455,7 +4514,7 @@ def create_wrapper_html(
             const f = document.getElementById("terminal-frame");
             if (f) {
               try { f.contentWindow.location.reload(); }
-              catch (e) { f.src = TERMINAL_URL; }
+              catch (e) { f.src = _frameUrl(_console); }
             }
           } catch (e) {}
         }, 20000);
@@ -5215,6 +5274,188 @@ def create_wrapper_html(
      mais aparece. Fecha com "Agora não" apenas nesta aba (sessionStorage).
      ═══════════════════════════════════════════════════════════════════ -->
 <style>
+
+  /* ════════════════════════════════════════════════════════════════
+     v0.7.11 — VPN da UFV (tela inicial + painel)
+     ════════════════════════════════════════════════════════════════ */
+  #vpn-ask-overlay, #vpn-overlay {
+    position: fixed; inset: 0; z-index: 99998; display: none;
+    align-items: center; justify-content: center; padding: 16px;
+    background: var(--ov-dim); backdrop-filter: blur(4px);
+  }
+  #vpn-ask-overlay .va-card {
+    width: 100%; max-width: 540px; background: var(--rail); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 16px; padding: 26px 24px;
+    box-shadow: 0 30px 90px rgba(0,0,0,.55);
+  }
+  .va-top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .va-brand { font-size: 20px; letter-spacing: -.02em; }
+  .va-brand b { font-weight: 700; }
+  .va-brand em { font-style: normal; font-weight: 600; color: var(--accent); }
+  .va-kicker {
+    font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-muted);
+  }
+  .va-ico { font-size: 36px; text-align: center; margin: 2px 0 8px; }
+  #vpn-ask-overlay h2 { font-size: 20px; margin: 0 0 6px; text-align: center; }
+  #vpn-ask-overlay .va-sub {
+    font-size: 12.5px; color: var(--ink-muted); line-height: 1.55;
+    text-align: center; margin: 0 0 18px;
+  }
+  .va-choice {
+    display: flex; align-items: center; gap: 13px; width: 100%; text-align: left;
+    padding: 13px 14px; margin-bottom: 9px; border-radius: 10px; cursor: pointer;
+    background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+    transition: border-color .15s, background .15s, transform .15s;
+  }
+  .va-choice:hover {
+    border-color: var(--accent); background: var(--accent-dim); transform: translateY(-1px);
+  }
+  .va-choice.yes { border-color: rgba(var(--accent-rgb),.55); background: var(--accent-dim); }
+  .va-choice .va-ico2 {
+    font-size: 20px; width: 34px; height: 34px; display: flex; align-items: center;
+    justify-content: center; border-radius: 9px; background: var(--accent-dim); flex: 0 0 auto;
+  }
+  .va-choice b { display: block; font-size: 13.5px; margin-bottom: 2px; }
+  .va-choice small { display: block; font-size: 11px; color: var(--ink-muted); line-height: 1.4; }
+  .va-arrow { margin-left: auto; color: var(--accent); font-size: 16px; }
+  .va-note {
+    font-size: 10.5px; color: var(--ink-muted); line-height: 1.5;
+    margin-top: 8px; text-align: center;
+  }
+
+  #vpn-overlay .vpn-card {
+    width: 100%; max-width: 680px; max-height: 92vh; overflow: auto;
+    background: var(--rail); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 14px; box-shadow: 0 30px 90px rgba(0,0,0,.6);
+  }
+  .vpn-head {
+    display: flex; align-items: flex-start; gap: 12px; padding: 18px 20px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .vpn-title { font-size: 16px; font-weight: 700; }
+  .vpn-sub { font-size: 11px; color: var(--ink-muted); margin-top: 2px; }
+  .vpn-x {
+    margin-left: auto; background: transparent; border: 0; color: var(--ink-muted);
+    font-size: 18px; cursor: pointer; padding: 2px 7px; border-radius: 6px;
+  }
+  .vpn-x:hover { background: var(--accent-dim); color: var(--ink); }
+  .vpn-status {
+    display: flex; align-items: center; gap: 8px; padding: 12px 20px;
+    font-size: 12.5px; font-weight: 600; border-bottom: 1px solid var(--line);
+  }
+  .vpn-dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--ink-muted);
+    flex: 0 0 auto;
+  }
+  .vpn-dot.on { background: var(--green); box-shadow: 0 0 0 3px var(--green-dim); }
+  .vpn-dot.wait { background: var(--amber); animation: vpnPulse 1.2s infinite; }
+  .vpn-dot.err { background: var(--red); box-shadow: 0 0 0 3px var(--red-dim); }
+  @keyframes vpnPulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+  #vpn-status-extra {
+    margin-left: auto; font-size: 10.5px; color: var(--ink-muted);
+    font-weight: 400; text-align: right; word-break: break-all;
+  }
+  .vpn-warn {
+    margin: 14px 20px 0; padding: 12px 14px; border-radius: 10px;
+    background: var(--amber-dim); border: 1px solid rgba(209,167,5,.35);
+    font-size: 11.5px; line-height: 1.5;
+  }
+  .vpn-warn b { display: block; margin-bottom: 4px; color: var(--amber); }
+  .vpn-warn ul { margin: 4px 0 0 16px; padding: 0; }
+  .vpn-warn li { margin: 2px 0; }
+  .vpn-form { padding: 14px 20px 2px; display: grid; gap: 7px; }
+  .vpn-form label { font-size: 11px; font-weight: 600; color: var(--ink-muted); }
+  .vpn-form input[type=text], .vpn-form input[type=password] {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink); font-size: 13px; outline: none;
+  }
+  .vpn-form input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
+  .vpn-check {
+    display: flex; align-items: center; gap: 8px; font-size: 11.5px !important;
+    font-weight: 400 !important; color: var(--ink) !important; margin-top: 2px;
+  }
+  .vpn-check input { accent-color: var(--accent); width: 15px; height: 15px; }
+  .vpn-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 9px 0 14px; }
+  .vpn-primary, .vpn-danger, .vpn-ghost {
+    padding: 9px 15px; border-radius: 8px; font-size: 12.5px; font-weight: 600;
+    cursor: pointer; border: 1px solid transparent;
+  }
+  .vpn-primary { background: linear-gradient(135deg, var(--amber), var(--accent)); color: #141c24; }
+  .vpn-danger { background: transparent; color: var(--red); border-color: var(--red); }
+  .vpn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  .vpn-primary:disabled, .vpn-danger:disabled, .vpn-ghost:disabled { opacity: .45; cursor: not-allowed; }
+  .vpn-adv {
+    margin: 0 20px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 11.5px;
+  }
+  .vpn-adv summary { cursor: pointer; color: var(--ink-muted); font-weight: 600; }
+  .vpn-adv textarea {
+    width: 100%; min-height: 90px; margin-top: 8px; padding: 9px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    font-family: var(--font-mono); font-size: 10.5px; resize: vertical;
+  }
+  #vpn-details {
+    margin: 8px 0; font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--ink-muted); white-space: pre-wrap; line-height: 1.5;
+    max-height: 150px; overflow: auto;
+  }
+  .vpn-foot {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    padding: 12px 20px 16px; font-size: 10.5px; color: var(--ink-muted);
+  }
+  .vpn-foot a { color: var(--accent); text-decoration: none; }
+  .vpn-test-result {
+    margin: 0 20px 12px; padding: 9px 11px; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--line);
+    font-family: var(--font-mono); font-size: 10.5px; line-height: 1.55;
+    white-space: pre-wrap; color: var(--ink-muted); display: none;
+  }
+  .vpn-test-result.show { display: block; }
+  .vpn-fwd {
+    margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line);
+  }
+  .vpn-fwd b { font-size: 11.5px; }
+  .vpn-fwd-hint {
+    font-size: 10.5px; color: var(--ink-muted); margin: 3px 0 7px; line-height: 1.45;
+  }
+  .vpn-fwd-row {
+    display: grid; grid-template-columns: 1.4fr .7fr .7fr auto; gap: 6px;
+    align-items: center;
+  }
+  .vpn-fwd-row input {
+    padding: 7px 8px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink); font-size: 11px; min-width: 0;
+  }
+  .vpn-fwd-item {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 10.5px;
+    margin-top: 6px; padding: 6px 8px; border-radius: 7px;
+    background: var(--surface); border: 1px solid var(--line);
+  }
+  .vpn-fwd-item code { font-family: var(--font-mono); color: var(--accent); }
+  .vpn-fwd-item button {
+    margin-left: auto; background: transparent; border: 0; color: var(--red);
+    cursor: pointer; font-size: 14px;
+  }
+  .vpn-fwd-empty { font-size: 10.5px; color: var(--ink-muted); margin-top: 6px; }
+  @media (max-width: 600px) {
+    .vpn-fwd-row { grid-template-columns: 1fr 1fr; }
+    .vpn-fwd-row button { grid-column: 1 / -1; }
+  }
+  #vpn-btn.connected svg { stroke: var(--green); }
+  #vpn-btn.connected { position: relative; }
+  #vpn-btn.connected::after {
+    content: ""; position: absolute; top: 5px; right: 5px; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--green); box-shadow: 0 0 0 2px var(--rail);
+  }
+  @media (max-width: 600px) {
+    #vpn-ask-overlay .va-card { padding: 20px 16px; }
+    #vpn-overlay { padding: 8px; }
+    .vpn-card { max-height: 95vh; }
+    .vpn-head, .vpn-form, .vpn-foot { padding-left: 14px; padding-right: 14px; }
+    .vpn-warn, .vpn-adv { margin-left: 14px; margin-right: 14px; }
+    .vpn-actions button { flex: 1; }
+  }
+
   #onboard-overlay{position:fixed;inset:0;z-index:99997;display:none;align-items:center;
     justify-content:center;background:rgba(8,11,15,.94);backdrop-filter:blur(7px);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
@@ -5250,6 +5491,12 @@ def create_wrapper_html(
     cursor:pointer;padding:0 0 12px;font-family:inherit;}
   #onboard-overlay .ob-back:hover{color:#b29149}
   #onboard-overlay .ob-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  #onboard-overlay .ob-other{margin:4px 0 12px}
+  #onboard-overlay .ob-other summary{cursor:pointer;font-size:11.5px;color:#9a9790;padding:8px 2px;list-style:none}
+  #onboard-overlay .ob-other summary::-webkit-details-marker{display:none}
+  #onboard-overlay .ob-other summary:hover{color:#b29149}
+  #onboard-overlay .ob-other summary::before{content:"▸ ";color:#b29149}
+  #onboard-overlay .ob-other[open] summary::before{content:"▾ "}
   #onboard-overlay .ob-prov{position:relative;text-align:left;background:rgba(255,255,255,.03);
     border:1px solid rgba(255,255,255,.09);border-radius:11px;padding:14px;cursor:pointer;
     color:inherit;font-family:inherit;transition:border-color .15s,background .15s,transform .15s;}
@@ -5353,6 +5600,135 @@ def create_wrapper_html(
   }
 </style>
 
+
+<!-- ═══════════════════════════════════════════════════════════════
+     v0.7.11 — VPN da UFV
+     1) tela inicial: "Você é aluno(a) da UFV?"
+     2) painel de conexão (CPF + senha do portal vpn.ufvnet.ufv.br)
+     ═══════════════════════════════════════════════════════════════ -->
+
+<div id="vpn-ask-overlay" role="dialog" aria-modal="true" aria-labelledby="vpn-ask-title">
+  <div class="va-card">
+    <div class="va-top">
+      <span class="va-brand"><b>UFV</b><em>AI</em></span>
+      <span class="va-kicker" data-i18n="vpn.kicker">Acesso à rede da UFV</span>
+    </div>
+    <div class="va-ico" aria-hidden="true">🎓</div>
+    <h2 id="vpn-ask-title" data-i18n="vpn.ask_title">Você é aluno(a) da UFV?</h2>
+    <p class="va-sub" data-i18n="vpn.ask_sub">Se você tem vínculo com a UFV, pode conectar o UFVAI à VPN da universidade e acessar sistemas e periódicos restritos.</p>
+
+    <button type="button" class="va-choice yes" onclick="vpnAnswer('ufv')">
+      <span class="va-ico2" aria-hidden="true">🎓</span>
+      <span>
+        <b data-i18n="vpn.ask_yes">Sim, sou aluno(a) da UFV</b>
+        <small data-i18n="vpn.ask_yes_sub">Informar CPF e senha da VPN</small>
+      </span>
+      <span class="va-arrow" aria-hidden="true">→</span>
+    </button>
+
+    <button type="button" class="va-choice" onclick="vpnAnswer('no')">
+      <span class="va-ico2" aria-hidden="true">🌐</span>
+      <span>
+        <b data-i18n="vpn.ask_no">Não, continuar sem VPN</b>
+        <small data-i18n="vpn.ask_no_sub">O UFVAI funciona normalmente com a internet do Colab</small>
+      </span>
+      <span class="va-arrow" aria-hidden="true">→</span>
+    </button>
+
+    <p class="va-note" data-i18n="vpn.ask_note">Você pode mudar isso depois no botão 🛡 VPN, na barra superior.</p>
+  </div>
+</div>
+
+<div id="vpn-overlay" role="dialog" aria-modal="true" aria-labelledby="vpn-title"
+     onclick="if(event.target===this)closeVpn()">
+  <div class="vpn-card">
+    <div class="vpn-head">
+      <div>
+        <div class="vpn-title" id="vpn-title">🛡 <span data-i18n="vpn.title">VPN da UFV</span></div>
+        <div class="vpn-sub" data-i18n="vpn.subtitle">Acesso à rede institucional pelo Colab (OpenVPN)</div>
+      </div>
+      <button type="button" class="vpn-x" onclick="closeVpn()" aria-label="Fechar">✕</button>
+    </div>
+
+    <div class="vpn-status" role="status" aria-live="polite">
+      <span class="vpn-dot" id="vpn-dot"></span>
+      <span id="vpn-status-text" data-i18n="vpn.off">Desconectado</span>
+      <span id="vpn-status-extra"></span>
+    </div>
+
+    <div class="vpn-warn">
+      <b data-i18n="vpn.warn_title">Antes de conectar</b>
+      <ul>
+        <li data-i18n="vpn.warn1">Use suas credenciais pessoais do portal vpn.ufvnet.ufv.br (CPF + senha).</li>
+        <li data-i18n="vpn.warn2">A UFV limita a VPN a 1 dispositivo por CPF: conectar aqui pode desconectar seu computador.</li>
+        <li data-i18n="vpn.warn3">Por padrão o túnel é total: o OpenCode (agente + terminal) sai pela UFV. O kernel do notebook e o wrapper continuam fora.</li>
+        <li data-i18n="vpn.warn4">A senha não é gravada, a menos que você marque “lembrar” (aí fica cifrada no seu Drive).</li>
+      </ul>
+    </div>
+
+    <div class="vpn-form">
+      <label for="vpn-cpf" data-i18n="vpn.cpf">CPF</label>
+      <input id="vpn-cpf" type="text" inputmode="numeric" maxlength="14" autocomplete="off"
+             spellcheck="false" placeholder="000.000.000-00">
+      <label for="vpn-pass" data-i18n="vpn.password">Senha da VPN</label>
+      <input id="vpn-pass" type="password" autocomplete="off" spellcheck="false" placeholder="••••••••">
+      <label class="vpn-check" for="vpn-remember">
+        <input type="checkbox" id="vpn-remember">
+        <span data-i18n="vpn.remember">Lembrar neste Drive (cifrado)</span>
+      </label>
+      <label class="vpn-check" for="vpn-system">
+        <input type="checkbox" id="vpn-system" checked>
+        <span data-i18n="vpn.system_mode">Usar a VPN em todo o UFVAI (terminal + OpenCode)</span>
+      </label>
+      <p class="vpn-fwd-hint" data-i18n="vpn.system_hint">Padrão: o OpenCode (agente + terminal) roda dentro da VPN — a rede da UFV sai por tun0 e a internet comum (LLM) continua pelo Colab.</p>
+      <label class="vpn-check" for="vpn-full">
+        <input type="checkbox" id="vpn-full">
+        <span data-i18n="vpn.full_mode">Túnel total (todo o tráfego pela UFV)</span>
+      </label>
+      <p class="vpn-fwd-hint" data-i18n="vpn.full_hint">Só para modelos/serviços internos da UFV: nesse modo a UFV bloqueia a internet externa e o LLM em nuvem para de responder.</p>
+      <div class="vpn-actions">
+        <button type="button" id="vpn-connect-btn" class="vpn-primary" onclick="vpnConnect()" data-i18n="vpn.connect">Conectar</button>
+        <button type="button" id="vpn-disconnect-btn" class="vpn-danger" onclick="vpnDisconnect()" style="display:none" data-i18n="vpn.disconnect">Desconectar</button>
+        <button type="button" class="vpn-ghost" id="vpn-test-btn" onclick="vpnTest(this)" data-i18n="vpn.test">Testar acesso</button>
+      </div>
+      <div id="vpn-test-result" class="vpn-test-result" role="status" aria-live="polite"></div>
+    </div>
+
+    <details class="vpn-adv">
+      <summary data-i18n="vpn.advanced">Detalhes técnicos</summary>
+      <div id="vpn-details"></div>
+      <div class="vpn-actions" style="margin:6px 0 8px">
+        <button type="button" class="vpn-ghost" onclick="vpnProfile(true)" data-i18n="vpn.profile">Baixar/atualizar perfil .ovpn</button>
+      </div>
+      <label for="vpn-profile-text" style="font-size:11px;color:var(--ink-muted)" data-i18n="vpn.profile_paste">Colar perfil .ovpn (modo offline)</label>
+      <textarea id="vpn-profile-text" placeholder="-----BEGIN CERTIFICATE----- ..."></textarea>
+      <div class="vpn-actions" style="margin:6px 0 0">
+        <button type="button" class="vpn-ghost" onclick="vpnProfile(false, true)" data-i18n="vpn.profile_save">Salvar perfil colado</button>
+        <button type="button" class="vpn-ghost" onclick="vpnForget()" data-i18n="vpn.forget">Esquecer credenciais salvas</button>
+      </div>
+
+      <div class="vpn-fwd">
+        <b data-i18n="vpn.forward_title">Modelo/serviço na rede da UFV</b>
+        <p class="vpn-fwd-hint" data-i18n="vpn.forward_hint">Ex.: Ollama em 10.0.0.10:11434. No OpenCode, use http://127.0.0.1:11435/v1 como baseURL.</p>
+        <div class="vpn-fwd-row">
+          <input id="vpn-fwd-host" type="text" placeholder="10.0.0.10" autocomplete="off" spellcheck="false">
+          <input id="vpn-fwd-port" type="number" placeholder="11434" min="1" max="65535">
+          <input id="vpn-fwd-local" type="number" placeholder="11435" min="1" max="65535">
+          <button type="button" class="vpn-ghost" onclick="vpnForward()" data-i18n="vpn.forward_add">Encaminhar</button>
+        </div>
+        <div id="vpn-fwd-list"></div>
+      </div>
+    </details>
+
+    <div class="vpn-foot">
+      <a href="https://vpn.ufvnet.ufv.br/linux_ubuntu.html" target="_blank" rel="noopener" data-i18n="vpn.guide">Instruções oficiais da UFV</a>
+      <span>↗</span>
+      <span>·</span>
+      <span data-i18n="vpn.foot">Proxy local: socks5h://127.0.0.1:1081</span>
+    </div>
+  </div>
+</div>
+
 <div id="onboard-overlay" role="dialog" aria-modal="true" aria-label="Configurar provedor de IA">
   <div class="ob-card">
     <div class="ob-top">
@@ -5388,6 +5764,10 @@ def create_wrapper_html(
       <p class="ob-sub">Escolha um provedor. Em todos, você cria a chave no site do provedor e cola aqui —
         leva cerca de 1 minuto.</p>
       <div class="ob-grid" id="ob-grid"></div>
+      <details class="ob-other" id="ob-other-details" style="display:none">
+        <summary>Outro provedor (OpenAI, Anthropic, Groq, Mistral…)</summary>
+        <div class="ob-grid" id="ob-grid-others" style="margin-top:10px"></div>
+      </details>
       <p class="ob-note">🔒 A chave é gravada <b>cifrada</b> em <code>backups/</code> no seu Drive.
         As chaves são de sua responsabilidade e não têm vínculo com a plataforma UFVAI.</p>
     </div>
@@ -5433,23 +5813,32 @@ def create_wrapper_html(
   }
 
   // ── cards de provedor (passo 1) ──────────────────────────────
-  function renderProviders(){
-    var grid = $("ob-grid");
-    if (!grid || !DATA) return;
-    var html = "";
-    (DATA.providers || []).forEach(function(p){
-      var cls = "ob-prov" + (p.recommended ? " rec" : "");
-      var badge = p.recommended ? '<span class="p-badge rec">recomendado</span>'
-                : (p.paid ? '<span class="p-badge paid">pago</span>'
-                          : '<span class="p-badge free">grátis</span>');
-      html += '<button class="' + cls + '" data-prov="' + p.id + '">' + badge +
-              '<span class="p-name">' + p.label + '</span>' +
-              '<span class="p-tag">' + p.tagline + '</span></button>';
-    });
-    grid.innerHTML = html;
-    [].forEach.call(grid.querySelectorAll("[data-prov]"), function(btn){
+  function provCard(p){
+    var cls = "ob-prov" + (p.recommended ? " rec" : "");
+    var badge = p.other ? '<span class="p-badge free">lista</span>'
+              : p.recommended ? '<span class="p-badge rec">recomendado</span>'
+              : (p.paid ? '<span class="p-badge paid">pago</span>'
+                        : '<span class="p-badge free">grátis</span>');
+    return '<button class="' + cls + '" data-prov="' + p.id + '">' + badge +
+           '<span class="p-name">' + p.label + '</span>' +
+           '<span class="p-tag">' + p.tagline + '</span></button>';
+  }
+  function bindCards(container){
+    [].forEach.call(container.querySelectorAll("[data-prov]"), function(btn){
       btn.addEventListener("click", function(){ pick(btn.getAttribute("data-prov")); });
     });
+  }
+  function renderProviders(){
+    if (!DATA) return;
+    var all = DATA.providers || [];
+    var main = all.filter(function(p){ return !p.other; });
+    var others = all.filter(function(p){ return p.other; });
+    var grid = $("ob-grid");
+    if (grid){ grid.innerHTML = main.map(provCard).join(""); bindCards(grid); }
+    var og = $("ob-grid-others");
+    if (og){ og.innerHTML = others.map(provCard).join(""); bindCards(og); }
+    var det = $("ob-other-details");
+    if (det) det.style.display = others.length ? "block" : "none";
   }
 
   // ── "print" da tela de cada provedor (reprodução declarada) ──
@@ -5495,7 +5884,7 @@ def create_wrapper_html(
       steps = '<li>Abra a página <b>Chaves de API</b> do Google AI Studio (botão abaixo).</li>' +
               '<li>Clique em <b>Criar chave de API</b> (canto superior direito) e confirme.</li>' +
               '<li>Na linha da chave, clique no <b>ícone de copiar</b>, volte para esta janela e cole no campo.</li>';
-      extra = '<p class="ob-note">A chave começa com <b>AIza</b>. Ao salvar, o modelo padrão vira o ' +
+      extra = '<p class="ob-note">Ao salvar, o modelo padrão vira o ' +
               '<b>Gemini Flash-Lite Latest</b> com esforço <b>high</b> — e continua nos próximos usos.</p>';
     } else if (provider === "nvidia"){
       steps = '<li>Entre em <b>build.nvidia.com</b> com sua conta NVIDIA.</li>' +
@@ -5505,13 +5894,19 @@ def create_wrapper_html(
       steps = '<li>Crie a conta em <b>openrouter.ai</b>.</li>' +
               '<li>Abra <b>openrouter.ai/keys</b> e clique em <b>Create Key</b>.</li>' +
               '<li>Copie a chave (<b>sk-or-</b>) — ela aparece uma única vez — e cole abaixo.</li>';
+    } else if (p.other) {
+      steps = '<li>Crie a conta e a chave em <b>' + (p.url_label || p.label) + '</b>.</li>' +
+              '<li>Copie a chave e cole no campo abaixo.</li>';
+      extra = p.env
+        ? '<p class="ob-note">A chave será salva como <b>' + p.env + '</b> e o modelo você escolhe depois em 🎛️.</p>'
+        : '';
     } else {
       steps = '<li>O <b>OpenCode Go</b> é a opção <b>paga</b> do ecossistema (assinatura à parte).</li>' +
               '<li>Assine em <b>opencode.ai/go</b> e copie a chave do painel.</li>' +
               '<li>Cole a chave abaixo. O UFVAI não intermedeia pagamento nem cobra por isso.</li>';
     }
     var label = provider === "opencode_go" ? "Abrir opencode.ai/go" : "Abrir " + p.url_label;
-    var ph = provider === "google" ? "AIza…" : (provider === "nvidia" ? "nvapi-…" : "sk-…");
+    var ph = provider === "google" ? "Cole a chave do Google" : (provider === "nvidia" ? "nvapi-…" : "sk-…");
     return '<p class="ob-sub">' + (p.paid ? 'Esta opção é paga. ' : 'Grátis. ') +
         'Crie a chave no site do provedor e cole aqui — o UFVAI guarda cifrado.</p>' +
       '<ol class="ob-steps">' + steps + '</ol>' +
@@ -5608,10 +6003,18 @@ def create_wrapper_html(
       var skip = false;
       try { skip = sessionStorage.getItem("ufvai_ob_skip") === "1"; } catch(e){}
       if (skip){ clearInterval(timer); return; }
-      if (visible($("terms-overlay")) || visible($("welcome-overlay"))) {
-        if (tries > 480) clearInterval(timer);   // ~4 min de tolerância
+      var _as = $("autosave-overlay");
+      if (visible($("terms-overlay")) || visible($("welcome-overlay")) ||
+          (_as && _as.classList.contains("open"))) {
+        tries = 0;
         return;
       }
+      // v0.7.11: a pergunta "é aluno da UFV?" vem ANTES do provedor/chave.
+      // Espera o fetch da VPN decidir (unknown) e a resposta do usuário.
+      var vpnState = window.UFVAI_VPN_STATE || "unknown";
+      if (vpnState === "unknown" && tries < 20) return;  // ~10 s
+      if (vpnState === "asking") return;
+      if (visible($("vpn-overlay"))) return;             // painel aberto
       clearInterval(timer);
       OV.style.display = "flex";
       showStep("ob-step0");
@@ -5641,6 +6044,366 @@ def create_wrapper_html(
     })["catch"](function(){});
 })();
 </script>
+
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   v0.7.11 — VPN da UFV (frontend)
+   A pergunta inicial aparece depois de Termos/welcome/onboarding.
+   O painel fica disponível no botão 🛡 da barra superior.
+   ════════════════════════════════════════════════════════════════ */
+(function(){
+  var ASK = document.getElementById("vpn-ask-overlay");
+  var OV  = document.getElementById("vpn-overlay");
+  if (!ASK || !OV) return;
+
+  var poll = null, last = {}, busy = false, _toastT = null, pendingSystem = false;
+  window.UFVAI_VPN_STATE = "unknown";
+
+  function $(id){ return document.getElementById(id); }
+  function show(el, on){ if (el) el.style.display = on ? "flex" : "none"; }
+  function visible(el){
+    if (!el) return false;
+    var cs = window.getComputedStyle ? getComputedStyle(el) : el.style;
+    return cs.display !== "none" && cs.visibility !== "hidden";
+  }
+  function D(){
+    var all = window.UFVAI_I18N || {};
+    var lang = (document.documentElement.lang || "pt-BR").replace("-", "_");
+    return all[lang] || all["pt_BR"] || {};
+  }
+  function tr(key, fallback){
+    var v = D()[key];
+    return (v === undefined || v === null || v === "") ? fallback : v;
+  }
+  function toast(msg, type){
+    var el = $("toast");
+    if (!el) { try { console.log(msg); } catch(e){} return; }
+    el.className = "show " + (type || "info");
+    el.textContent = msg;
+    clearTimeout(_toastT);
+    _toastT = setTimeout(function(){ el.classList.remove("show"); }, 4200);
+  }
+  function fmtCpf(v){
+    v = (v || "").replace(/\\D/g, "").slice(0, 11);
+    v = v.replace(/^(\\d{3})(\\d)/, "$1.$2");
+    v = v.replace(/^(\\d{3})\\.(\\d{3})(\\d)/, "$1.$2.$3");
+    v = v.replace(/\\.(\\d{3})(\\d{1,2})$/, ".$1-$2");
+    return v;
+  }
+
+  function render(st){
+    last = st || {};
+    var state = last.state || "disconnected";
+    var dot = $("vpn-dot"), txt = $("vpn-status-text"), extra = $("vpn-status-extra");
+    if (dot) dot.className = "vpn-dot" + (state === "connected" ? " on" : state === "connecting" ? " wait" : state === "error" ? " err" : "");
+    var key = state === "connected" ? "vpn.on" : state === "connecting" ? "vpn.connecting" : state === "error" ? "vpn.error" : "vpn.off";
+    var fallback = state === "connected" ? "Conectado à VPN da UFV" : state === "connecting" ? "Conectando…" : state === "error" ? "Falha na VPN" : "Desconectado";
+    if (txt){ txt.setAttribute("data-i18n", key); txt.textContent = tr(key, fallback); }
+    if (extra){
+      if (state === "connected"){
+        var bits = [];
+        if (last.tun_ip) bits.push(last.tun_ip);
+        if (last.proxy) bits.push(last.proxy);
+        if (last.system_mode) bits.push(tr("vpn.system_badge", "todo o UFVAI na VPN"));
+        extra.textContent = bits.join(" · ");
+      } else {
+        extra.textContent = last.progress || (state === "error" ? (last.last_error || "") : "");
+      }
+    }
+
+    var btn = $("vpn-btn");
+    if (btn) btn.className = "tb-icon" + (state === "connected" ? " connected" : "");
+    if ($("vpn-system") && last.system_mode) $("vpn-system").checked = true;
+    if ($("vpn-full") && state === "connected") $("vpn-full").checked = !!last.full_tunnel;
+
+    var cbtn = $("vpn-connect-btn"), dbtn = $("vpn-disconnect-btn");
+    if (cbtn){
+      cbtn.disabled = (state === "connecting" || state === "connected");
+      cbtn.textContent = state === "connecting" ? tr("vpn.connecting", "Conectando…") : tr("vpn.connect", "Conectar");
+    }
+    if (dbtn) dbtn.style.display = (state === "connected" || state === "connecting") ? "inline-block" : "none";
+
+    if (last.has_saved_credentials){
+      var cpf = $("vpn-cpf"), pass = $("vpn-pass");
+      if (cpf && !cpf.value) cpf.placeholder = last.saved_cpf_masked || "000.000.000-00";
+      if (pass && !pass.value) pass.placeholder = "•••••••• (salva)";
+    }
+
+    var det = $("vpn-details");
+    if (det){
+      var cap = last.capabilities || {};
+      var lines = [];
+      lines.push("modo: " + (last.mode || cap.mode || "—"));
+      lines.push("TUN: " + (cap.has_tun ? "sim" : "não") + " · NET_ADMIN: " + (cap.has_net_admin ? "sim" : "não") + " · slirp4netns: " + (cap.has_slirp4netns ? "sim" : "não") + " · openvpn: " + (cap.has_openvpn ? "sim" : "não"));
+      if (last.tun_ip) lines.push("IP no túnel: " + last.tun_ip);
+      if ((last.dns || []).length) lines.push("DNS da VPN: " + last.dns.join(", "));
+      if ((last.routes || []).length) lines.push("rotas:\\n  " + last.routes.slice(0, 12).join("\\n  "));
+      if (last.profile && last.profile.sha256) lines.push("perfil: " + String(last.profile.sha256).slice(0, 16) + "…");
+      if (last.last_error) lines.push("erro: " + last.last_error);
+      if ((last.log_tail || []).length) lines.push("log:\\n" + last.log_tail.slice(-6).join("\\n"));
+      det.textContent = lines.join("\\n");
+    }
+
+    var fwdList = $("vpn-fwd-list");
+    if (fwdList){
+      var fw = last.forwards || [];
+      if (!fw.length){
+        fwdList.innerHTML = '<div class="vpn-fwd-empty">' + tr("vpn.forward_empty", "Nenhum encaminhamento ativo.") + '</div>';
+      } else {
+        fwdList.innerHTML = fw.map(function(f){
+          return '<div class="vpn-fwd-item"><code>' + (f.local_url || "") + '</code> → ' +
+                 (f.remote_host || "") + ':' + (f.remote_port || "") +
+                 '<button type="button" class="vpn-fwd-del" data-id="' + (f.id || "") + '" title="' +
+                 tr("vpn.forward_remove", "Remover") + '">×</button></div>';
+        }).join("");
+        [].forEach.call(fwdList.querySelectorAll(".vpn-fwd-del"), function(btn){
+          btn.addEventListener("click", function(){
+            window.vpnUnforward(btn.getAttribute("data-id"));
+          });
+        });
+      }
+    }
+
+    if (state === "connected" && pendingSystem && !last.system_mode){
+      pendingSystem = false;
+      fetch("/api/vpn/system", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({enabled: true})
+      }).then(function(r){ return r.json(); }).then(function(d){
+        if (d && d.error){ toast(d.error, "error"); }
+        else {
+          toast(tr("vpn.system_on", "Modo total ativado. Recarregando…"), "success");
+          setTimeout(function(){ try { location.reload(); } catch(e){} }, 2500);
+        }
+      }).catch(function(){});
+    }
+    if (state !== "connected") pendingSystem = false;
+
+    if (state === "connecting" && !poll) poll = setInterval(refresh, 1500);
+    if (state !== "connecting" && poll){ clearInterval(poll); poll = null; }
+  }
+
+  function refresh(){
+    return fetch("/api/vpn", {cache: "no-store"})
+      .then(function(r){ return r.json(); })
+      .then(render)
+      .catch(function(){});
+  }
+  window.vpnRefresh = refresh;
+
+  window.openVpn = function(){ show(OV, true); refresh(); };
+  window.closeVpn = function(){ show(OV, false); if (poll){ clearInterval(poll); poll = null; } };
+
+  window.vpnAnswer = function(choice){
+    try { localStorage.setItem("ufvai_vpn_answered", choice); } catch(e){}
+    window.UFVAI_VPN_STATE = "done";
+    show(ASK, false);
+    fetch("/api/vpn/answer", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({choice: choice})
+    }).then(function(r){ return r.json(); }).then(render).catch(function(){});
+    if (choice === "ufv") window.openVpn();
+  };
+
+  window.vpnConnect = function(){
+    if (busy) return;
+    var cpf = ($("vpn-cpf") && $("vpn-cpf").value || "").replace(/\\D/g, "");
+    var pass = ($("vpn-pass") && $("vpn-pass").value || "");
+    var saved = !!(last && last.has_saved_credentials);
+    if (cpf.length !== 11 && !saved){ toast(tr("vpn.need_cpf", "Informe o CPF (11 dígitos)."), "warn"); return; }
+    if (!pass && !saved){ toast(tr("vpn.need_pass", "Informe a senha da VPN."), "warn"); return; }
+
+    var system = !!($("vpn-system") && $("vpn-system").checked);
+    var full = !!($("vpn-full") && $("vpn-full").checked);
+    pendingSystem = system;
+    busy = true;
+    var btn = $("vpn-connect-btn");
+    if (btn){ btn.disabled = true; btn.textContent = tr("vpn.connecting", "Conectando…"); }
+    fetch("/api/vpn/connect", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        cpf: cpf,
+        password: pass,
+        remember: !!($("vpn-remember") && $("vpn-remember").checked),
+        use_saved: saved && !pass,
+        full_tunnel: full,
+        system: system
+      })
+    }).then(function(r){ return r.json(); }).then(function(d){
+      busy = false;
+      render(d);
+      if (d && d.ok === false && d.error){ toast(d.error, "error"); }
+    }).catch(function(e){
+      busy = false;
+      if (btn){ btn.disabled = false; btn.textContent = tr("vpn.connect", "Conectar"); }
+      toast("Falha de conexão: " + (e && e.message ? e.message : e), "error");
+    });
+  };
+
+  window.vpnDisconnect = function(){
+    var wasSystem = !!(last && last.system_mode);
+    var url = wasSystem ? "/api/vpn/system" : "/api/vpn/disconnect";
+    var payload = wasSystem ? {enabled: false} : {};
+    fetch(url, {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    }).then(function(r){ return r.json(); }).then(function(d){
+      render(d);
+      toast(tr("vpn.disconnected_toast", "VPN desconectada."), "info");
+      if (wasSystem) setTimeout(function(){ try { location.reload(); } catch(e){} }, 2500);
+    }).catch(function(){});
+  };
+
+  window.vpnTest = function(btn){
+    if (btn){ btn.disabled = true; btn.textContent = tr("vpn.testing", "Testando…"); }
+    fetch("/api/vpn/test", {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (btn){ btn.disabled = false; btn.textContent = tr("vpn.test", "Testar acesso"); }
+      var inner = (d && d.internal) || {};
+      var pub = (d && d.public) || {};
+      var res = $("vpn-test-result");
+      var lines = [];
+      if (d && d.error) lines.push("⚠️ " + d.error);
+      function fmtBytes(n){
+        n = Number(n) || 0;
+        if (n >= 1048576) return (n / 1048576).toFixed(1) + " MB";
+        if (n >= 1024) return (n / 1024).toFixed(1) + " KB";
+        return n + " B";
+      }
+      lines.push("IP direto: " + ((d && d.direct_ip) || "—"));
+      var vpnTag = (d && d.proxy_ip)
+        ? ((d.exit_ip_differs) ? "  [diferente]" : "  [igual]")
+        : "  [sem resposta externa]";
+      lines.push("IP pela VPN: " + ((d && d.proxy_ip) || "—") + vpnTag);
+      lines.push("www.ufv.br: " + (pub.http || "falhou"));
+      lines.push("sistemas.ufv.br: " + (inner.http || "falhou"));
+      lines.push("TUN: " + ((d && d.tun_ip) || "—") + " · modo: " + ((d && d.full_tunnel) ? "total" : "split") + " · caminho: " + ((d && d.path) || "—"));
+      lines.push("DNS: " + (((d && d.dns) || []).join(", ") || "— (slirp 10.0.2.3)"));
+      lines.push("DNS interno: " + ((d && d.dns_internal) ? "ok (sistemas.ufv.br resolve)" : "não resolveu sistemas.ufv.br"));
+      if (d && (d.tun_tx || d.tun_rx)){
+        lines.push("Túnel tun0 no teste: +" + fmtBytes(d.tun_tx) + " ↑ / +" + fmtBytes(d.tun_rx) + " ↓" + ((d.tunnel_active) ? "  [tráfego passou pela VPN]" : ""));
+      }
+      if (d && d.route_default) lines.push("Rota de 1.1.1.1: " + d.route_default);
+      if (d && d.diag_internal && d.diag_internal.ip) lines.push("sistemas.ufv.br → " + d.diag_internal.ip + (d.diag_internal.route ? " · " + d.diag_internal.route : ""));
+      if (d && d.diag_public && d.diag_public.ip) lines.push("www.ufv.br → " + d.diag_public.ip + (d.diag_public.route ? " · " + d.diag_public.route : ""));
+      if (inner.error) lines.push("interno: " + inner.error);
+      if (res){ res.textContent = lines.join("\\n"); res.classList.add("show"); }
+
+      if (d && d.verdict === "vpn"){
+        toast(tr("vpn.verdict_vpn", "VPN confirmada — o tráfego está saindo pela UFV."), "success");
+      } else if (d && d.verdict === "proxy_only"){
+        toast(tr("vpn.verdict_proxy_only", "Proxy ativo, mas o IP de saída é o mesmo — split tunnel ou VPN não está roteando."), "warn");
+      } else {
+        toast(tr("vpn.verdict_no_proxy", "O proxy não respondeu — a VPN pode não estar conectada."), "error");
+      }
+    }).catch(function(){
+      if (btn){ btn.disabled = false; btn.textContent = tr("vpn.test", "Testar acesso"); }
+    });
+  };
+
+  window.vpnProfile = function(force, paste){
+    var payload = paste ? {content: ($("vpn-profile-text") && $("vpn-profile-text").value || "")} : {force: !!force};
+    fetch("/api/vpn/profile", {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d && d.ok){
+        var sha = (d.profile && d.profile.sha256 || "").slice(0, 12);
+        toast("Perfil OK" + (sha ? " · " + sha + "…" : ""), "success");
+        refresh();
+      } else {
+        toast((d && d.error) || "Falha ao obter o perfil .ovpn", "error");
+      }
+    }).catch(function(e){ toast("Falha: " + (e && e.message ? e.message : e), "error"); });
+  };
+
+  window.vpnForward = function(){
+    var host = ($("vpn-fwd-host") && $("vpn-fwd-host").value || "").trim();
+    var port = ($("vpn-fwd-port") && $("vpn-fwd-port").value || "");
+    var local = ($("vpn-fwd-local") && $("vpn-fwd-local").value || "");
+    if (!host || !port){ toast(tr("vpn.forward_bad", "Informe host e porta."), "warn"); return; }
+    fetch("/api/vpn/forward", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({host: host, port: parseInt(port, 10), local_port: parseInt(local, 10) || 0})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      if (d && d.ok){
+        toast(tr("vpn.forward_ok", "Porta encaminhada") + ": " + (d.forward.local_url || ""), "success");
+        render(d.status || {});
+      } else {
+        toast((d && d.error) || "Falha ao encaminhar", "error");
+      }
+    }).catch(function(e){ toast("Falha: " + (e && e.message ? e.message : e), "error"); });
+  };
+
+  window.vpnUnforward = function(id){
+    fetch("/api/vpn/unforward", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({id: id})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      render(d.status || {});
+    }).catch(function(){});
+  };
+
+  window.vpnForget = function(){
+    fetch("/api/vpn/forget", {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: "{}"
+    }).then(function(r){ return r.json(); }).then(function(){
+      toast(tr("vpn.forgotten", "Credenciais apagadas."), "info");
+      refresh();
+    }).catch(function(){});
+  };
+
+  var cpfEl = $("vpn-cpf");
+  if (cpfEl){
+    cpfEl.addEventListener("input", function(){ this.value = fmtCpf(this.value); });
+  }
+
+  // A pergunta inicial espera Termos, "Bem-vindo de volta" e onboarding.
+  function arm(){
+    var tries = 0;
+    var timer = setInterval(function(){
+      tries++;
+      var answered = false;
+      try { answered = !!localStorage.getItem("ufvai_vpn_answered"); } catch(e){}
+      if (answered){ clearInterval(timer); return; }
+      var _as = $("autosave-overlay");
+      if (visible($("terms-overlay")) || visible($("welcome-overlay")) ||
+          (_as && _as.classList.contains("open"))){
+        tries = 0;
+        return;
+      }
+      clearInterval(timer);
+      fetch("/api/vpn", {cache: "no-store"})
+        .then(function(r){ return r.json(); })
+        .then(function(st){
+          render(st);
+          if (st && st.should_ask){
+            window.UFVAI_VPN_STATE = "asking";
+            show(ASK, true);
+          } else {
+            window.UFVAI_VPN_STATE = "skip";
+          }
+        }).catch(function(){ window.UFVAI_VPN_STATE = "skip"; });
+    }, 600);
+  }
+
+  fetch("/api/vpn", {cache: "no-store"})
+    .then(function(r){ return r.json(); })
+    .then(function(st){
+      render(st);
+      if (st && st.should_ask){
+        window.UFVAI_VPN_STATE = "unknown";
+        arm();
+      } else {
+        window.UFVAI_VPN_STATE = "skip";
+      }
+    }).catch(function(){ window.UFVAI_VPN_STATE = "skip"; });
+})();
+</script>
+
 
 <script>
 (function(){
@@ -5934,6 +6697,8 @@ def create_wrapper_html(
 
     # Substitui placeholders do template (feito DEPOIS da f-string)
     html = html.replace("{__TERMINAL_URL__}", terminal_url)
+    html = html.replace("{__TTYD_URL__}", ttyd_url or "")
+    html = html.replace("{__READY_URL__}", "/api/ocweb_ready" if web_mode else "/api/ttyd_ready")
     html = html.replace("{__DRIVE_URL__}", drive_url)
     html = html.replace("{__VERSION__}", VERSION)
     # v0.6.8: garantir que qualquer variante do placeholder seja substituída
@@ -6021,6 +6786,7 @@ def create_wrapper_html(
             "providers.confirm_delete": "Excluir chave de",
             "providers.deleted": "excluído",
             "sessions.refresh": "↻ Atualizar",
+            "console.toggle": "Alternar terminal / versão web",
             "sessions.title": "Histórico de Sessões",
             "sessions.search_placeholder": "🔍 Buscar por id ou conteúdo…",
             "shortcuts.title": "Atalhos de Teclado",
@@ -6030,6 +6796,7 @@ def create_wrapper_html(
             "shortcuts.history_prev": "Histórico anterior", "shortcuts.history_next": "Histórico seguinte",
             "theme.toggle": "Alternar tema", "theme.light": "Tema claro (UI + terminal)",
             "theme.dark": "Tema escuro (UI + terminal)",
+            "theme.web_applied": "Tema aplicado na versão web",
             "theme.terminal_reloaded": "Terminal recarregado com novo tema",
             # v0.6.5 — Splash de carregamento do terminal
             "boot.starting": "Iniciando terminal…",
@@ -6085,7 +6852,66 @@ def create_wrapper_html(
             "memory.note_title": "Título",
             "memory.no_results": "Nenhum resultado para a busca.",
             # v0.5.1.2 hotfix — Diretrizes do Agente
-            "agents.title": "Diretrizes do Agente",
+                        # v0.7.11 — VPN da UFV
+            "vpn.title": "VPN da UFV",
+            "vpn.tooltip": "VPN da UFV (acesso à rede institucional)",
+            "vpn.subtitle": "Acesso à rede institucional pelo Colab (OpenVPN)",
+            "vpn.kicker": "Acesso à rede da UFV",
+            "vpn.ask_title": "Você é aluno(a) da UFV?",
+            "vpn.ask_sub": "Se você tem vínculo com a UFV, pode conectar o UFVAI à VPN da universidade e acessar sistemas e periódicos restritos.",
+            "vpn.ask_yes": "Sim, sou aluno(a) da UFV",
+            "vpn.ask_yes_sub": "Informar CPF e senha da VPN",
+            "vpn.ask_no": "Não, continuar sem VPN",
+            "vpn.ask_no_sub": "O UFVAI funciona normalmente com a internet do Colab",
+            "vpn.ask_note": "Você pode mudar isso depois no botão 🛡 VPN, na barra superior.",
+            "vpn.off": "Desconectado",
+            "vpn.connecting": "Conectando…",
+            "vpn.on": "Conectado à VPN da UFV",
+            "vpn.error": "Falha na VPN",
+            "vpn.warn_title": "Antes de conectar",
+            "vpn.warn1": "Use suas credenciais pessoais do portal vpn.ufvnet.ufv.br (CPF + senha).",
+            "vpn.warn2": "A UFV limita a VPN a 1 dispositivo por CPF: conectar aqui pode desconectar seu computador.",
+            "vpn.warn3": "Por padrão o OpenCode (agente + terminal) roda dentro da VPN: a rede da UFV sai por tun0 e a internet comum continua pelo Colab. O kernel do notebook e o wrapper ficam fora.",
+            "vpn.warn4": "A senha não é gravada, a menos que você marque “lembrar” (aí fica cifrada no seu Drive).",
+            "vpn.cpf": "CPF",
+            "vpn.password": "Senha da VPN",
+            "vpn.remember": "Lembrar neste Drive (cifrado)",
+            "vpn.connect": "Conectar",
+            "vpn.disconnect": "Desconectar",
+            "vpn.test": "Testar acesso",
+            "vpn.testing": "Testando…",
+            "vpn.advanced": "Detalhes técnicos",
+            "vpn.profile": "Baixar/atualizar perfil .ovpn",
+            "vpn.profile_paste": "Colar perfil .ovpn (modo offline)",
+            "vpn.profile_save": "Salvar perfil colado",
+            "vpn.forget": "Esquecer credenciais salvas",
+            "vpn.foot": "Proxy local: socks5h://127.0.0.1:1081",
+            "vpn.need_cpf": "Informe o CPF (11 dígitos).",
+            "vpn.need_pass": "Informe a senha da VPN.",
+            "vpn.ok_test": "Acesso interno OK",
+            "vpn.fail_test": "Acesso interno falhou",
+            "vpn.public_only": "VPN ativa, mas o acesso interno falhou",
+            "vpn.forward_title": "Modelo/serviço na rede da UFV",
+            "vpn.forward_hint": "Ex.: Ollama em 10.0.0.10:11434. No OpenCode, use http://127.0.0.1:11435/v1 como baseURL.",
+            "vpn.forward_add": "Encaminhar",
+            "vpn.forward_remove": "Remover",
+            "vpn.forward_empty": "Nenhum encaminhamento ativo.",
+            "vpn.forward_ok": "Porta encaminhada",
+            "vpn.forward_bad": "Informe host e porta.",
+            "vpn.system_mode": "Usar a VPN em todo o UFVAI (terminal + OpenCode)",
+            "vpn.system_hint": "Padrão: o OpenCode (agente + terminal) roda dentro da VPN — a rede da UFV sai por tun0 e a internet comum (LLM) continua pelo Colab.",
+            "vpn.full_mode": "Túnel total (todo o tráfego pela UFV)",
+            "vpn.full_hint": "Só para modelos/serviços internos da UFV: nesse modo a UFV bloqueia a internet externa e o LLM em nuvem para de responder.",
+            "vpn.system_on": "Modo total ativado. Recarregando…",
+            "vpn.system_badge": "todo o UFVAI na VPN",
+            "vpn.system_off": "Modo total desativado.",
+            "vpn.verdict_vpn": "VPN confirmada — o tráfego está saindo pela UFV.",
+            "vpn.verdict_proxy_only": "Proxy ativo, mas o IP de saída é o mesmo — split tunnel ou VPN não está roteando.",
+            "vpn.verdict_no_proxy": "O proxy não respondeu — a VPN pode não estar conectada.",
+            "vpn.disconnected_toast": "VPN desconectada.",
+            "vpn.forgotten": "Credenciais apagadas.",
+            "vpn.guide": "Instruções oficiais da UFV",
+"agents.title": "Diretrizes do Agente",
             "manual.title": "Manual do UFVAI",
             "manual.subtitle": "Guia completo de uso (MANUAL.md)",
             "manual.loading": "Carregando manual…",
@@ -6168,6 +6994,7 @@ def create_wrapper_html(
             "providers.confirm_delete": "Delete key for",
             "providers.deleted": "deleted",
             "sessions.refresh": "↻ Refresh",
+            "console.toggle": "Toggle terminal / web version",
             "sessions.title": "Session History",
             "sessions.search_placeholder": "🔍 Search by id or content…",
             "shortcuts.title": "Keyboard Shortcuts",
@@ -6177,6 +7004,7 @@ def create_wrapper_html(
             "shortcuts.history_prev": "Previous history", "shortcuts.history_next": "Next history",
             "theme.toggle": "Toggle theme", "theme.light": "Light theme (UI + terminal)",
             "theme.dark": "Dark theme (UI + terminal)",
+            "theme.web_applied": "Theme applied to the web version",
             "theme.terminal_reloaded": "Terminal reloaded with new theme",
             # v0.6.5 — Terminal boot splash
             "boot.starting": "Starting the terminal…",
@@ -6232,7 +7060,66 @@ def create_wrapper_html(
             "memory.note_title": "Title",
             "memory.no_results": "No results for the search.",
             # v0.5.1.2 hotfix — Agent Guidelines
-            "agents.title": "Agent Guidelines",
+                        # v0.7.11 — UFV VPN
+            "vpn.title": "UFV VPN",
+            "vpn.tooltip": "UFV VPN (institutional network access)",
+            "vpn.subtitle": "Institutional network access from Colab (OpenVPN)",
+            "vpn.kicker": "UFV network access",
+            "vpn.ask_title": "Are you a UFV student?",
+            "vpn.ask_sub": "If you are affiliated with UFV, you can connect UFVAI to the university VPN and access restricted systems and journals.",
+            "vpn.ask_yes": "Yes, I am a UFV student",
+            "vpn.ask_yes_sub": "Enter CPF and VPN password",
+            "vpn.ask_no": "No, continue without VPN",
+            "vpn.ask_no_sub": "UFVAI works normally with Colab's internet",
+            "vpn.ask_note": "You can change this later with the 🛡 VPN button in the top bar.",
+            "vpn.off": "Disconnected",
+            "vpn.connecting": "Connecting…",
+            "vpn.on": "Connected to the UFV VPN",
+            "vpn.error": "VPN error",
+            "vpn.warn_title": "Before connecting",
+            "vpn.warn1": "Use your personal credentials from vpn.ufvnet.ufv.br (CPF + password).",
+            "vpn.warn2": "UFV limits the VPN to 1 device per CPF: connecting here may disconnect your computer.",
+            "vpn.warn3": "By default OpenCode (agent + terminal) runs inside the VPN: the UFV network goes through tun0 and regular internet keeps using Colab. The notebook kernel and the wrapper stay outside.",
+            "vpn.warn4": "The password is not stored unless you tick “remember” (then it is encrypted in your Drive).",
+            "vpn.cpf": "CPF",
+            "vpn.password": "VPN password",
+            "vpn.remember": "Remember on this Drive (encrypted)",
+            "vpn.connect": "Connect",
+            "vpn.disconnect": "Disconnect",
+            "vpn.test": "Test access",
+            "vpn.testing": "Testing…",
+            "vpn.advanced": "Technical details",
+            "vpn.profile": "Download/update .ovpn profile",
+            "vpn.profile_paste": "Paste .ovpn profile (offline)",
+            "vpn.profile_save": "Save pasted profile",
+            "vpn.forget": "Forget saved credentials",
+            "vpn.foot": "Local proxy: socks5h://127.0.0.1:1081",
+            "vpn.need_cpf": "Enter the CPF (11 digits).",
+            "vpn.need_pass": "Enter the VPN password.",
+            "vpn.ok_test": "Internal access OK",
+            "vpn.fail_test": "Internal access failed",
+            "vpn.public_only": "VPN is up, but internal access failed",
+            "vpn.forward_title": "Model/service on the UFV network",
+            "vpn.forward_hint": "E.g. Ollama at 10.0.0.10:11434. In OpenCode, use http://127.0.0.1:11435/v1 as baseURL.",
+            "vpn.forward_add": "Forward",
+            "vpn.forward_remove": "Remove",
+            "vpn.forward_empty": "No active forwards.",
+            "vpn.forward_ok": "Port forwarded",
+            "vpn.forward_bad": "Enter host and port.",
+            "vpn.system_mode": "Use the VPN for the whole UFVAI (terminal + OpenCode)",
+            "vpn.system_hint": "Default: OpenCode (agent + terminal) runs inside the VPN — the UFV network goes through tun0 and regular internet (LLM) keeps using Colab.",
+            "vpn.full_mode": "Full tunnel (all traffic through UFV)",
+            "vpn.full_hint": "Only for UFV-internal models/services: in this mode UFV blocks external internet and cloud LLMs stop responding.",
+            "vpn.system_on": "Full mode enabled. Reloading…",
+            "vpn.system_badge": "whole UFVAI on the VPN",
+            "vpn.system_off": "Full mode disabled.",
+            "vpn.verdict_vpn": "VPN confirmed — traffic is exiting through UFV.",
+            "vpn.verdict_proxy_only": "Proxy is up, but the exit IP is the same — split tunnel or the VPN is not routing.",
+            "vpn.verdict_no_proxy": "The proxy did not respond — the VPN may not be connected.",
+            "vpn.disconnected_toast": "VPN disconnected.",
+            "vpn.forgotten": "Credentials deleted.",
+            "vpn.guide": "Official UFV instructions",
+"agents.title": "Agent Guidelines",
             "manual.title": "UFVAI Manual",
             "manual.subtitle": "Complete user guide (MANUAL.md)",
             "manual.loading": "Loading manual…",
@@ -6315,6 +7202,7 @@ def create_wrapper_html(
             "providers.confirm_delete": "Eliminar clave de",
             "providers.deleted": "eliminado",
             "sessions.refresh": "↻ Actualizar",
+            "console.toggle": "Alternar terminal / versión web",
             "sessions.title": "Historial de Sesiones",
             "sessions.search_placeholder": "🔍 Buscar por id o contenido…",
             "shortcuts.title": "Atajos de Teclado",
@@ -6324,6 +7212,7 @@ def create_wrapper_html(
             "shortcuts.history_prev": "Historial anterior", "shortcuts.history_next": "Historial siguiente",
             "theme.toggle": "Alternar tema", "theme.light": "Tema claro (UI + terminal)",
             "theme.dark": "Tema oscuro (UI + terminal)",
+            "theme.web_applied": "Tema aplicado a la versión web",
             "theme.terminal_reloaded": "Terminal recargado con nuevo tema",
             # v0.6.5 — Splash de arranque del terminal
             "boot.starting": "Iniciando el terminal…",
@@ -6379,7 +7268,66 @@ def create_wrapper_html(
             "memory.note_title": "Título",
             "memory.no_results": "Sin resultados para la búsqueda.",
             # v0.5.1.2 hotfix — Directrices del Agente
-            "agents.title": "Directrices del Agente",
+                        # v0.7.11 — VPN de la UFV
+            "vpn.title": "VPN de la UFV",
+            "vpn.tooltip": "VPN de la UFV (acceso a la red institucional)",
+            "vpn.subtitle": "Acceso a la red institucional desde Colab (OpenVPN)",
+            "vpn.kicker": "Acceso a la red de la UFV",
+            "vpn.ask_title": "¿Eres estudiante de la UFV?",
+            "vpn.ask_sub": "Si tienes vínculo con la UFV, puedes conectar UFVAI a la VPN de la universidad y acceder a sistemas y revistas restringidas.",
+            "vpn.ask_yes": "Sí, soy estudiante de la UFV",
+            "vpn.ask_yes_sub": "Informar CPF y contraseña de la VPN",
+            "vpn.ask_no": "No, continuar sin VPN",
+            "vpn.ask_no_sub": "UFVAI funciona normalmente con la internet de Colab",
+            "vpn.ask_note": "Puedes cambiarlo después con el botón 🛡 VPN de la barra superior.",
+            "vpn.off": "Desconectado",
+            "vpn.connecting": "Conectando…",
+            "vpn.on": "Conectado a la VPN de la UFV",
+            "vpn.error": "Error de VPN",
+            "vpn.warn_title": "Antes de conectar",
+            "vpn.warn1": "Usa tus credenciales personales del portal vpn.ufvnet.ufv.br (CPF + contraseña).",
+            "vpn.warn2": "La UFV limita la VPN a 1 dispositivo por CPF: conectar aquí puede desconectar tu computadora.",
+            "vpn.warn3": "Por defecto OpenCode (agente + terminal) se ejecuta dentro de la VPN: la red de la UFV sale por tun0 y la internet común sigue por Colab. El kernel del notebook y el wrapper quedan fuera.",
+            "vpn.warn4": "La contraseña no se guarda, a menos que marques «recordar» (entonces queda cifrada en tu Drive).",
+            "vpn.cpf": "CPF",
+            "vpn.password": "Contraseña de la VPN",
+            "vpn.remember": "Recordar en este Drive (cifrado)",
+            "vpn.connect": "Conectar",
+            "vpn.disconnect": "Desconectar",
+            "vpn.test": "Probar acceso",
+            "vpn.testing": "Probando…",
+            "vpn.advanced": "Detalles técnicos",
+            "vpn.profile": "Descargar/actualizar perfil .ovpn",
+            "vpn.profile_paste": "Pegar perfil .ovpn (sin conexión)",
+            "vpn.profile_save": "Guardar perfil pegado",
+            "vpn.forget": "Olvidar credenciales guardadas",
+            "vpn.foot": "Proxy local: socks5h://127.0.0.1:1081",
+            "vpn.need_cpf": "Informa el CPF (11 dígitos).",
+            "vpn.need_pass": "Informa la contraseña de la VPN.",
+            "vpn.ok_test": "Acceso interno OK",
+            "vpn.fail_test": "Falló el acceso interno",
+            "vpn.public_only": "VPN activa, pero falló el acceso interno",
+            "vpn.forward_title": "Modelo/servicio en la red de la UFV",
+            "vpn.forward_hint": "Ej.: Ollama en 10.0.0.10:11434. En OpenCode, usa http://127.0.0.1:11435/v1 como baseURL.",
+            "vpn.forward_add": "Reenviar",
+            "vpn.forward_remove": "Quitar",
+            "vpn.forward_empty": "Ningún reenvío activo.",
+            "vpn.forward_ok": "Puerto reenviado",
+            "vpn.forward_bad": "Informa host y puerto.",
+            "vpn.system_mode": "Usar la VPN en todo el UFVAI (terminal + OpenCode)",
+            "vpn.system_hint": "Predeterminado: OpenCode (agente + terminal) se ejecuta dentro de la VPN — la red de la UFV sale por tun0 y la internet común (LLM) sigue por Colab.",
+            "vpn.full_mode": "Túnel total (todo el tráfico por la UFV)",
+            "vpn.full_hint": "Solo para modelos/servicios internos de la UFV: en este modo la UFV bloquea la internet externa y el LLM en la nube deja de responder.",
+            "vpn.system_on": "Modo total activado. Recargando…",
+            "vpn.system_badge": "todo el UFVAI en la VPN",
+            "vpn.system_off": "Modo total desactivado.",
+            "vpn.verdict_vpn": "VPN confirmada — el tráfico sale por la UFV.",
+            "vpn.verdict_proxy_only": "El proxy está activo, pero la IP de salida es la misma — split tunnel o la VPN no está enrutando.",
+            "vpn.verdict_no_proxy": "El proxy no respondió — la VPN puede no estar conectada.",
+            "vpn.disconnected_toast": "VPN desconectada.",
+            "vpn.forgotten": "Credenciales eliminadas.",
+            "vpn.guide": "Instrucciones oficiales de la UFV",
+"agents.title": "Directrices del Agente",
             "manual.title": "Manual del UFVAI",
             "manual.subtitle": "Guía completa de uso (MANUAL.md)",
             "manual.loading": "Cargando manual…",
@@ -6462,6 +7410,7 @@ def create_wrapper_html(
             "providers.confirm_delete": "Supprimer la clé de",
             "providers.deleted": "supprimé",
             "sessions.refresh": "↻ Actualiser",
+            "console.toggle": "Basculer terminal / version web",
             "sessions.title": "Historique des sessions",
             "sessions.search_placeholder": "🔍 Rechercher par id ou contenu…",
             "shortcuts.title": "Raccourcis clavier",
@@ -6471,6 +7420,7 @@ def create_wrapper_html(
             "shortcuts.history_prev": "Historique précédent", "shortcuts.history_next": "Historique suivant",
             "theme.toggle": "Basculer le thème", "theme.light": "Thème clair (UI + terminal)",
             "theme.dark": "Thème sombre (UI + terminal)",
+            "theme.web_applied": "Thème appliqué à la version web",
             "theme.terminal_reloaded": "Terminal rechargé avec le nouveau thème",
             # v0.6.5 — Écran de démarrage du terminal
             "boot.starting": "Démarrage du terminal…",
@@ -6526,7 +7476,66 @@ def create_wrapper_html(
             "memory.note_title": "Titre",
             "memory.no_results": "Aucun résultat pour la recherche.",
             # v0.5.1.2 hotfix — Directives de l'Agent
-            "agents.title": "Directives de l'Agent",
+                        # v0.7.11 — VPN de l'UFV
+            "vpn.title": "VPN de l'UFV",
+            "vpn.tooltip": "VPN de l'UFV (accès au réseau institutionnel)",
+            "vpn.subtitle": "Accès au réseau institutionnel depuis Colab (OpenVPN)",
+            "vpn.kicker": "Accès au réseau de l'UFV",
+            "vpn.ask_title": "Êtes-vous étudiant(e) de l'UFV ?",
+            "vpn.ask_sub": "Si vous avez un lien avec l'UFV, vous pouvez connecter UFVAI au VPN de l'université et accéder aux systèmes et revues restreints.",
+            "vpn.ask_yes": "Oui, je suis étudiant(e) de l'UFV",
+            "vpn.ask_yes_sub": "Saisir le CPF et le mot de passe du VPN",
+            "vpn.ask_no": "Non, continuer sans VPN",
+            "vpn.ask_no_sub": "UFVAI fonctionne normalement avec l'internet de Colab",
+            "vpn.ask_note": "Vous pouvez changer cela plus tard avec le bouton 🛡 VPN de la barre supérieure.",
+            "vpn.off": "Déconnecté",
+            "vpn.connecting": "Connexion…",
+            "vpn.on": "Connecté au VPN de l'UFV",
+            "vpn.error": "Erreur VPN",
+            "vpn.warn_title": "Avant de connecter",
+            "vpn.warn1": "Utilisez vos identifiants personnels du portail vpn.ufvnet.ufv.br (CPF + mot de passe).",
+            "vpn.warn2": "L'UFV limite le VPN à 1 appareil par CPF : vous connecter ici peut déconnecter votre ordinateur.",
+            "vpn.warn3": "Par défaut OpenCode (agent + terminal) s'exécute dans le VPN : le réseau de l'UFV sort par tun0 et l'internet courant reste via Colab. Le noyau du notebook et le wrapper restent dehors.",
+            "vpn.warn4": "Le mot de passe n'est pas enregistré, sauf si vous cochez « mémoriser » (il est alors chiffré sur votre Drive).",
+            "vpn.cpf": "CPF",
+            "vpn.password": "Mot de passe du VPN",
+            "vpn.remember": "Mémoriser sur ce Drive (chiffré)",
+            "vpn.connect": "Connecter",
+            "vpn.disconnect": "Déconnecter",
+            "vpn.test": "Tester l'accès",
+            "vpn.testing": "Test en cours…",
+            "vpn.advanced": "Détails techniques",
+            "vpn.profile": "Télécharger/mettre à jour le profil .ovpn",
+            "vpn.profile_paste": "Coller le profil .ovpn (hors ligne)",
+            "vpn.profile_save": "Enregistrer le profil collé",
+            "vpn.forget": "Oublier les identifiants enregistrés",
+            "vpn.foot": "Proxy local : socks5h://127.0.0.1:1081",
+            "vpn.need_cpf": "Saisissez le CPF (11 chiffres).",
+            "vpn.need_pass": "Saisissez le mot de passe du VPN.",
+            "vpn.ok_test": "Accès interne OK",
+            "vpn.fail_test": "Échec de l'accès interne",
+            "vpn.public_only": "VPN actif, mais l'accès interne a échoué",
+            "vpn.forward_title": "Modèle/service sur le réseau de l'UFV",
+            "vpn.forward_hint": "Ex. : Ollama sur 10.0.0.10:11434. Dans OpenCode, utilisez http://127.0.0.1:11435/v1 comme baseURL.",
+            "vpn.forward_add": "Rediriger",
+            "vpn.forward_remove": "Retirer",
+            "vpn.forward_empty": "Aucune redirection active.",
+            "vpn.forward_ok": "Port redirigé",
+            "vpn.forward_bad": "Indiquez l'hôte et le port.",
+            "vpn.system_mode": "Utiliser le VPN pour tout l'UFVAI (terminal + OpenCode)",
+            "vpn.system_hint": "Par défaut : OpenCode (agent + terminal) s'exécute dans le VPN — le réseau de l'UFV sort par tun0 et l'internet courant (LLM) reste via Colab.",
+            "vpn.full_mode": "Tunnel complet (tout le trafic par l'UFV)",
+            "vpn.full_hint": "Uniquement pour les modèles/services internes de l'UFV : dans ce mode l'UFV bloque l'internet externe et le LLM cloud cesse de répondre.",
+            "vpn.system_on": "Mode total activé. Rechargement…",
+            "vpn.system_badge": "tout l'UFVAI sur le VPN",
+            "vpn.system_off": "Mode total désactivé.",
+            "vpn.verdict_vpn": "VPN confirmé — le trafic sort par l'UFV.",
+            "vpn.verdict_proxy_only": "Le proxy fonctionne, mais l'IP de sortie est le même — split tunnel ou le VPN ne route pas.",
+            "vpn.verdict_no_proxy": "Le proxy n'a pas répondu — le VPN n'est peut-être pas connecté.",
+            "vpn.disconnected_toast": "VPN déconnecté.",
+            "vpn.forgotten": "Identifiants supprimés.",
+            "vpn.guide": "Instructions officielles de l'UFV",
+"agents.title": "Directives de l'Agent",
             "manual.title": "Manuel du UFVAI",
             "manual.subtitle": "Guide complet d'utilisation (MANUAL.md)",
             "manual.loading": "Chargement du manuel…",
@@ -6609,6 +7618,7 @@ def create_wrapper_html(
             "providers.confirm_delete": "删除以下提供商的密钥：",
             "providers.deleted": "已删除",
             "sessions.refresh": "↻ 刷新",
+            "console.toggle": "切换终端 / 网页版",
             "sessions.title": "会话历史",
             "sessions.search_placeholder": "🔍 按 ID 或内容搜索…",
             "shortcuts.title": "键盘快捷键",
@@ -6618,6 +7628,7 @@ def create_wrapper_html(
             "shortcuts.history_prev": "上一条历史", "shortcuts.history_next": "下一条历史",
             "theme.toggle": "切换主题", "theme.light": "浅色主题（界面+终端）",
             "theme.dark": "深色主题（界面+终端）",
+            "theme.web_applied": "主题已应用到网页版",
             "theme.terminal_reloaded": "终端已应用新主题并重新加载",
             # v0.6.5 — 终端启动画面
             "boot.starting": "正在启动终端…",
@@ -6668,7 +7679,66 @@ def create_wrapper_html(
             "memory.no_results": "无结果",
             "memory.note_title": "笔记标题",
             "memory.open_vault": "在 Obsidian 中打开",
-            "agents.title": "智能体规则（AGENTS.md）",
+                        # v0.7.11 — UFV VPN
+            "vpn.title": "UFV VPN",
+            "vpn.tooltip": "UFV VPN（机构网络访问）",
+            "vpn.subtitle": "通过 Colab 访问机构网络（OpenVPN）",
+            "vpn.kicker": "UFV 网络访问",
+            "vpn.ask_title": "您是 UFV 的学生吗？",
+            "vpn.ask_sub": "如果您与 UFV 有关联，可以将 UFVAI 连接到大学 VPN，访问受限系统和期刊。",
+            "vpn.ask_yes": "是，我是 UFV 学生",
+            "vpn.ask_yes_sub": "输入 CPF 和 VPN 密码",
+            "vpn.ask_no": "否，不使用 VPN 继续",
+            "vpn.ask_no_sub": "UFVAI 可正常使用 Colab 的网络",
+            "vpn.ask_note": "之后可通过顶部栏的 🛡 VPN 按钮更改。",
+            "vpn.off": "未连接",
+            "vpn.connecting": "连接中…",
+            "vpn.on": "已连接到 UFV VPN",
+            "vpn.error": "VPN 错误",
+            "vpn.warn_title": "连接前",
+            "vpn.warn1": "请使用 vpn.ufvnet.ufv.br 的个人凭据（CPF + 密码）。",
+            "vpn.warn2": "UFV 限制每个 CPF 只能有 1 台设备：在此连接可能会断开您的电脑。",
+            "vpn.warn3": "默认情况下 OpenCode（智能体 + 终端）运行在 VPN 内：UFV 网络经 tun0 出口，普通互联网仍走 Colab。笔记本内核和 wrapper 仍在外部。",
+            "vpn.warn4": "除非勾选“记住”，否则不会保存密码（勾选后将加密保存在您的 Drive 中）。",
+            "vpn.cpf": "CPF",
+            "vpn.password": "VPN 密码",
+            "vpn.remember": "在此 Drive 中记住（加密）",
+            "vpn.connect": "连接",
+            "vpn.disconnect": "断开",
+            "vpn.test": "测试访问",
+            "vpn.testing": "测试中…",
+            "vpn.advanced": "技术详情",
+            "vpn.profile": "下载/更新 .ovpn 配置",
+            "vpn.profile_paste": "粘贴 .ovpn 配置（离线）",
+            "vpn.profile_save": "保存粘贴的配置",
+            "vpn.forget": "清除已保存的凭据",
+            "vpn.foot": "本地代理：socks5h://127.0.0.1:1081",
+            "vpn.need_cpf": "请输入 CPF（11 位数字）。",
+            "vpn.need_pass": "请输入 VPN 密码。",
+            "vpn.ok_test": "内部访问正常",
+            "vpn.fail_test": "内部访问失败",
+            "vpn.public_only": "VPN 已连接，但内部访问失败",
+            "vpn.forward_title": "UFV 网络中的模型/服务",
+            "vpn.forward_hint": "例如 Ollama 位于 10.0.0.10:11434。在 OpenCode 中使用 http://127.0.0.1:11435/v1 作为 baseURL。",
+            "vpn.forward_add": "转发",
+            "vpn.forward_remove": "移除",
+            "vpn.forward_empty": "没有活动的转发。",
+            "vpn.forward_ok": "端口已转发",
+            "vpn.forward_bad": "请输入主机和端口。",
+            "vpn.system_mode": "让整个 UFVAI 使用 VPN（终端 + OpenCode）",
+            "vpn.system_hint": "默认：OpenCode（智能体 + 终端）运行在 VPN 内 — UFV 网络经 tun0 出口，普通互联网（LLM）仍走 Colab。",
+            "vpn.full_mode": "全隧道（所有流量经 UFV）",
+            "vpn.full_hint": "仅用于 UFV 内部模型/服务：此模式下 UFV 会阻断外部互联网，云端 LLM 将停止响应。",
+            "vpn.system_on": "全局模式已启用，正在重新加载…",
+            "vpn.system_badge": "整个 UFVAI 走 VPN",
+            "vpn.system_off": "全局模式已停用。",
+            "vpn.verdict_vpn": "VPN 已确认 — 流量正通过 UFV 出口。",
+            "vpn.verdict_proxy_only": "代理正常，但出口 IP 相同 — 可能是拆分隧道或 VPN 未路由。",
+            "vpn.verdict_no_proxy": "代理无响应 — VPN 可能未连接。",
+            "vpn.disconnected_toast": "VPN 已断开。",
+            "vpn.forgotten": "凭据已删除。",
+            "vpn.guide": "UFV 官方说明",
+"agents.title": "智能体规则（AGENTS.md）",
             "manual.title": "UFVAI 使用手册",
             "manual.subtitle": "完整使用指南（MANUAL.md）",
             "manual.loading": "正在加载手册…",
