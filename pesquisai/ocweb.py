@@ -176,7 +176,7 @@ def _inject_html(data: bytes, session_id: str = "") -> bytes:
     return text.encode("utf-8")
 
 
-_BOOT_JS = """(function(){
+_BOOT_JS = r"""(function(){
   try{var f=window.fetch;window.fetch=function(u,o){
     o=o||{};
     if(o.credentials===undefined||o.credentials==="omit")o.credentials="same-origin";
@@ -195,8 +195,10 @@ _BOOT_JS = """(function(){
   }
   try{var _qt=new URLSearchParams(location.search).get("theme");if(_qt)ufvaiTheme(_qt.indexOf("light")>=0?"light":"dark");}catch(e){}
   window.addEventListener("message",function(e){var d=e.data||{};if(d&&d.type==="ufvai-theme")ufvaiTheme(d.theme);});
-  function b64(s){return btoa(unescape(encodeURIComponent(s))).replace(/\\+/g,"-").replace(/\\//g,"_").replace(/=+$/,"")}
-  function key(){var a=document.querySelector('a[href*="/server/"][href*="/session/"]');if(!a)return "";var m=(a.getAttribute("href")||"").match(/\\/server\\/([^\\/]+)\\/session\\//);return m?m[1]:""}
+  try{performance.setResourceTimingBufferSize(1000)}catch(e){}
+
+  function b64(s){return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
+  function key(){var a=document.querySelector('a[href*="/server/"][href*="/session/"]');if(!a)return "";var m=(a.getAttribute("href")||"").match(/\/server\/([^\/]+)\/session\//);return m?m[1]:""}
   function catalog(cb){fetch("/__ufvai/catalog",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){cb(d||{ready:true})}).catch(function(){cb({ready:true})})}
   function whenReady(cb,t){
     catalog(function(d){
@@ -205,81 +207,71 @@ _BOOT_JS = """(function(){
       setTimeout(function(){whenReady(cb,t-1)},600);
     });
   }
-  // v0.7.11-web9: a TUI publica a sessão que está exibindo; o proxy faz
-  // push por SSE (/__ufvai/live) e a web troca na hora — sem polling e sem
-  // inferir a sessão: é exatamente o que o terminal mostra.
-  // O "key" da rota é o base64url da PRÓPRIA origem (é assim que a SPA monta
-  // os links). Usar a URL do motor aqui deixava a rota sem servidor
-  // registrado e a sessão abria em branco.
-  function curSid(){
-    var m=location.pathname.match(/^\\/server\\/[^\\/]+\\/session\\/([^\\/?#]+)/);
-    return m?m[1]:"";
-  }
-  function originKey(){
-    try{return b64(location.origin)}catch(e){return ""}
-  }
-  function routeBase(){
-    var m=location.pathname.match(/^(\\/server\\/[^\\/]+)\\/session\\//);
-    return m?m[1]:"";
-  }
+
+  // ── rota da SPA ────────────────────────────────────────────────────────
+  // A chave da rota é o base64url da PRÓPRIA origem (é assim que a SPA monta
+  // os links). Usar a URL do motor deixa a sessão em branco.
+  function curSid(){var m=location.pathname.match(/^\/server\/[^\/]+\/session\/([^\/?#]+)/);return m?m[1]:""}
+  function originKey(){try{return b64(location.origin)}catch(e){return ""}}
+  function routeBase(){var m=location.pathname.match(/^(\/server\/[^\/]+)\/session\//);return m?m[1]:""}
   function canNav(){
-    // Só não troca quando o usuário está com um rascunho no prompt — o texto
-    // digitado seria perdido. (A checagem antiga por "Working" no texto da
-    // página dava falso positivo e travava a sincronização.)
+    // Só não troca com rascunho no prompt: o texto digitado seria perdido.
     var ed=document.querySelector('[contenteditable="true"][aria-label="Prompt"]');
-    if(ed&&(ed.textContent||"").trim())return false;
-    return true;
+    return !(ed&&(ed.textContent||"").trim());
   }
-  var _pushedSid="";
-  function markPush(sid){
-    _pushedSid=sid;
-    try{sessionStorage.setItem("ufvai-pushed",sid)}catch(e){}
-  }
-  function wasPushed(sid){
-    try{
-      if(sessionStorage.getItem("ufvai-pushed")===sid){sessionStorage.removeItem("ufvai-pushed");return true}
-    }catch(e){}
-    return false;
-  }
-  function mainText(){
-    var m=document.querySelector("main");return m?(m.innerText||""):"";
+  function mainText(){var m=document.querySelector("main");return m?(m.innerText||""):""}
+
+  // ── foco: ordem total decidida pelo servidor (seq) ─────────────────────
+  // Cada troca (TUI ou web) chega com um seq. Aplica-se só o que é mais novo
+  // que o último visto e que não coincide com a sessão na tela. Batimentos e o
+  // snapshot de conexão só servem de referência: nunca revertem uma escolha.
+  var _lastSeq=-1,_seeded=false,_pendingSid="",_echoSid="",_echoUntil=0,_reportedSid="";
+  function seedSeq(n){if(typeof n==="number"&&n>_lastSeq)_lastSeq=n;_seeded=true}
+  function applyFocus(ev){
+    if(!ev||!ev.sid)return;
+    if(!_seeded){seedSeq(ev.seq);return}
+    if(typeof ev.seq==="number"){if(ev.seq<=_lastSeq)return;_lastSeq=ev.seq}
+    if(ev.sid===curSid()){_pendingSid="";return}
+    if(!canNav()){_pendingSid=ev.sid;return}   // rascunho: aplica quando esvaziar
+    navTo(ev.sid);
   }
   function navTo(sid){
     if(!sid||sid===curSid())return false;
     var base=routeBase()||("/server/"+originKey());
     if(!base||base==="/server/")return false;
-    markPush(sid);
+    // A troca vem do terminal: a navegação resultante não volta como foco.
+    _echoSid=sid;_echoUntil=Date.now()+2000;
     var path=base+"/session/"+sid;
-    // 1) Dentro da SPA: pushState + popstate troca de sessão SEM recarregar
-    //    (rota interna). Se em 700 ms o conteúdo não mudou, a SPA ignorou o
-    //    evento e caímos para a navegação normal.
     if(routeBase()){
       try{
-        var before=mainText();
+        // Rota interna da SPA, sem recarregar. Se nenhum nó do DOM mudar em
+        // 1,5 s, a SPA ignorou o evento: recarrega UMA vez por sessão.
+        var reacted=false,mo=null;
+        try{
+          mo=new MutationObserver(function(){reacted=true});
+          mo.observe(document.body,{childList:true,subtree:true,characterData:true});
+        }catch(e){}
         history.pushState({},"",path);
         window.dispatchEvent(new PopStateEvent("popstate",{state:{}}));
         setTimeout(function(){
-          if(mainText()===before&&curSid()===sid){try{location.replace(path)}catch(e){}}
-        },700);
+          try{if(mo)mo.disconnect()}catch(e){}
+          if(reacted||curSid()!==sid)return;
+          var k="ufvai.navfb."+sid;
+          try{if(sessionStorage.getItem(k))return;sessionStorage.setItem(k,"1")}catch(e){}
+          if(canNav()){try{location.replace(path)}catch(e){}}
+        },1500);
         return true;
       }catch(e){}
     }
-    // 2) Fora de uma sessão (lista de projetos): o link da SPA resolve a rota.
-    try{
-      var a=document.querySelector('a[href*="/session/'+sid+'"]');
-      if(a){a.click();return true}
-    }catch(e){}
-    // 3) Último recurso.
-    location.replace(path);
+    // Fora de uma sessão (lista de projetos): o próprio link da SPA resolve a rota.
+    try{var a=document.querySelector('a[href*="/session/'+sid+'"]');if(a){a.click();return true}}catch(e){}
+    try{location.replace(path)}catch(e){}
     return true;
   }
-  var _live=null,_lastLive=0,_lastFocus="";
-  function liveOk(){
-    // "Saudável" = conexão aberta E mensagem (ou ping) recente. Sem isso, o
-    // polling assume — se o navegador enfileirar a conexão SSE (limite por
-    // host), o push fica mudo e não podemos ficar esperando para sempre.
-    return !!_live&&_live.readyState===1&&(Date.now()-_lastLive)<5000;
-  }
+
+  // ── canal ao vivo: /__ufvai/live (SSE) ─────────────────────────────────
+  var _live=null,_lastLive=0;
+  function liveOk(){return !!_live&&_live.readyState===1&&(Date.now()-_lastLive)<20000}
   function startLive(){
     if(typeof window.EventSource!=="function")return false;
     try{
@@ -287,55 +279,58 @@ _BOOT_JS = """(function(){
       _live=new window.EventSource("/__ufvai/live");
       _live.onopen=function(){_lastLive=Date.now()};
       _live.onmessage=function(ev){
-        _lastLive=Date.now();
+        _lastLive=Date.now();   // qualquer dado (inclusive o ping) prova que o canal está vivo
         var d=null;try{d=JSON.parse(ev.data)}catch(e){return}
-        if(!d||!d.sid||d.sid===curSid())return;
-        _lastFocus=d.sid;
-        if(!canNav())return;
-        navTo(d.sid);
+        if(!d||d.type==="ping")return;
+        if(d.type==="snapshot"){
+          if(!_seeded){seedSeq(d.seq);return}
+          applyFocus(d);
+          return;
+        }
+        if(d.type==="focus")applyFocus(d);
       };
     }catch(e){return false}
     return true;
   }
   startLive();
   if(window.addEventListener)window.addEventListener("pageshow",function(){startLive()});
-  // Reserva: sem push saudável, consulta a cada 1,2 s (funciona também fora
-  // de uma rota de sessão: a lista de projetos segue o terminal).
+
+  // Reserva: sem canal vivo, consulta a cada 1,5 s. Usa só o foco ordenado
+  // (nunca a sessão "active", que puxava a página para longe da escolhida).
   setInterval(function(){
-    // O foco pode ter chegado enquanto havia rascunho no prompt (e foi
-    // ignorado). Assim que o prompt esvazia, aplica o último foco pendente.
-    if(_lastFocus&&_lastFocus!==curSid()&&canNav()){navTo(_lastFocus);_lastFocus="";return}
+    if(_pendingSid&&_pendingSid!==curSid()&&canNav()){var s=_pendingSid;_pendingSid="";navTo(s);return}
     if(!_live||_live.readyState===2)startLive();
     if(liveOk())return;
     fetch("/__ufvai/session?fallback=1",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){
-      if(d&&d.active&&d.active!==curSid()&&d.active_age_ms<30000&&canNav())navTo(d.active);
+      if(d&&d.focus){if(!_seeded)seedSeq(d.focus.seq);else applyFocus(d.focus)}
     }).catch(function(){});
-  },1200);
-  // v0.7.11-web9: web → terminal — o plugin da TUI segue este foco.
-  // Só navegação feita pelo USUÁRIO é publicada: um push do terminal não
-  // volta para o terminal (evita ping-pong entre as duas telas).
-  var _reported="",_lastSid="";
+  },1500);
+
+  // ── web → terminal ─────────────────────────────────────────────────────
+  // Toda troca feita aqui é publicada na hora (pushState, replaceState,
+  // popstate) e, como rede de segurança, a cada 1,2 s.
   function reportFocus(){
     var sid=curSid();
-    if(!sid)return;
-    // Primeira leitura da página: publica o que está na tela (o terminal
-    // segue), exceto se esta navegação veio de um push do próprio terminal.
-    var first=!_reported;
-    if(!first&&location.pathname===_reported&&sid===_lastSid)return;
-    _reported=location.pathname;_lastSid=sid;_lastFocus="";
-    if(sid===_pushedSid||wasPushed(sid)){_pushedSid="";return}
+    if(!sid||sid===_reportedSid)return;
+    _reportedSid=sid;
+    if(sid===_echoSid&&Date.now()<_echoUntil){_echoSid="";return}   // eco do terminal
     try{
       fetch("/__ufvai/focus",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({sid:sid,ts:Date.now(),source:"web"}),cache:"no-store"});
+        body:JSON.stringify({sid:sid,ts:Date.now(),source:"web"}),cache:"no-store",keepalive:true});
     }catch(e){}
   }
   setInterval(reportFocus,1200);
+  try{
+    var _ps=history.pushState,_rs=history.replaceState;
+    history.pushState=function(){var r=_ps.apply(this,arguments);try{reportFocus()}catch(e){}return r};
+    history.replaceState=function(){var r=_rs.apply(this,arguments);try{reportFocus()}catch(e){}return r};
+    window.addEventListener("popstate",function(){try{reportFocus()}catch(e){}});
+  }catch(e){}
+  reportFocus();   // primeira leitura: publica o que está na tela
 
-  // v0.7.11-web13 ── rede de segurança do botão Parar ────────────────────
-  // O botão da SPA faz POST /api/session/<id>/interrupt?resume=true. Se por
-  // qualquer motivo essa chamada não sair (botão desabilitado, handler
-  // perdido, SSE travado), mandamos a interrupção nós mesmos 600 ms depois
-  // do clique. O endpoint é idempotente, então um pedido duplicado é inócuo.
+  // ── botão Parar: rede de segurança ─────────────────────────────────────
+  // O botão da SPA faz POST /api/session/<id>/interrupt?resume=true. Se essa
+  // chamada não sair, mandamos a interrupção 600 ms depois (idempotente).
   function _stopFallback(ev){
     try{
       var el=ev.target;
@@ -343,7 +338,6 @@ _BOOT_JS = """(function(){
       if(!btn)return;
       var sid=curSid(); if(!sid)return;
       setTimeout(function(){
-        // Se a SPA já mandou a interrupção, não duplica.
         if(Date.now()-(window.__ufvaiLastInterrupt||0)<900)return;
         fetch("/__ufvai/run-state?sid="+encodeURIComponent(sid),{cache:"no-store"})
           .then(function(r){return r.ok?r.json():null})
@@ -351,13 +345,11 @@ _BOOT_JS = """(function(){
             if(js&&js.running){
               try{
                 fetch("/api/session/"+sid+"/interrupt?resume=true",{
-                  method:"POST",headers:{"Content-Type":"application/json"},
-                  body:"{}",cache:"no-store"
+                  method:"POST",headers:{"Content-Type":"application/json"},body:"{}",cache:"no-store"
                 });
               }catch(e){}
             }else if(js&&!js.running){
-              // Turno já terminou no servidor: não há o que interromper — o
-              // "Working" é estado preso. Recarrega para limpar (nada se perde).
+              // Turno já terminou no servidor: o "Working" é estado preso.
               _unstuckReload(sid);
             }
           }).catch(function(){});
@@ -366,56 +358,71 @@ _BOOT_JS = """(function(){
   }
   try{document.addEventListener("click",_stopFallback,true);}catch(e){}
 
-  // Recarrega no máximo 1× por 30 s — o estado do turno está no servidor.
+  // Recarrega no máximo 1× a cada 2 min por sessão (o estado está no servidor).
   function _unstuckReload(sid){
     var k="ufvai.unstuck."+sid;
     try{
       var last=Number(sessionStorage.getItem(k)||0);
-      if(Date.now()-last<30000)return;
+      if(Date.now()-last<120000)return;
       sessionStorage.setItem(k,String(Date.now()));
     }catch(e){}
     try{location.reload();}catch(e){}
   }
 
-  // v0.7.11-web13 ── destravar o "Working" no fim da resposta ────────────
-  // Se o evento final (session.execution.succeeded) não chegou (SSE bufferizado
-  // no proxy do Colab, reconexão etc.), o rodapé fica "Working" para sempre.
-  // Aqui consultamos o estado real da sessão: terminada e ociosa = a SPA está
-  // atrasada. Cutucamos a revalidação e, se ainda assim não limpar, recarregamos
-  // UMA vez (o estado está no servidor; nada se perde).
+  // "Working" preso: só age quando o MOTOR diz que a sessão não está rodando
+  // (/__ufvai/run-state usa /api/session/active), três vezes seguidas (~18 s).
   var _stuck=0;
   setInterval(function(){
     window.__ufvaiWatch=(window.__ufvaiWatch||0)+1;
     var sid=curSid(); if(!sid){_stuck=0;return}
-    var main=document.querySelector("main");
-    if(!main)return;
-    var texto=main.innerText||"";
-    if(!/(?:Working|Trabalhando)/.test(texto)){_stuck=0;return}
+    if(!/(?:Working|Trabalhando)/.test(mainText())){_stuck=0;return}
     var ed=document.querySelector('[contenteditable="true"][aria-label="Prompt"]');
     if(ed&&(ed.textContent||"").trim())return;      // usuário digitando: não mexer
     fetch("/__ufvai/run-state?sid="+encodeURIComponent(sid),{cache:"no-store"})
       .then(function(r){return r.ok?r.json():null})
       .then(function(js){
-        if(!js||js.running){_stuck=0;return}          // rodando de verdade
+        if(!js||js.running){_stuck=0;return}          // o motor diz que está rodando
         _stuck++;
         window.__ufvaiStuck=_stuck;
         try{window.dispatchEvent(new Event("focus"));}catch(e){}
-        try{document.dispatchEvent(new Event("visibilitychange"));}catch(e){}
-        if(_stuck<2)return;
+        if(_stuck<3)return;
         _stuck=0;
         _unstuckReload(sid);
       }).catch(function(){});
-  },4000);
-  // v0.7.11-web12: a troca de sessão feita pelo USUÁRIO é publicada na hora
-  // (pushState/replaceState/popstate), em vez de esperar o próximo tique.
-  try{
-    var _ps=history.pushState,_rs=history.replaceState;
-    history.pushState=function(){var r=_ps.apply(this,arguments);try{reportFocus()}catch(e){}return r};
-    history.replaceState=function(){var r=_rs.apply(this,arguments);try{reportFocus()}catch(e){}return r};
-    window.addEventListener("popstate",function(){try{reportFocus()}catch(e){}});
-  }catch(e){}
+  },6000);
 
-  // Sessão: espera o catálogo de provedores/modelos antes de navegar.
+  // ── modelos ────────────────────────────────────────────────────────────
+  // A SPA busca /api/model ao abrir a sessão. Se a lista não chegou (motor
+  // subindo, evento server.connected perdido), recarrega UMA vez a cada 10 min.
+  // Só age quando o servidor já tem modelos (há chave configurada).
+  function modelsOk(){
+    try{
+      var es=performance.getEntriesByType("resource");
+      for(var i=es.length-1;i>=0;i--){
+        if((es[i].name||"").indexOf("/api/model")<0)continue;
+        var st=es[i].responseStatus;
+        if(!st)return true;              // sem dado de status: não mexe
+        return st===200;
+      }
+    }catch(e){return true}
+    return false;                        // a SPA nunca pediu /api/model
+  }
+  if(/^\/server\/[^\/]+\/session\//.test(location.pathname)){
+    setTimeout(function(){
+      catalog(function(d){
+        if(!d||!d.ready)return;          // sem modelos no servidor (ex.: sem chave)
+        if(modelsOk())return;
+        try{
+          var last=Number(sessionStorage.getItem("ufvai.modelreload")||0);
+          if(Date.now()-last<600000)return;
+          sessionStorage.setItem("ufvai.modelreload",String(Date.now()));
+        }catch(e){}
+        if(canNav()){try{location.reload()}catch(e){}}
+      });
+    },12000);
+  }
+
+  // ── início: "/" abre a sessão atual (espera o catálogo, sem bloquear) ──
   var n=0,t=setInterval(function(){
     n++;
     if(location.pathname!=="/"){clearInterval(t);return}
@@ -427,22 +434,6 @@ _BOOT_JS = """(function(){
       if(d&&d.sid)whenReady(go,20); else go();
     }).catch(function(){});
   },700);
-  // Numa sessão aberta direto: se o catálogo NÃO estava pronto no load e
-  // ficou pronto depois, recarrega UMA vez para a SPA buscar os modelos.
-  if(/^\\/server\\/[^\\/]+\\/session\\//.test(location.pathname)){
-    catalog(function(d0){
-      if(d0&&d0.ready)return;
-      whenReady(function(ok){
-        if(!ok)return;
-        try{
-          var k="ufvai.catalog.reload."+location.pathname;
-          if(sessionStorage.getItem(k))return;
-          sessionStorage.setItem(k,"1");
-          setTimeout(function(){location.reload()},400);
-        }catch(e){}
-      },20);
-    });
-  }
 })();"""
 
 
@@ -518,9 +509,14 @@ def _api_json(path: str, timeout: float = 5.0):
         conn.close()
 
 
-# v0.7.11-web8: fecha a 1ª conexão SSE uma vez para forçar um handshake
-# real depois que o listener da SPA já está registrado.
-_CLOSE_FIRST_SSE = float(os.environ.get("UFVAI_TEST_CLOSE_FIRST_SSE", "1.0") or 0)
+# v0.8.0 (web14b): atrasa a 1ª conexão SSE de cada documento HTML (~1,2 s)
+# para o ``server.connected`` chegar depois de o listener da SPA existir.
+# A versão anterior FECHAVA essa conexão logo na abertura: além de derrubar o
+# stream, o evento que dispara provider.sync/model.sync se perdia e o seletor
+# de modelos ficava vazio justamente no primeiro acesso (motor recém-iniciado).
+_SSE_HANDSHAKE_DELAY_S = float(
+    os.environ.get("UFVAI_SSE_HANDSHAKE_DELAY", "1.2") or 0
+)
 _CLOSE_ONCE_LOCK = threading.Lock()
 _CLOSE_ONCE_DONE = False
 _RESP_CACHE: dict = {}
@@ -536,14 +532,40 @@ def _cache_key(path: str) -> str:
     return f"{parsed.path}|{directory}"
 
 
-def _cache_get(key: str, port: int, ttl: float = 180.0):
+# v0.8.0 (web14): o catálogo (modelos/provedores) muda quando uma chave é salva
+# ou o motor reinicia. O TTL antigo (180 s) servia listas velhas por 3 minutos;
+# agora o cache também é invalidado pela identidade do motor (porta + mtime do
+# service.json), que muda a cada reinício.
+_CACHE_TTL_S: float = float(os.environ.get("UFVAI_CATALOG_TTL", "60") or 60)
+
+
+def _engine_stamp() -> tuple:
+    """Identidade do motor atual: (porta, mtime_ns do service.json)."""
+    try:
+        return (service_info()[1], service_file().stat().st_mtime_ns)
+    except OSError:
+        return (0, 0)
+
+
+def _has_rows(raw: bytes) -> bool:
+    """True se a resposta traz ``data`` com ao menos um item (lista vazia não é cacheada)."""
+    try:
+        payload = json.loads(raw.decode("utf-8", "replace"))
+    except ValueError:
+        return False
+    rows = payload.get("data") if isinstance(payload, dict) else None
+    return isinstance(rows, list) and len(rows) > 0
+
+
+def _cache_get(key: str, port: int, ttl: float | None = None):
     now = time.time()
+    ttl = _CACHE_TTL_S if ttl is None else ttl
     with _RESP_LOCK:
         item = _RESP_CACHE.get(key)
         if not item:
             return None
-        ts, cached_port, data, ctype = item
-        if cached_port != port or now - ts > ttl:
+        ts, cached_port, data, ctype, stamp = item
+        if cached_port != port or now - ts > ttl or stamp != _engine_stamp():
             return None
         return data, ctype
 
@@ -552,11 +574,27 @@ def _cache_put(key: str, port: int, data: bytes, ctype: str = "application/json"
     with _RESP_LOCK:
         if len(_RESP_CACHE) > 64:
             _RESP_CACHE.clear()
-        _RESP_CACHE[key] = (time.time(), port, data, ctype)
+        _RESP_CACHE[key] = (time.time(), port, data, ctype, _engine_stamp())
+
+
+def invalidate_catalog_cache() -> None:
+    """Descarta modelos/provedores em cache (chave salva ou motor reiniciado)."""
+    with _RESP_LOCK:
+        for key in [k for k in _RESP_CACHE if k.startswith(("/api/model", "/api/provider"))]:
+            _RESP_CACHE.pop(key, None)
+    with _CATALOG_LOCK:
+        _CATALOG_CACHE.update(ts=0.0)
+    with _GLOBAL_LOCK:
+        _GLOBAL_ROWS.clear()
+        _GLOBAL_ROWS.update({"ts": 0.0, "model": None, "provider": None})
 
 
 def compute_run_state(
-    data: dict, rows: list, now_ms: int, stale_ms: int = 120_000
+    data: dict,
+    rows: list,
+    now_ms: int,
+    stale_ms: int = 120_000,
+    engine_running: bool | None = None,
 ) -> dict:
     """Decide se o turno está rodando a partir da última mensagem.
 
@@ -588,6 +626,13 @@ def compute_run_state(
             age = now_ms - last_ms
             running = age < stale_ms
             stale = not running
+    if engine_running is not None:
+        # v0.8.0 (web14): o motor é a fonte da verdade. Entre dois passos do
+        # turno a última mensagem já está fechada, mas a sessão segue em
+        # execução — a heurística acima dava falso "parado" e recarregava a
+        # página a cada ~30 s.
+        running = bool(engine_running)
+        stale = bool(not running and not completed and last_ms and now_ms - last_ms >= stale_ms)
     return {
         "running": bool(running),
         "stale": bool(stale),
@@ -662,15 +707,17 @@ def _global_rows(kind: str, ttl: float = 30.0):
     now = time.time()
     with _GLOBAL_LOCK:
         cached = _GLOBAL_ROWS.get(kind)
-        if cached is not None and now - float(_GLOBAL_ROWS["ts"]) < ttl:
+        if cached and now - float(_GLOBAL_ROWS.get(f"{kind}_ts", 0.0)) < ttl:
             return cached
     payload = _api_json(f"/api/{kind}", timeout=15.0)
     rows = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(rows, list):
+    # v0.8.0 (web14): lista vazia não é guardada — ela pode ser só o motor
+    # ainda subindo, e cacheá-la deixava o seletor vazio por 30 s.
+    if not isinstance(rows, list) or not rows:
         return None
     with _GLOBAL_LOCK:
         _GLOBAL_ROWS[kind] = rows
-        _GLOBAL_ROWS["ts"] = now
+        _GLOBAL_ROWS[f"{kind}_ts"] = now
     return rows
 
 
@@ -1079,39 +1126,119 @@ def write_focus(sid: str, route: str = "session") -> bool:
         return False
 
 
-def apply_tui_focus(sid: str, route: str = "session") -> bool:
-    """Registra o foco da TUI e publica no SSE imediatamente.
-
-    É o caminho rápido do ``POST /__ufvai/focus`` (``source: "tui"``): grava o
-    arquivo, memoriza a sessão atual e empurra para as páginas abertas — tudo
-    em uma chamada, sem esperar o polling de 50 ms.
-    """
-    if not write_focus(sid, route):
-        return False
-    _remember_session(sid)
-    _publish_live(
-        {
-            "sid": sid,
-            "ts": int(time.time() * 1000),
-            "source": "tui",
-        }
-    )
-    return True
+# v0.8.0 (web14): o foco tem UMA ordem, decidida pelo servidor. Cada TROCA de
+# sessão — vinda da TUI ou da web — recebe um ``seq`` crescente. Batimentos da
+# TUI (mesma sessão) não geram evento: nunca revertem uma escolha recente.
+#   TUI → web : /__ufvai/live          (SSE; eventos das duas origens)
+#   web → TUI : /__ufvai/focus/stream  (SSE; só eventos da web)
+#   arquivos  : FOCUS_FILE / WEB_FOCUS_FILE (reserva e compatibilidade)
+_TUI_SUBS: set = set()
+_FOCUS_LOCK = threading.Lock()
+_FOCUS: dict = {
+    # v0.8.0 (web14b): o seq nasce do relógio (ms). Se o proxy reiniciar, os
+    # clientes que guardaram um seq alto não ignoram os eventos novos.
+    "seq": int(time.time() * 1000), "sid": "", "source": "", "ts": 0,
+    "tui_sid": "", "web_sid": "",
+}
 
 
-def write_web_focus(sid: str) -> bool:
-    """Grava o foco escolhido na web (o plugin da TUI segue)."""
-    sid = str(sid or "").strip()
+def _focus_next(sid: str, source: str) -> int:
+    """Registra uma troca de sessão. Chamar com ``_FOCUS_LOCK`` adquirido."""
+    _FOCUS["seq"] = int(_FOCUS["seq"]) + 1
+    _FOCUS["sid"] = sid
+    _FOCUS["source"] = source
+    _FOCUS["ts"] = int(time.time() * 1000)
+    return int(_FOCUS["seq"])
+
+
+def _focus_snapshot() -> dict:
+    """Foco atual para quem acabou de conectar (referência; não navega)."""
+    with _FOCUS_LOCK:
+        sid = str(_FOCUS.get("sid") or "")
+        seq = int(_FOCUS.get("seq") or 0)
+        source = str(_FOCUS.get("source") or "")
     if not sid:
-        return False
+        data = read_focus()
+        sid = str(data.get("sid") or "").strip()
+        source = str(data.get("source") or "tui")
+    return {"sid": sid, "seq": seq, "source": source}
+
+
+def _write_web_file(sid: str, seq: int) -> bool:
     try:
         tmp = f"{WEB_FOCUS_FILE}.{os.getpid()}.{threading.get_ident()}.tmp"
         with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump({"sid": sid, "ts": int(time.time() * 1000), "source": "web"}, fh)
+            json.dump(
+                {"sid": sid, "seq": seq, "ts": int(time.time() * 1000), "source": "web"},
+                fh,
+            )
         os.replace(tmp, WEB_FOCUS_FILE)
         return True
     except OSError:
         return False
+
+
+def _start_prefetch(sid: str) -> None:
+    ready = threading.Event()
+    with _PREFETCH_LOCK:
+        _PREFETCH_READY[sid] = ready
+    threading.Thread(
+        target=prefetch_session,
+        args=(sid, ready),
+        name="ufvai-prefetch",
+        daemon=True,
+    ).start()
+
+
+def apply_tui_focus(sid: str, route: str = "session") -> bool:
+    """Foco publicado pela TUI (``POST /__ufvai/focus``, ``source: "tui"``).
+
+    Grava o arquivo de reserva sempre, mas só publica quando a sessão mudou em
+    relação à última que a TUI reportou (batimentos não publicam).
+    """
+    sid = str(sid or "").strip()
+    if not sid:
+        return False
+    write_focus(sid, route)
+    with _FOCUS_LOCK:
+        if _FOCUS.get("tui_sid") == sid:
+            return True
+        _FOCUS["tui_sid"] = sid
+        seq = _focus_next(sid, "tui")
+        ts = int(_FOCUS["ts"])
+    _remember_session(sid)
+    with _LIVE_LOCK:
+        has_pages = bool(_LIVE_SUBS)
+    if has_pages:
+        _start_prefetch(sid)
+    _publish_live({"type": "focus", "sid": sid, "seq": seq, "source": "tui", "ts": ts})
+    return True
+
+
+def write_web_focus(sid: str) -> bool:
+    """Foco escolhido na web (``POST /__ufvai/focus``, ``source: "web"``).
+
+    Publica para o terminal (``/__ufvai/focus/stream``) e para as outras abas
+    da web (``/__ufvai/live``). A ``CURRENT_SESSION_FILE`` só é atualizada
+    quando a TUI segue a escolha (``apply_tui_focus``).
+    """
+    sid = str(sid or "").strip()
+    if not sid:
+        return False
+    with _FOCUS_LOCK:
+        changed = _FOCUS.get("web_sid") != sid
+        if changed:
+            _FOCUS["web_sid"] = sid
+            seq = _focus_next(sid, "web")
+        else:
+            seq = int(_FOCUS.get("seq") or 0)
+        ts = int(_FOCUS.get("ts") or 0)
+    ok = _write_web_file(sid, seq)
+    if changed:
+        msg = {"type": "focus", "sid": sid, "seq": seq, "source": "web", "ts": ts}
+        _publish_live(msg)
+        _publish_tui(msg)
+    return ok
 
 
 def _publish_live(payload: dict) -> None:
@@ -1125,39 +1252,35 @@ def _publish_live(payload: dict) -> None:
             pass
 
 
-def _watch_focus() -> None:
-    """Observa ``FOCUS_FILE`` (0,05 s) e publica mudanças de sessão.
+def _publish_tui(payload: dict) -> None:
+    msg = json.dumps(payload, ensure_ascii=False)
+    with _LIVE_LOCK:
+        subs = list(_TUI_SUBS)
+    for sub in subs:
+        try:
+            sub.put_nowait(msg)
+        except Exception:  # noqa: BLE001
+            pass
 
-    O caminho rápido é o ``POST /__ufvai/focus`` do plugin (publicação
-    imediata). Este laço é a rede de segurança para plugins antigos, para
-    quem escreve o arquivo à mão e para quando o POST falha.
+
+def _watch_focus() -> None:
+    """Rede de segurança: observa ``FOCUS_FILE`` (50 ms).
+
+    Cobre plugins antigos, quem escreve o arquivo à mão e o caso em que o POST
+    da TUI falha. Só age quando a sessão no arquivo é diferente da última que a
+    TUI reportou, então não duplica o que já chegou por HTTP.
     """
-    last = ""
+    last_ts = 0
     while not _FOCUS_STOP.is_set():
         data = read_focus()
         sid = str(data.get("sid") or "").strip()
-        if sid and sid != last:
-            last = sid
-            _remember_session(sid)
-            _publish_live(
-                {
-                    "sid": sid,
-                    "ts": data.get("ts") or int(time.time() * 1000),
-                    "source": data.get("source") or "tui",
-                }
-            )
-            with _LIVE_LOCK:
-                has_pages = bool(_LIVE_SUBS)
-            if has_pages:
-                ready = threading.Event()
-                with _PREFETCH_LOCK:
-                    _PREFETCH_READY[sid] = ready
-                threading.Thread(
-                    target=prefetch_session,
-                    args=(sid, ready),
-                    name="ufvai-prefetch",
-                    daemon=True,
-                ).start()
+        ts = int(data.get("ts") or 0)
+        if sid and ts != last_ts:
+            last_ts = ts
+            with _FOCUS_LOCK:
+                known = _FOCUS.get("tui_sid")
+            if sid != known:
+                apply_tui_focus(sid, str(data.get("route") or "session"))
         _FOCUS_STOP.wait(0.05)
 
 
@@ -1196,7 +1319,7 @@ def _take_close_once() -> bool:
 
 
 def _rearm_close_once() -> None:
-    """Cada documento HTML (page load) rearma o reconnect do SSE."""
+    """Cada documento HTML (page load) rearma o atraso do 1º SSE."""
     global _CLOSE_ONCE_DONE
     with _CLOSE_ONCE_LOCK:
         _CLOSE_ONCE_DONE = False
@@ -1343,6 +1466,137 @@ def _sync_session_from_event(chunk: bytes) -> None:
 
 
 # ── proxy HTTP/SSE/WebSocket ─────────────────────────────────
+
+# v0.8.0 (web14): tempo máximo que o proxy espera o motor subir antes de
+# devolver erro à SPA. O motor V2 reseta conexões e responde 503
+# (``service_starting``) por ~5-10 s após iniciar; a SPA não repete
+# requisições falhas, então sem essa espera o seletor de modelos ficava vazio.
+_UPSTREAM_WAIT_S: float = float(os.environ.get("UFVAI_UPSTREAM_WAIT_S", "12") or 12)
+
+# v0.8.0 (web14b): logo após o motor (re)iniciar, ``/api/model`` e
+# ``/api/provider`` podem responder 200 com ``data: []`` antes de o catálogo
+# terminar de carregar. A SPA aceita esse vazio e não repete — o seletor de
+# modelos fica em branco para quem abre a interface nessa janela. Enquanto a
+# janela estiver aberta, o proxy repete a leitura por até ``_EMPTY_RETRY_S``.
+_WARM_LOCK = threading.Lock()
+_WARM: dict = {"stamp": None, "until": 0.0}
+_WARM_GRACE_S: float = float(os.environ.get("UFVAI_WARM_GRACE_S", "25") or 25)
+_EMPTY_RETRY_S: float = float(os.environ.get("UFVAI_EMPTY_RETRY_S", "6") or 6)
+
+
+def _engine_warm() -> bool:
+    """True durante a janela de carregamento após um (re)início do motor.
+
+    A identidade vem do ``service.json`` (porta + mtime): qualquer reinício
+    abre a janela. Fora dela, lista vazia é resposta legítima (ex.: sem chave)
+    e não deve atrasar a SPA.
+    """
+    stamp = _engine_stamp()
+    now = time.time()
+    with _WARM_LOCK:
+        if _WARM["stamp"] != stamp:
+            _WARM["stamp"] = stamp
+            _WARM["until"] = now + _WARM_GRACE_S
+        return now < float(_WARM["until"])
+
+
+def _payload_has_rows(raw: bytes, encoding: str = "") -> bool:
+    """``data`` com ao menos um item, mesmo quando o corpo veio comprimido."""
+    enc = (encoding or "").lower().strip()
+    data = raw
+    if enc in ("gzip", "x-gzip"):
+        try:
+            data = gzip.decompress(raw)
+        except OSError:
+            return False
+    elif enc == "deflate":
+        try:
+            data = zlib.decompress(raw)
+        except zlib.error:
+            try:
+                data = zlib.decompress(data, -zlib.MAX_WBITS)
+            except zlib.error:
+                return False
+    return _has_rows(data)
+
+
+
+class _Buffered:
+    """Resposta do motor já lida (corpo em memória), com a interface usada pelo proxy."""
+
+    def __init__(self, status: int, reason: str, headers: list, body: bytes) -> None:
+        self.status = status
+        self.reason = reason
+        self._headers = headers
+        self._body = body
+
+    def getheader(self, name: str, default=None):
+        for key, value in self._headers:
+            if key.lower() == name.lower():
+                return value
+        return default
+
+    def getheaders(self) -> list:
+        return list(self._headers)
+
+    def read(self, amt=None) -> bytes:
+        body, self._body = self._body, b""
+        return body
+
+
+def _open_upstream(method: str, path: str, body, headers: dict, host: str, port: int):
+    """Abre a requisição ao motor, repetindo enquanto ele está subindo.
+
+    GET/HEAD são repetidos em qualquer falha de conexão e em 503 (corpo curto,
+    antes do SSE). POST só é repetido quando a conexão é recusada — nesse caso
+    nada chegou ao motor, então não há risco de executar duas vezes.
+    Devolve ``(resposta, conexão)``; a conexão é ``None`` quando a resposta
+    já foi lida e está em memória (``_Buffered``).
+    """
+    deadline = time.time() + _UPSTREAM_WAIT_S
+    idempotent = method in ("GET", "HEAD")
+    route = path.split("?", 1)[0]
+    # Só GET de catálogo, e só na janela de carregamento do motor.
+    catalog_get = method == "GET" and route in ("/api/model", "/api/provider") and _engine_warm()
+    empty_deadline = min(deadline, time.time() + _EMPTY_RETRY_S)
+    delay = 0.15
+    while True:
+        conn = http.client.HTTPConnection(host, port, timeout=600)
+        try:
+            conn.request(method, path, body=body, headers=headers)
+            resp = conn.getresponse()
+        except (OSError, http.client.HTTPException) as exc:
+            conn.close()
+            retry_ok = idempotent or isinstance(exc, ConnectionRefusedError)
+            if not retry_ok or time.time() >= deadline:
+                raise
+            time.sleep(delay)
+            delay = min(delay * 1.6, 1.0)
+            continue
+        ctype = (resp.getheader("Content-Type") or "").lower()
+        if idempotent and resp.status == 503 and not ctype.startswith("text/event-stream"):
+            raw = resp.read(65536)
+            headers_out = resp.getheaders()
+            conn.close()
+            if time.time() < deadline:
+                time.sleep(delay)
+                delay = min(delay * 1.6, 1.0)
+                continue
+            return _Buffered(503, resp.reason, headers_out, raw), None
+        if catalog_get and resp.status == 200:
+            # v0.8.0 (web14b): 200 com lista vazia durante o aquecimento é
+            # transitório. Repetir aqui evita que a SPA "grude" no vazio.
+            raw = resp.read()
+            headers_out = resp.getheaders()
+            encoding = resp.getheader("Content-Encoding") or ""
+            conn.close()
+            if _payload_has_rows(raw, encoding) or time.time() >= empty_deadline:
+                return _Buffered(200, resp.reason or "OK", headers_out, raw), None
+            time.sleep(delay)
+            delay = min(delay * 1.6, 1.0)
+            continue
+        return resp, conn
+
 
 class _Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -1496,7 +1750,20 @@ class _Handler(BaseHTTPRequestHandler):
             f"/api/session/{quote(sid, safe='')}/message?limit=3&order=desc"
         )
         rows = msgs.get("data") if isinstance(msgs, dict) else None
-        info = compute_run_state(data, rows or [], int(time.time() * 1000))
+        # Sinal autoritativo do motor: sessões em execução (``type``: running,
+        # busy ou pending). ``None`` se o motor não respondeu → heurística.
+        active = _api_json("/api/session/active")
+        act_map = active.get("data") if isinstance(active, dict) else None
+        engine_running = None
+        if isinstance(act_map, dict):
+            status = act_map.get(sid)
+            engine_running = bool(
+                isinstance(status, dict)
+                and status.get("type") in ("running", "busy", "pending")
+            )
+        info = compute_run_state(
+            data, rows or [], int(time.time() * 1000), engine_running=engine_running
+        )
         info["sid"] = sid
         body = json.dumps(info).encode("utf-8")
         self.send_response(200)
@@ -1576,12 +1843,16 @@ class _Handler(BaseHTTPRequestHandler):
             sid = latest_session()
             source = "latest"
         active, active_age = current_active()
+        # v0.8.0 (web14): ``focus`` traz a ordem (seq) do último foco. A web usa
+        # só isso no reserva; ``active`` (sessão que começou a executar) não
+        # serve para navegar — puxava a página para longe da sessão escolhida.
         body = json.dumps(
             {
                 "sid": sid,
                 "active": active,
                 "active_age_ms": active_age,
                 "source": source,
+                "focus": _focus_snapshot(),
             }
         ).encode("utf-8")
         self.send_response(200)
@@ -1591,11 +1862,18 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _live_stream(self) -> None:
-        """SSE local: entrega o foco da TUI assim que ele muda."""
+    def _live_stream(self, kind: str = "web") -> None:
+        """SSE de foco: ``web`` (páginas, eventos das duas origens) ou ``tui``
+        (plugin do terminal, só eventos da web).
+
+        Primeiro envia um ``snapshot`` (referência, sem navegar). Depois, cada
+        troca como ``data:``. O ping também vai em ``data:`` — o navegador só
+        marca o canal como vivo quando recebe mensagem com dados.
+        """
+        subs = _TUI_SUBS if kind == "tui" else _LIVE_SUBS
         sub: queue.Queue = queue.Queue(maxsize=64)
         with _LIVE_LOCK:
-            _LIVE_SUBS.add(sub)
+            subs.add(sub)
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache, no-store, no-transform")
@@ -1611,32 +1889,21 @@ class _Handler(BaseHTTPRequestHandler):
 
         try:
             _send(b"retry: 1000\n\n")
-            data = read_focus()
-            sid = str(data.get("sid") or "").strip()
-            if sid:
-                _send(
-                    b"data: "
-                    + json.dumps(
-                        {
-                            "sid": sid,
-                            "ts": data.get("ts") or 0,
-                            "source": data.get("source") or "tui",
-                        }
-                    ).encode("utf-8")
-                    + b"\n\n"
-                )
+            snap = {"type": "snapshot", **_focus_snapshot()}
+            _send(b"data: " + json.dumps(snap, ensure_ascii=False).encode("utf-8") + b"\n\n")
             while True:
                 try:
                     msg = sub.get(timeout=15)
                 except queue.Empty:
-                    _send(b": ping\n\n")
+                    ping = json.dumps({"type": "ping", "seq": int(_FOCUS.get("seq") or 0)})
+                    _send(b"data: " + ping.encode("utf-8") + b"\n\n")
                     continue
                 _send(b"data: " + str(msg).encode("utf-8") + b"\n\n")
         except (BrokenPipeError, ConnectionResetError, OSError):
             pass
         finally:
             with _LIVE_LOCK:
-                _LIVE_SUBS.discard(sub)
+                subs.discard(sub)
 
     def _web_focus(self) -> None:
         """A web informa a sessão que está exibindo (terminal segue)."""
@@ -1681,7 +1948,10 @@ class _Handler(BaseHTTPRequestHandler):
             self._boot_js()
             return
         if rota == "/__ufvai/live":
-            self._live_stream()
+            self._live_stream("web")
+            return
+        if rota == "/__ufvai/focus/stream":
+            self._live_stream("tui")
             return
         if rota == "/__ufvai/focus":
             self._web_focus()
@@ -1797,26 +2067,20 @@ class _Handler(BaseHTTPRequestHandler):
                 return
 
         headers = self._forward_headers(password)
-        conn = http.client.HTTPConnection(host, port, timeout=600)
+        conn = None
         try:
-            # v0.7.11-web5: uma tentativa extra cobre o reinício do motor
-            # (service.json muda de porta) sem devolver 502 para a SPA.
-            resp = None
-            for attempt in range(2):
-                try:
-                    conn.request(method, self.path, body=body, headers=headers)
-                    resp = conn.getresponse()
-                    break
-                except OSError:
-                    try:
-                        conn.close()
-                    except OSError:
-                        pass
-                    if attempt == 0:
-                        time.sleep(0.15)
-                        conn = http.client.HTTPConnection(host, port, timeout=600)
-                        continue
-                    raise
+            # v0.8.0 (web14b): uma vez por documento, espera o listener da SPA
+            # existir antes de abrir o SSE — sem fechar a conexão depois.
+            if (
+                _SSE_HANDSHAKE_DELAY_S > 0
+                and self.path.split("?", 1)[0] == "/api/event"
+                and _take_close_once()
+            ):
+                time.sleep(_SSE_HANDSHAKE_DELAY_S)
+            # v0.8.0 (web14): repete enquanto o motor sobe (ver _open_upstream).
+            # Substitui a tentativa única da v0.7.11-web5, que não cobria a
+            # janela de ~5-10 s do reinício e devolvia 502 para a SPA.
+            resp, conn = _open_upstream(method, self.path, body, headers, host, port)
             assert resp is not None
             ctype = (resp.getheader("Content-Type") or "").lower()
 
@@ -1860,47 +2124,10 @@ class _Handler(BaseHTTPRequestHandler):
                     target=_heartbeat, name="ufvai-keepalive", daemon=True
                 ).start()
 
-                # v0.7.11-web8: no Colab o bundle da SPA pode carregar depois
-                # do primeiro server.connected. Sem esse handshake a SPA não
-                # dispara provider.sync/model.sync e o seletor/lista de
-                # provedores ficam em branco até abrir as configurações.
-                # Fechamos a PRIMEIRA conexão uma vez; a reconexão recebe um
-                # handshake real quando o listener já existe.
-                if _CLOSE_FIRST_SSE > 0 and _take_close_once():
-                    def _force_reconnect() -> None:
-                        nonlocal closed
-                        time.sleep(_CLOSE_FIRST_SSE)
-                        with write_lock:
-                            if closed:
-                                return
-                            try:
-                                self.wfile.write(b"0\r\n\r\n")
-                                self.wfile.flush()
-                            except OSError:
-                                pass
-                            closed = True
-                        # ``self.connection`` é o socket do cliente (tem
-                        # shutdown); ``conn`` é um HTTPConnection — fechá-lo
-                        # encerra o lado do motor. Antes chamávamos
-                        # ``conn.shutdown()``, que não existe: a exceção matava
-                        # a thread e a SPA ficava sem reconectar (o stream
-                        # caía em "disconnected" para sempre).
-                        try:
-                            self.connection.shutdown(socket.SHUT_RDWR)
-                        except OSError:
-                            pass
-                        try:
-                            conn.close()
-                        except Exception:  # noqa: BLE001
-                            pass
-                        try:
-                            self.connection.close()
-                        except OSError:
-                            pass
-
-                    threading.Thread(
-                        target=_force_reconnect, name="ufvai-reconnect", daemon=True
-                    ).start()
+                # v0.8.0 (web14b): o handshake já foi atrasado antes de abrir
+                # o stream (ver _SSE_HANDSHAKE_DELAY_S). Não fechamos mais a
+                # primeira conexão: derrubá-la perdia o server.connected e
+                # deixava o seletor de modelos vazio no primeiro acesso.
 
                 try:
                     while True:
@@ -1972,6 +2199,7 @@ class _Handler(BaseHTTPRequestHandler):
                 method in ("GET", "HEAD")
                 and rota_api in ("/api/model", "/api/provider")
                 and status_out == 200
+                and _has_rows(data)
             ):
                 _cache_put(cache_key, port, data)
             if method == "POST" and rota_api == "/api/session" and resp.status == 200:
@@ -2033,7 +2261,8 @@ class _Handler(BaseHTTPRequestHandler):
             except OSError:
                 pass
         finally:
-            conn.close()
+            if conn is not None:
+                conn.close()
 
     do_GET = lambda self: self._handle("GET")  # type: ignore[assignment]
     do_POST = lambda self: self._handle("POST")  # type: ignore[assignment]

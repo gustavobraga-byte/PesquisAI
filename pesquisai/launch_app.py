@@ -3195,6 +3195,20 @@ def _start_opencode_service_with_keys(timeout_s: float = 20.0) -> bool:
     )
 
 
+def _invalidate_catalog_cache() -> None:
+    """Descarta modelos/provedores em cache do proxy (chave salva, motor reiniciado).
+
+    v0.8.0 (web14): sem isso a SPA podia receber a lista anterior por até 60 s
+    depois de salvar uma chave.
+    """
+    try:
+        from . import ocweb as _ocweb
+
+        _ocweb.invalidate_catalog_cache()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("cache do catálogo não invalidado (%s)", exc)
+
+
 def _hard_restart_engine(reason: str = "key") -> None:
     """Encerra o motor e TODAS as sessões e sobe tudo de novo (v0.7.10).
 
@@ -3227,6 +3241,7 @@ def _hard_restart_engine(reason: str = "key") -> None:
         _start_opencode_service_with_keys()
     except Exception as exc:  # noqa: BLE001
         logger.warning("Restart duro (%s): serviço não subiu (%s)", reason, exc)
+    _invalidate_catalog_cache()
     try:
         restart_ttyd_with_lang(_current_lang or "pt_BR")
     except Exception as exc:  # noqa: BLE001

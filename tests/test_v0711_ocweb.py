@@ -356,10 +356,12 @@ def test_boot_js_tem_rede_de_seguranca_para_o_parar():
 
 
 def test_boot_js_destrava_working_com_limite():
+    """v0.8.0: recarga do "Working" só com confirmação do motor e no máximo 1× a cada 2 min."""
     js = ocweb._BOOT_JS
     assert "ufvai.unstuck." in js
     assert "location.reload()" in js
-    assert "30000" in js
+    assert "120000" in js
+    assert "_stuck<3" in js            # três confirmações antes de recarregar
 
 
 def test_boot_js_reporta_navegacao_do_usuario_na_hora():
@@ -590,15 +592,103 @@ def test_boot_js_usa_chave_da_propria_origem():
 
 
 def test_boot_js_nao_devolve_push_ao_terminal():
-    """Push do terminal não volta como foco (evita ping-pong TUI ↔ web)."""
+    """Troca vinda do terminal não volta como foco (evita ping-pong TUI ↔ web).
+
+    v0.8.0: a marca de eco fica em memória e expira; a antiga flag em
+    sessionStorage vazava e impedia de publicar a sessão depois.
+    """
     js = ocweb._BOOT_JS
-    assert "function markPush" in js
-    assert "ufvai-pushed" in js
-    assert "wasPushed" in js
+    assert "_echoSid" in js and "_echoUntil" in js
+    assert "ufvai-pushed" not in js
 
 
 def test_boot_js_reporta_foco_inicial():
     """Ao abrir a web numa sessão, o terminal passa a seguir essa sessão."""
     js = ocweb._BOOT_JS
     bloco = js.split("function reportFocus", 1)[1]
-    assert "var first=!_reported;" in bloco
+    assert "_reportedSid" in bloco
+    assert "reportFocus();" in js      # primeira leitura, ao carregar
+
+
+def test_focus_seq_nasce_do_relogio():
+    """v0.8.0 (web14b): reiniciar o proxy não pode "congelar" os clientes.
+
+    Com seq começando em 0, uma aba que guardou um seq alto ignorava todos os
+    eventos novos depois de um reload do proxy.
+    """
+    assert ocweb._FOCUS["seq"] > 1_600_000_000_000
+
+
+def _fake_engine(monkeypatch, respostas):
+    """Sobe um motor de mentira que devolve ``respostas`` em sequência."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    restantes = list(respostas)
+    chamadas = {"n": 0}
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *_a):
+            pass
+
+        def do_GET(self):  # noqa: N802
+            chamadas["n"] += 1
+            body = restantes.pop(0) if restantes else restantes_final[0]
+            raw = json.dumps(body).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+    restantes_final = [respostas[-1]]
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setattr(ocweb, "service_info", lambda: ("127.0.0.1", srv.server_address[1], ""))
+    monkeypatch.setattr(ocweb, "service_file", lambda: __import__("pathlib").Path("/nao/existe"))
+    return srv, chamadas
+
+
+def test_catalogo_vazio_e_repetido_durante_o_aquecimento(monkeypatch):
+    """200 com ``data: []`` logo após o motor subir é transitório: repetir.
+
+    Era a causa do seletor de modelos em branco no primeiro acesso: a SPA
+    recebia a lista vazia e não pedia de novo.
+    """
+    srv, chamadas = _fake_engine(monkeypatch, [{"data": []}, {"data": []}, {"data": [{"id": "m1"}]}])
+    try:
+        monkeypatch.setattr(ocweb, "_engine_warm", lambda: True)
+        monkeypatch.setattr(ocweb, "_EMPTY_RETRY_S", 3.0)
+        monkeypatch.setattr(ocweb, "_UPSTREAM_WAIT_S", 5.0)
+        resp, conn = ocweb._open_upstream("GET", "/api/model", None, {}, "127.0.0.1", srv.server_address[1])
+        assert conn is None
+        assert json.loads(resp.read())["data"] == [{"id": "m1"}]
+        assert chamadas["n"] == 3
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_catalogo_vazio_nao_atrasa_fora_do_aquecimento(monkeypatch):
+    """Sem janela de aquecimento, lista vazia é resposta legítima."""
+    srv, chamadas = _fake_engine(monkeypatch, [{"data": []}])
+    try:
+        monkeypatch.setattr(ocweb, "_engine_warm", lambda: False)
+        resp, conn = ocweb._open_upstream("GET", "/api/model", None, {}, "127.0.0.1", srv.server_address[1])
+        assert resp.status == 200
+        assert chamadas["n"] == 1
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_sse_atrasa_handshake_sem_fechar_o_stream():
+    """v0.8.0 (web14b): atrasar o 1º SSE em vez de derrubá-lo.
+
+    Fechar a conexão perdia o ``server.connected`` que dispara
+    provider.sync/model.sync — o seletor ficava vazio no primeiro acesso.
+    """
+    assert isinstance(ocweb._SSE_HANDSHAKE_DELAY_S, float)
+    src = Path(ocweb.__file__).read_text(encoding="utf-8")
+    assert "def _force_reconnect" not in src
+    assert "_SSE_HANDSHAKE_DELAY_S > 0" in src

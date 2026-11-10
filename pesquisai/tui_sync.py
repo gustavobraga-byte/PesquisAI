@@ -1,28 +1,19 @@
-"""pesquisai/tui_sync.py — v0.7.11-web12: sincronização em tempo real TUI ↔ web.
+"""pesquisai/tui_sync.py — sincronização em tempo real TUI ↔ web (v0.8.0 / web14).
 
-O problema de sincronizar as duas interfaces não é de transporte (as duas já
-falam com o mesmo motor), é de **intenção**: o motor não sabe qual sessão a
-TUI está *exibindo* — só sabe qual sessão recebeu mensagem. Inferir isso por
-eventos (`session.execution.started`) erra sempre que o usuário apenas troca
-de aba/sessão no terminal, e o polling de 2,5 s na web adiciona até 2,5 s de
-atraso.
+Modelo: o proxy (``ocweb``) decide uma ORDEM para as trocas de sessão (``seq``).
+Batimentos da TUI — a mesma sessão repetida — não são trocas e não são
+publicados: por isso não revertem uma navegação recente da web.
 
-A TUI do OpenCode V2 expõe a rota atual ao plugin (`context.ui.router`), então
-o próprio terminal **publica** a sessão que está na tela:
+* TUI → web: o plugin faz ``POST /__ufvai/focus`` (``source: "tui"``) só quando
+  a rota muda; o proxy publica no SSE ``/__ufvai/live`` na hora.
+* web → TUI: o plugin mantém o stream ``/__ufvai/focus/stream`` (SSE, só eventos
+  da web) e navega a TUI para a sessão escolhida no navegador. Sem o stream,
+  lê ``/tmp/ufvai-web-focus.json`` a cada 100 ms.
+* Batimento: a cada 2 s o arquivo de reserva é reescrito (sem evento).
 
-* a cada 100 ms (barato: leitura em memória) e imediatamente no evento
-  `session.execution.started`, publica a sessão por ``POST /__ufvai/focus``
-  (``source: "tui"``) **e** grava ``/tmp/ufvai-focus.json`` como reserva;
-* o proxy da web (``ocweb``) observa o arquivo a cada 250 ms e faz *push*
-  para as páginas abertas por ``/__ufvai/live`` (SSE) — a troca acontece em
-  milissegundos, não em segundos;
-* no sentido inverso, a web grava ``/tmp/ufvai-web-focus.json`` ao navegar e
-  este plugin navega a TUI para a mesma sessão (se o foco tiver < 5 s).
-
-Nada aqui inventa estado: o valor publicado é ``context.ui.router.current()``
-— exatamente a sessão que o terminal mostra. Se a API não existir na versão do
-motor, o plugin não publica nada e o proxy cai no comportamento anterior
-(eventos + polling), sem quebrar a TUI.
+Nada aqui inventa estado: a sessão publicada é ``context.ui.router.current()``.
+Se a API não existir na versão do motor, o plugin não publica nada e a TUI
+segue normal.
 """
 
 from __future__ import annotations
@@ -46,25 +37,30 @@ SYNC_PLUGIN_TUI_TS: str = r'''import { Plugin } from "@opencode/plugin/tui"
 import { readFileSync, renameSync, writeFileSync } from "node:fs"
 
 /**
- * UFVAI — sincronização em tempo real TUI <-> web (v0.7.11-web12).
+ * UFVAI — sincronização em tempo real TUI <-> web (v0.8.0 / web14).
  *
- * Publica a sessão que a TUI está exibindo de duas formas:
- *   1. `POST /__ufvai/focus` (source "tui") — caminho rápido: o proxy publica
- *      no SSE na hora (~1 ms), sem esperar o polling do arquivo;
- *   2. FOCUS_FILE — reserva para plugins antigos e para quando o POST falha.
- * A checagem da rota é feita a cada 100 ms (leitura em memória).
+ * Regra única: só uma TROCA de sessão é publicada; batimentos não. A web e a
+ * TUI aplicam apenas eventos mais novos (seq do servidor) e nunca "trocam" para
+ * a sessão que já estão mostrando. Assim um batimento antigo não reverte uma
+ * escolha recente.
  *
- * No sentido inverso, lê WEB_FOCUS_FILE (gravado pela web) e navega para a
- * sessão escolhida no navegador, desde que o foco seja recente.
+ *   TUI -> web:  POST /__ufvai/focus (source "tui") ao mudar de rota.
+ *   web -> TUI:  stream SSE /__ufvai/focus/stream (só eventos da web). O proxy
+ *                empurra na hora; se o stream cair, lê o arquivo de reserva.
+ *
+ * A rota vem de context.ui.router.current(). Se a API não existir na versão do
+ * motor, o plugin fica silencioso e a TUI segue normal.
  */
 
 const FOCUS = process.env.UFVAI_FOCUS_FILE || "/tmp/ufvai-focus.json"
 const WEB = process.env.UFVAI_WEB_FOCUS_FILE || "/tmp/ufvai-web-focus.json"
-const FOCUS_URL =
-  process.env.UFVAI_FOCUS_URL || "http://127.0.0.1:8002/__ufvai/focus"
+const BASE = process.env.UFVAI_PROXY_URL || "http://127.0.0.1:8002"
+const FOCUS_URL = process.env.UFVAI_FOCUS_URL || `${BASE}/__ufvai/focus`
+const STREAM_URL = process.env.UFVAI_FOCUS_STREAM_URL || `${BASE}/__ufvai/focus/stream`
 const PUBLISH_MS = 100
-const FOLLOW_MS = 250
-const FOLLOW_MAX_AGE = 5000
+const HEARTBEAT_MS = 2000
+const FILE_FOLLOW_MS = 100
+const RECONNECT_MS = 1000
 
 /** Entrega o foco ao proxy por HTTP (não bloqueia a TUI se falhar). */
 function postFocus(sid: string, route: string) {
@@ -74,12 +70,7 @@ function postFocus(sid: string, route: string) {
     const p = f(FOCUS_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sid,
-        ts: Date.now(),
-        route: route || "session",
-        source: "tui",
-      }),
+      body: JSON.stringify({ sid, ts: Date.now(), route: route || "session", source: "tui" }),
     })
     if (p && typeof p.catch === "function") p.catch(() => {})
   } catch {}
@@ -108,60 +99,147 @@ function current(context: any): { sid: string; route: string } {
   }
 }
 
+/**
+ * Acompanha o stream de foco da web (SSE via fetch). Reconecta sozinho.
+ * `isUp()` diz se o stream está recebendo; a reserva por arquivo só age sem ele.
+ */
+function openStream(onEvent: (ev: any) => void, stopped: () => boolean) {
+  let up = false
+  let controller: any = null
+  let timer: any = null
+  const connect = async () => {
+    timer = null
+    if (stopped()) return
+    try {
+      const AC = (globalThis as any).AbortController
+      controller = AC ? new AC() : null
+      const f = (globalThis as any).fetch
+      if (typeof f !== "function") throw new Error("sem fetch")
+      const res = await f(STREAM_URL, {
+        headers: { Accept: "text/event-stream" },
+        signal: controller ? controller.signal : undefined,
+      })
+      if (!res || !res.ok || !res.body) throw new Error("status")
+      up = true
+      const reader = res.body.getReader()
+      const dec = new TextDecoder()
+      let buf = ""
+      while (!stopped()) {
+        const chunk = await reader.read()
+        if (chunk.done) break
+        buf += dec.decode(chunk.value, { stream: true })
+        let idx = buf.indexOf("\n\n")
+        while (idx >= 0) {
+          const block = buf.slice(0, idx)
+          buf = buf.slice(idx + 2)
+          idx = buf.indexOf("\n\n")
+          const line = block.split("\n").find((l: string) => l.startsWith("data: "))
+          if (!line) continue
+          try {
+            onEvent(JSON.parse(line.slice(6)))
+          } catch {}
+        }
+      }
+    } catch {
+      // sem stream (proxy reiniciando ou versão antiga): a reserva cobre
+    }
+    up = false
+    if (!stopped()) timer = setTimeout(connect, RECONNECT_MS)
+  }
+  void connect()
+  return {
+    isUp: () => up,
+    close: () => {
+      try {
+        if (controller) controller.abort()
+      } catch {}
+      if (timer) clearTimeout(timer)
+    },
+  }
+}
+
 export default Plugin.define({
   id: "ufvai.sync",
   setup(context: any) {
-    let lastSid = ""
-    let lastWebTs = 0
-    let lastWrite = 0
     let stopped = false
+    let lastSid = ""     // última sessão PUBLICADA (troca real)
+    let lastWrite = 0    // última escrita do arquivo de reserva
+    let webSeq = -1      // último seq da web já aplicado
+    let seeded = false   // a primeira leitura da web só serve de referência
+
+    const writeFocus = (now: { sid: string; route: string }) => {
+      lastWrite = Date.now()
+      try {
+        atomicWrite(
+          FOCUS,
+          JSON.stringify({ sid: now.sid, ts: Date.now(), route: now.route || "session", source: "tui" }),
+        )
+      } catch {
+        // melhor esforço: nunca derruba a TUI por causa do arquivo
+      }
+    }
 
     const publish = () => {
       if (stopped) return
       const now = current(context)
       if (!now.sid) return
-      const t = Date.now()
-      // reescreve a cada 2 s mesmo sem trocar de sessão: mantém o arquivo
-      // fresco para páginas web que conectam depois e para o /tmp limpo.
-      if (now.sid === lastSid && t - lastWrite < 2000) return
-      lastSid = now.sid
-      lastWrite = t
-      try {
-        atomicWrite(
-          FOCUS,
-          JSON.stringify({
-            sid: now.sid,
-            ts: Date.now(),
-            route: now.route || "session",
-            source: "tui",
-          }),
-        )
-      } catch {
-        // melhor esforço: nunca derruba a TUI por causa do arquivo
+      if (now.sid === lastSid) {
+        // batimento: mantém o arquivo de reserva fresco — não é troca
+        if (Date.now() - lastWrite >= 2000) writeFocus(now)
+        return
       }
-      // caminho rápido: o proxy publica no SSE imediatamente
+      lastSid = now.sid
+      writeFocus(now)
       postFocus(now.sid, now.route)
     }
 
-    const follow = () => {
-      if (stopped) return
-      let data: any
-      try {
-        data = JSON.parse(readFileSync(WEB, "utf8"))
-      } catch {
-        return
-      }
-      const ts = Number((data && data.ts) || 0)
-      const sid = String((data && data.sid) || "")
-      if (!sid || ts <= lastWebTs) return
-      lastWebTs = ts
-      if (Date.now() - ts > FOLLOW_MAX_AGE) return
+    const applyWeb = (sid: string, seq: number) => {
+      if (!sid || !(seq > webSeq)) return
+      webSeq = seq
       if (current(context).sid === sid) return
       try {
         context.ui.router.navigate({ type: "session", sessionID: sid })
       } catch {}
     }
 
+    const onStream = (ev: any) => {
+      if (!ev) return
+      if (ev.type === "snapshot") {
+        const seq = Number(ev.seq) || 0
+        if (!seeded) {
+          seeded = true
+          webSeq = Math.max(webSeq, seq)
+          return
+        }
+        if (ev.source === "web") applyWeb(String(ev.sid || ""), seq)
+        return
+      }
+      if (ev.type === "focus" && ev.source === "web") {
+        seeded = true
+        applyWeb(String(ev.sid || ""), Number(ev.seq) || 0)
+      }
+    }
+
+    const followFile = () => {
+      if (stopped || stream.isUp()) return
+      let data: any
+      try {
+        data = JSON.parse(readFileSync(WEB, "utf8"))
+      } catch {
+        return
+      }
+      const sid = String((data && data.sid) || "")
+      const seq = Number((data && data.seq) || 0)
+      if (!sid || !seq) return
+      if (!seeded) {
+        seeded = true
+        webSeq = Math.max(webSeq, seq)
+        return
+      }
+      applyWeb(sid, seq)
+    }
+
+    const stream = openStream(onStream, () => stopped)
     const offs: any[] = []
     for (const evt of ["session.execution.started", "session.viewed", "session.created"]) {
       try {
@@ -171,12 +249,13 @@ export default Plugin.define({
     }
     publish()
     const t1 = setInterval(() => publish(), PUBLISH_MS)
-    const t2 = setInterval(() => follow(), FOLLOW_MS)
+    const t2 = setInterval(() => followFile(), FILE_FOLLOW_MS)
 
     return () => {
       stopped = true
       clearInterval(t1)
       clearInterval(t2)
+      stream.close()
       for (const fn of offs) {
         try {
           fn()
