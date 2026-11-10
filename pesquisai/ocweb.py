@@ -271,7 +271,6 @@ _BOOT_JS = r"""(function(){
 
   // ── canal ao vivo: /__ufvai/live (SSE) ─────────────────────────────────
   var _live=null,_lastLive=0;
-  function liveOk(){return !!_live&&_live.readyState===1&&(Date.now()-_lastLive)<20000}
   function startLive(){
     if(typeof window.EventSource!=="function")return false;
     try{
@@ -295,12 +294,15 @@ _BOOT_JS = r"""(function(){
   startLive();
   if(window.addEventListener)window.addEventListener("pageshow",function(){startLive()});
 
-  // Reserva: sem canal vivo, consulta a cada 1,5 s. Usa só o foco ordenado
-  // (nunca a sessão "active", que puxava a página para longe da escolhida).
+  // Reserva: consulta a cada 1,5 s, SEMPRE. O SSE é o caminho rápido, mas o
+  // proxy do Colab pode manter o stream "aberto" sem entregar eventos; nesse
+  // caso o canal parece vivo e a página ficaria parada. O seq descarta o que
+  // já foi aplicado, então a consulta é idempotente e barata.
+  // Usa só o foco ordenado (nunca a sessão "active", que puxava a página para
+  // longe da escolhida).
   setInterval(function(){
     if(_pendingSid&&_pendingSid!==curSid()&&canNav()){var s=_pendingSid;_pendingSid="";navTo(s);return}
     if(!_live||_live.readyState===2)startLive();
-    if(liveOk())return;
     fetch("/__ufvai/session?fallback=1",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){
       if(d&&d.focus){if(!_seeded)seedSeq(d.focus.seq);else applyFocus(d.focus)}
     }).catch(function(){});
@@ -395,14 +397,20 @@ _BOOT_JS = r"""(function(){
   // A SPA busca /api/model ao abrir a sessão. Se a lista não chegou (motor
   // subindo, evento server.connected perdido), recarrega UMA vez a cada 10 min.
   // Só age quando o servidor já tem modelos (há chave configurada).
-  function modelsOk(){
+  function modelsOk(count){
     try{
       var es=performance.getEntriesByType("resource");
       for(var i=es.length-1;i>=0;i--){
         if((es[i].name||"").indexOf("/api/model")<0)continue;
         var st=es[i].responseStatus;
         if(!st)return true;              // sem dado de status: não mexe
-        return st===200;
+        if(st!==200)return false;
+        // v0.8.0 (web15): 200 com corpo mínimo = catálogo vazio/truncado.
+        // O proxy sabe que há modelos (count > 0), então a SPA ficou com uma
+        // lista em branco e precisa de uma recarga.
+        var size=Number(es[i].decodedBodySize||es[i].transferSize||0);
+        if(count>0&&size>0&&size<4096)return false;
+        return true;
       }
     }catch(e){return true}
     return false;                        // a SPA nunca pediu /api/model
@@ -411,7 +419,7 @@ _BOOT_JS = r"""(function(){
     setTimeout(function(){
       catalog(function(d){
         if(!d||!d.ready)return;          // sem modelos no servidor (ex.: sem chave)
-        if(modelsOk())return;
+        if(modelsOk(Number(d.models)||0))return;
         try{
           var last=Number(sessionStorage.getItem("ufvai.modelreload")||0);
           if(Date.now()-last<600000)return;

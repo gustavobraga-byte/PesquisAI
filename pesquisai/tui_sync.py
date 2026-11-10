@@ -221,7 +221,11 @@ export default Plugin.define({
     }
 
     const followFile = () => {
-      if (stopped || stream.isUp()) return
+      if (stopped) return
+      // v0.8.0 (web15): o arquivo é SEMPRE acompanhado. Antes, um SSE
+      // "aberto" mas bufferizado (proxy do Colab) desligava esta reserva:
+      // o stream dizia isUp()=true e nenhum evento chegava — a TUI ficava
+      // parada. O seq abaixo torna a leitura idempotente e barata.
       let data: any
       try {
         data = JSON.parse(readFileSync(WEB, "utf8"))

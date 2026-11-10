@@ -4388,7 +4388,21 @@ def create_wrapper_html(
       if (/:8001$/.test(o)) return o.replace(":8001", ":8000") + "/";
       return "";
     })();
-    let _console = localStorage.getItem("ufvai.console") || "web";
+    // v0.8.0 (web15): o TERMINAL é a visão padrão ao abrir a interface.
+    // A chave v2 ignora o "web" gravado por versões anteriores (migração
+    // única); depois disso, a escolha feita no botão continua valendo.
+    const _CONSOLE_KEY = "ufvai.console.v2";
+    const READY_URL_WEB = "{__READY_URL__}";
+    let _console = (function () {
+      try {
+        var saved = localStorage.getItem(_CONSOLE_KEY);
+        if (saved === "ttyd" || saved === "web") return saved;
+      } catch (e) {}
+      return TTYD_URL ? "ttyd" : "web";
+    })();
+    function _readyUrl() {
+      return (_console === "ttyd" && TTYD_URL) ? "/api/ttyd_ready" : READY_URL_WEB;
+    }
     function _currentTheme() {
       return (document.documentElement.getAttribute("data-theme") === "pesquisai-light")
         ? "light" : "dark";
@@ -4416,7 +4430,7 @@ def create_wrapper_html(
       const fr = document.getElementById("terminal-frame");
       if (!fr) return;
       _console = (mode === "ttyd" && TTYD_URL) ? "ttyd" : "web";
-      try { localStorage.setItem("ufvai.console", _console); } catch (e) {}
+      try { localStorage.setItem(_CONSOLE_KEY, _console); } catch (e) {}
       const b = document.getElementById("console-toggle");
       if (b) { b.dataset.mode = _console; b.setAttribute("aria-label", _console); }
       fr.src = _frameUrl(_console);
@@ -4467,7 +4481,7 @@ def create_wrapper_html(
       maxMs = maxMs || 30000;
       while (Date.now() - t0 < maxMs) {
         try {
-          const r = await fetch(BASE + "{__READY_URL__}", { cache: "no-store" });
+          const r = await fetch(BASE + _readyUrl(), { cache: "no-store" });
           if (r.ok) {
             const d = await r.json();
             if (d.ready) { if (d.pid) _ttydPid = d.pid; return true; }
@@ -4504,7 +4518,7 @@ def create_wrapper_html(
       if (!_ttydWatch) {
         _ttydWatch = setInterval(async () => {
           try {
-            const r = await fetch(BASE + "{__READY_URL__}", { cache: "no-store" });
+            const r = await fetch(BASE + _readyUrl(), { cache: "no-store" });
             if (!r.ok) return;
             const d = await r.json();
             if (!d.ready || !d.pid) return;
