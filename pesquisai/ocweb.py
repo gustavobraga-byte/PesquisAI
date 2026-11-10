@@ -517,6 +517,25 @@ def _api_json(path: str, timeout: float = 5.0):
         conn.close()
 
 
+def _catalog_json(path: str, timeout: float = 12.0, wait: float = 6.0):
+    """Lê catálogo repetindo 503/lista vazia durante o aquecimento.
+
+    O motor pode publicar ``service.json`` antes de terminar a descoberta de
+    provedores/modelos. A SPA não repete uma resposta vazia, portanto o
+    endpoint interno também precisa aguardar o catálogo real.
+    """
+    deadline = time.time() + wait
+    last = None
+    while True:
+        last = _api_json(path, timeout=timeout)
+        rows = last.get("data") if isinstance(last, dict) else None
+        if isinstance(rows, list) and rows:
+            return last
+        if time.time() >= deadline:
+            return last
+        time.sleep(0.2)
+
+
 # v0.8.0 (web14b): atrasa a 1ª conexão SSE de cada documento HTML (~1,2 s)
 # para o ``server.connected`` chegar depois de o listener da SPA existir.
 # A versão anterior FECHAVA essa conexão logo na abertura: além de derrubar o
@@ -717,7 +736,7 @@ def _global_rows(kind: str, ttl: float = 30.0):
         cached = _GLOBAL_ROWS.get(kind)
         if cached and now - float(_GLOBAL_ROWS.get(f"{kind}_ts", 0.0)) < ttl:
             return cached
-    payload = _api_json(f"/api/{kind}", timeout=15.0)
+    payload = _catalog_json(f"/api/{kind}", timeout=15.0, wait=6.0)
     rows = payload.get("data") if isinstance(payload, dict) else None
     # v0.8.0 (web14): lista vazia não é guardada — ela pode ser só o motor
     # ainda subindo, e cacheá-la deixava o seletor vazio por 30 s.
@@ -785,13 +804,13 @@ def catalog(force: bool = False, ttl: float = 5.0) -> dict:
     if isinstance(prows, list) and prows and isinstance(prows[0], dict):
         directory = str(prows[0].get("canonical") or prows[0].get("worktree") or "")
     query = "?location%5Bdirectory%5D=" + quote(directory, safe="") if directory else ""
-    models = _api_json(f"/api/model{query}", timeout=12) if query else None
+    models = _catalog_json(f"/api/model{query}", timeout=12, wait=6.0) if query else None
     scoped_count = len((models.get("data") if isinstance(models, dict) else None) or [])
     if not models or not scoped_count:
-        models = _api_json("/api/model", timeout=12)
-    providers = _api_json(f"/api/provider{query}", timeout=8) if query else None
+        models = _catalog_json("/api/model", timeout=12, wait=6.0)
+    providers = _catalog_json(f"/api/provider{query}", timeout=8, wait=6.0) if query else None
     if not providers:
-        providers = _api_json("/api/provider", timeout=8)
+        providers = _catalog_json("/api/provider", timeout=8, wait=6.0)
     rows = models.get("data") if isinstance(models, dict) else None
     provs = providers.get("data") if isinstance(providers, dict) else None
     data = {

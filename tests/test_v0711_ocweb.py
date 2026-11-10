@@ -682,6 +682,15 @@ def test_catalogo_vazio_nao_atrasa_fora_do_aquecimento(monkeypatch):
         srv.server_close()
 
 
+def test_catalog_json_repara_catalogo_vazio_durante_aquecimento(monkeypatch):
+    """O endpoint interno também espera o catálogo, não só o proxy SPA."""
+    respostas = iter([{"data": []}, {"data": []}, {"data": [{"id": "m1"}]}])
+    monkeypatch.setattr(ocweb, "_api_json", lambda *a, **k: next(respostas))
+    monkeypatch.setattr(ocweb.time, "sleep", lambda *_a: None)
+    data = ocweb._catalog_json("/api/model", wait=1.0)
+    assert data["data"] == [{"id": "m1"}]
+
+
 def test_sse_atrasa_handshake_sem_fechar_o_stream():
     """v0.8.0 (web14b): atrasar o 1º SSE em vez de derrubá-lo.
 
@@ -692,3 +701,144 @@ def test_sse_atrasa_handshake_sem_fechar_o_stream():
     src = Path(ocweb.__file__).read_text(encoding="utf-8")
     assert "def _force_reconnect" not in src
     assert "_SSE_HANDSHAKE_DELAY_S > 0" in src
+
+
+# ─────────────────────────────────────────────────────────────────────
+# v0.8.0 (web15) — terminal é a visão padrão, prontidão segue o modo
+# ativo, reserva de foco sempre ativa e catálogo truncado se auto-cura.
+# ─────────────────────────────────────────────────────────────────────
+import shutil
+import subprocess
+import textwrap
+
+
+def _run_node(js: str) -> dict:
+    """Executa um trecho JS isolado e devolve o JSON impresso."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node indisponível")
+    proc = subprocess.run(
+        [node, "-e", js], capture_output=True, text=True, timeout=30,
+    )
+    assert proc.returncode == 0, proc.stderr[:800]
+    return json.loads(proc.stdout.strip().splitlines()[-1])
+
+
+def _console_block(html: str) -> str:
+    """Recorta o bloco que decide o console padrão do HTML gerado."""
+    start = html.index('const _CONSOLE_KEY')
+    end = html.index("function _currentTheme()")
+    return html[start:end]
+
+
+def test_wrapper_terminal_e_o_padrao_e_migra_da_chave_antiga():
+    html = create_wrapper_html(
+        "https://8002-x/", "https://drive.google.com/x",
+        web_mode=True, ttyd_url="https://8000-x/",
+    )
+    assert 'localStorage.getItem("ufvai.console")' not in html
+    block = _console_block(html)
+    assert '"ufvai.console.v2"' in block
+
+    casos = {
+        # chave v2 ausente + ttyd disponível → terminal
+        "{}": "ttyd",
+        # escolha explícita do usuário continua valendo
+        '{"ufvai.console.v2": "web"}': "web",
+        '{"ufvai.console.v2": "ttyd"}': "ttyd",
+        # "web" gravado pela chave ANTIGA é ignorado (migração única)
+        '{"ufvai.console": "web"}': "ttyd",
+        # valor inválido na chave nova → padrão
+        '{"ufvai.console.v2": "lixo"}': "ttyd",
+    }
+    for store, esperado in casos.items():
+        js = (
+            f"var TTYD_URL = 'https://8000-x/';\n"
+            f"var localStorage = {{getItem: function(k){{"
+            f"var s = {store}; return k in s ? s[k] : null; }}}};\n"
+            f"{block}\n"
+            f"console.log(JSON.stringify({{console: _console, ready: _readyUrl()}}));"
+        )
+        out = _run_node(js)
+        assert out["console"] == esperado, (store, out)
+        assert out["ready"] == ("/api/ttyd_ready" if esperado == "ttyd" else "/api/ocweb_ready")
+
+
+def test_wrapper_sem_ttyd_cai_na_web():
+    html = create_wrapper_html(
+        "https://8002-x/", "https://drive.google.com/x", web_mode=True,
+    )
+    block = _console_block(html)
+    js = (
+        "var TTYD_URL = '';\nvar localStorage = {getItem: function(){return null}};\n"
+        f"{block}\nconsole.log(JSON.stringify({{console: _console, ready: _readyUrl()}}));"
+    )
+    out = _run_node(js)
+    assert out == {"console": "web", "ready": "/api/ocweb_ready"}
+
+
+def test_wrapper_prontidao_nao_usa_url_fixa():
+    """O polling deve seguir o console ativo, não o ``web_mode`` do boot."""
+    html = create_wrapper_html(
+        "https://8002-x/", "https://drive.google.com/x",
+        web_mode=True, ttyd_url="https://8000-x/",
+    )
+    assert html.count("fetch(BASE + _readyUrl()") == 2
+    assert 'fetch(BASE + "/api/ocweb_ready"' not in html
+
+
+def test_boot_js_sempre_polling_de_foco():
+    """SSE aberto mas bufferizado (proxy Colab) não pode desligar a reserva."""
+    js = ocweb._BOOT_JS
+    assert "liveOk" not in js
+    assert 'if(liveOk())return;' not in js
+    i = js.index('fetch("/__ufvai/session?fallback=1"')
+    intervalo = js[max(0, i - 400):i]
+    assert "setInterval(function(){" in intervalo
+    assert "if(liveOk())" not in intervalo
+    # startLive continua sendo chamado quando o stream caiu
+    assert "_live.readyState===2" in intervalo
+
+
+def test_boot_js_recarrega_catalogo_truncado():
+    js = ocweb._BOOT_JS
+    fn = js[js.index("function modelsOk(count){"):js.index("  if(/^\\/server\\/")]
+    casos = [
+        # [responseStatus, decodedBodySize, transferSize, count] → esperado
+        ([200, 414000, 414000, 475], True),   # catálogo cheio: ok
+        ([200, 1200, 1200, 475], False),      # 200 truncado: recarrega
+        ([200, 1200, 1200, 0], True),         # sem modelos no servidor: não mexe
+        ([500, 0, 0, 475], False),            # erro: recarrega
+        ([0, 0, 0, 475], True),               # sem status: não mexe
+        ([200, 0, 0, 475], True),             # sem medida de corpo: não mexe
+    ]
+    for (status, decoded, transfer, count), esperado in casos:
+        js_run = (
+            "var ENTRADAS = [{name: 'https://x/api/model?location[directory]=/p',"
+            f" responseStatus: {status}, decodedBodySize: {decoded},"
+            f" transferSize: {transfer}}}];\n"
+            "var performance = {getEntriesByType: function(){return ENTRADAS}};\n"
+            f"{fn}\n"
+            f"console.log(JSON.stringify({{ok: modelsOk({count})}}));"
+        )
+        assert _run_node(js_run)["ok"] is esperado, (status, decoded, transfer, count)
+
+
+def test_boot_js_recarga_no_maximo_a_cada_dez_minutos():
+    js = ocweb._BOOT_JS
+    assert 'sessionStorage.getItem("ufvai.modelreload")' in js
+    assert "600000" in js
+
+
+def test_plugin_tui_sempre_acompanha_o_arquivo():
+    """A TUI não pode depender só do SSE: o arquivo é sempre lido."""
+    from pesquisai import tui_sync
+
+    src = tui_sync.SYNC_PLUGIN_TUI_TS
+    corpo = src[src.index("const followFile = () => {"):src.index("const stream = openStream")]
+    assert "stream.isUp()" not in corpo
+    assert "if (stopped) return" in corpo
+    assert "applyWeb(sid, seq)" in corpo
+    # o temporizador do arquivo é criado sem condição
+    assert "setInterval(() => followFile(), FILE_FOLLOW_MS)" in src
+    assert "setInterval(() => publish(), PUBLISH_MS)" in src
