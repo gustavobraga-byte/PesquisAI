@@ -123,11 +123,13 @@ class TestIntegracaoComTouch:
         assert "xterm-helper-textarea" in js
 
 
-class TestSemBump:
-    def test_versao_nao_mudou(self):
+class TestVersaoAtual:
+    # v0.7.8 nasceu com o teclado do terminal; no 0.7.10 o código continua o mesmo,
+    # só a versão do release mudou — este teste guarda a sincronia com __version__.py.
+    def test_versao_do_release(self):
         from pesquisai import __version__ as v
 
-        assert v.__version__ == "0.7.8"
+        assert v.__version__ == "0.7.10"
 
 
 class TestCacheDoIndex:
