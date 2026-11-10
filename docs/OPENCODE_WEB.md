@@ -370,3 +370,46 @@ e não há credenciais salvas. Ou seja: a pergunta aparece uma vez por Drive.
 
 O plugin continua gravando `/tmp/ufvai-focus.json` como reserva — plugins
 antigos e escritas manuais seguem funcionando.
+
+---
+
+## 19. “Working” preso e botão Parar (revisão `web13`)
+
+### 19.1 Por que ficava “Working”
+
+O status da sessão na SPA é um **conjunto alimentado por evento**:
+`session.execution.started` entra, `session.execution.succeeded|failed|
+interrupted` sai. Se o evento final não chega (SSE bufferizado no proxy do
+Colab, reconexão no meio), o rodapé nunca limpa — mesmo com o turno encerrado
+no motor.
+
+`session.time.busy > time.idle` **não** serve para decidir: quando um turno
+morre no meio, o motor mantém `outcome` do turno anterior e `idle` velho.
+
+### 19.2 O sinal correto
+
+`GET /__ufvai/run-state?sid=<id>` inspeciona a **última mensagem do
+assistente**:
+
+| Situação | `running` | `stale` |
+|---|---|---|
+| `time.completed` presente | `false` | `false` |
+| sem `completed`, atividade < 120 s | `true` | `false` |
+| sem `completed`, parada ≥ 120 s | `false` | `true` |
+
+Com isso o `boot.js` faz duas coisas:
+
+1. **destrava** — se a UI mostra “Working” e `running=false`, revalida e
+   recarrega uma vez (máx. 1×/30 s por sessão, via `sessionStorage`);
+2. **Parar** — se a chamada da SPA não sair em 600 ms, o fallback consulta o
+   estado: `running` → manda `POST /api/session/<id>/interrupt?resume=true`;
+   já terminado → apenas limpa a UI.
+
+### 19.3 Validação (proxy isolado + Chromium headless)
+
+- turno real de 30 s: **não** recarrega (sem falso positivo);
+- “Working” forjado com turno concluído: recarrega em ~8–12 s e limpa;
+- Parar em turno concluído: limpa em vez de interrupt inócuo;
+- Parar em turno real: `outcome = interrupted` no servidor;
+- `pytest`: **113 passed**.
+

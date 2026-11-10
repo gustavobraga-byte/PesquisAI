@@ -177,7 +177,15 @@ def _inject_html(data: bytes, session_id: str = "") -> bytes:
 
 
 _BOOT_JS = """(function(){
-  try{var f=window.fetch;window.fetch=function(u,o){o=o||{};if(o.credentials===undefined||o.credentials==="omit")o.credentials="same-origin";return f.call(this,u,o)}}catch(e){}
+  try{var f=window.fetch;window.fetch=function(u,o){
+    o=o||{};
+    if(o.credentials===undefined||o.credentials==="omit")o.credentials="same-origin";
+    try{
+      var _u=(typeof u==="string")?u:((u&&u.url)||"");
+      if(_u.indexOf("/interrupt")>=0)window.__ufvaiLastInterrupt=Date.now();
+    }catch(e){}
+    return f.call(this,u,o)
+  }}catch(e){}
   function ufvaiTheme(t){
     t=(t==="light")?"light":"dark";
     try{localStorage.setItem("opencode-color-scheme",t);
@@ -322,6 +330,82 @@ _BOOT_JS = """(function(){
     }catch(e){}
   }
   setInterval(reportFocus,1200);
+
+  // v0.7.11-web13 ── rede de segurança do botão Parar ────────────────────
+  // O botão da SPA faz POST /api/session/<id>/interrupt?resume=true. Se por
+  // qualquer motivo essa chamada não sair (botão desabilitado, handler
+  // perdido, SSE travado), mandamos a interrupção nós mesmos 600 ms depois
+  // do clique. O endpoint é idempotente, então um pedido duplicado é inócuo.
+  function _stopFallback(ev){
+    try{
+      var el=ev.target;
+      var btn=(el&&el.closest)?el.closest('button[aria-label="Stop"],button[aria-label="Parar"]'):null;
+      if(!btn)return;
+      var sid=curSid(); if(!sid)return;
+      setTimeout(function(){
+        // Se a SPA já mandou a interrupção, não duplica.
+        if(Date.now()-(window.__ufvaiLastInterrupt||0)<900)return;
+        fetch("/__ufvai/run-state?sid="+encodeURIComponent(sid),{cache:"no-store"})
+          .then(function(r){return r.ok?r.json():null})
+          .then(function(js){
+            if(js&&js.running){
+              try{
+                fetch("/api/session/"+sid+"/interrupt?resume=true",{
+                  method:"POST",headers:{"Content-Type":"application/json"},
+                  body:"{}",cache:"no-store"
+                });
+              }catch(e){}
+            }else if(js&&!js.running){
+              // Turno já terminou no servidor: não há o que interromper — o
+              // "Working" é estado preso. Recarrega para limpar (nada se perde).
+              _unstuckReload(sid);
+            }
+          }).catch(function(){});
+      },600);
+    }catch(e){}
+  }
+  try{document.addEventListener("click",_stopFallback,true);}catch(e){}
+
+  // Recarrega no máximo 1× por 30 s — o estado do turno está no servidor.
+  function _unstuckReload(sid){
+    var k="ufvai.unstuck."+sid;
+    try{
+      var last=Number(sessionStorage.getItem(k)||0);
+      if(Date.now()-last<30000)return;
+      sessionStorage.setItem(k,String(Date.now()));
+    }catch(e){}
+    try{location.reload();}catch(e){}
+  }
+
+  // v0.7.11-web13 ── destravar o "Working" no fim da resposta ────────────
+  // Se o evento final (session.execution.succeeded) não chegou (SSE bufferizado
+  // no proxy do Colab, reconexão etc.), o rodapé fica "Working" para sempre.
+  // Aqui consultamos o estado real da sessão: terminada e ociosa = a SPA está
+  // atrasada. Cutucamos a revalidação e, se ainda assim não limpar, recarregamos
+  // UMA vez (o estado está no servidor; nada se perde).
+  var _stuck=0;
+  setInterval(function(){
+    window.__ufvaiWatch=(window.__ufvaiWatch||0)+1;
+    var sid=curSid(); if(!sid){_stuck=0;return}
+    var main=document.querySelector("main");
+    if(!main)return;
+    var texto=main.innerText||"";
+    if(!/(?:Working|Trabalhando)/.test(texto)){_stuck=0;return}
+    var ed=document.querySelector('[contenteditable="true"][aria-label="Prompt"]');
+    if(ed&&(ed.textContent||"").trim())return;      // usuário digitando: não mexer
+    fetch("/__ufvai/run-state?sid="+encodeURIComponent(sid),{cache:"no-store"})
+      .then(function(r){return r.ok?r.json():null})
+      .then(function(js){
+        if(!js||js.running){_stuck=0;return}          // rodando de verdade
+        _stuck++;
+        window.__ufvaiStuck=_stuck;
+        try{window.dispatchEvent(new Event("focus"));}catch(e){}
+        try{document.dispatchEvent(new Event("visibilitychange"));}catch(e){}
+        if(_stuck<2)return;
+        _stuck=0;
+        _unstuckReload(sid);
+      }).catch(function(){});
+  },4000);
   // v0.7.11-web12: a troca de sessão feita pelo USUÁRIO é publicada na hora
   // (pushState/replaceState/popstate), em vez de esperar o próximo tique.
   try{
@@ -469,6 +553,51 @@ def _cache_put(key: str, port: int, data: bytes, ctype: str = "application/json"
         if len(_RESP_CACHE) > 64:
             _RESP_CACHE.clear()
         _RESP_CACHE[key] = (time.time(), port, data, ctype)
+
+
+def compute_run_state(
+    data: dict, rows: list, now_ms: int, stale_ms: int = 120_000
+) -> dict:
+    """Decide se o turno está rodando a partir da última mensagem.
+
+    ``session.time.busy > idle`` não serve sozinho: quando um turno morre no
+    meio, o motor mantém ``outcome`` do turno anterior e ``idle`` velho, e a
+    UI fica "Working" para sempre. A mensagem do assistente é o sinal direto:
+    ``time.completed`` presente = terminou; ausente e recente = rodando;
+    ausente e parada há muito tempo = turno órfão (``stale``).
+    """
+    last_assistant = next(
+        (
+            m
+            for m in (rows or [])
+            if isinstance(m, dict) and m.get("type") == "assistant"
+        ),
+        None,
+    )
+    running = False
+    stale = False
+    last_ms = 0
+    completed = None
+    if last_assistant:
+        t = last_assistant.get("time") or {}
+        created = int(t.get("created") or 0)
+        streamed = int(t.get("streamed") or 0)
+        completed = t.get("completed")
+        last_ms = max(created, streamed)
+        if not completed and last_ms:
+            age = now_ms - last_ms
+            running = age < stale_ms
+            stale = not running
+    return {
+        "running": bool(running),
+        "stale": bool(stale),
+        "completed": completed is not None,
+        "last_activity_ms": last_ms,
+        "age_ms": (now_ms - last_ms) if last_ms else None,
+        "outcome": (data or {}).get("outcome"),
+        "busy": ((data or {}).get("time") or {}).get("busy", 0),
+        "idle": ((data or {}).get("time") or {}).get("idle", 0),
+    }
 
 
 def _api_bytes(path: str, timeout: float = 20.0) -> bytes:
@@ -1344,6 +1473,39 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _run_state(self) -> None:
+        """Estado **real** de execução de uma sessão (para destravar a UI).
+
+        ``session.time.busy > idle`` não é confiável quando um turno morre no
+        meio (o motor mantém ``outcome`` do turno anterior e ``idle`` velho).
+        Aqui olhamos a última mensagem do assistente: se ela tem
+        ``time.completed``, o turno terminou; se não tem, ainda está rodando —
+        a menos que esteja parada há mais de ``STALE_MS`` (turno órfão).
+        """
+        qs = parse_qs(urlparse(self.path).query)
+        sid = str(qs.get("sid", [""])[0] or "").strip()
+        if not sid:
+            self._json_error(400, "sid obrigatório")
+            return
+        sess = _api_json(f"/api/session/{quote(sid, safe='')}")
+        data = sess.get("data") if isinstance(sess, dict) else None
+        if not isinstance(data, dict):
+            self._json_error(404, "sessão não encontrada")
+            return
+        msgs = _api_json(
+            f"/api/session/{quote(sid, safe='')}/message?limit=3&order=desc"
+        )
+        rows = msgs.get("data") if isinstance(msgs, dict) else None
+        info = compute_run_state(data, rows or [], int(time.time() * 1000))
+        info["sid"] = sid
+        body = json.dumps(info).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
     def _catalog_info(self) -> None:
         body = json.dumps(catalog()).encode("utf-8")
         self.send_response(200)
@@ -1387,6 +1549,15 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _json_error(self, status: int, message: str) -> None:
+        body = json.dumps({"error": message}, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
@@ -1523,6 +1694,9 @@ class _Handler(BaseHTTPRequestHandler):
             return
         if rota == "/__ufvai/diag":
             self._diag()
+            return
+        if rota == "/__ufvai/run-state":
+            self._run_state()
             return
 
         if self.headers.get("Upgrade", "").lower() == "websocket":

@@ -316,6 +316,52 @@ def test_foco_da_tui_por_http_publica_na_hora(monkeypatch, tmp_path):
             ocweb._LIVE_SUBS.discard(sub)
 
 
+def test_run_state_completed_is_not_running():
+    """Mensagem com `completed` = turno encerrado (não importa busy>idle)."""
+    data = {"outcome": "succeeded", "time": {"busy": 200, "idle": 100}}
+    rows = [{"type": "assistant", "time": {"created": 1000, "completed": 1500}}]
+    st = ocweb.compute_run_state(data, rows, now_ms=2000)
+    assert st["running"] is False
+    assert st["completed"] is True
+    assert st["outcome"] == "succeeded"
+
+
+def test_run_state_recente_sem_completed_esta_rodando():
+    data = {"outcome": "succeeded", "time": {"busy": 200, "idle": 100}}
+    rows = [{"type": "assistant", "time": {"created": 1000, "streamed": 9000}}]
+    st = ocweb.compute_run_state(data, rows, now_ms=10_000, stale_ms=120_000)
+    assert st["running"] is True
+    assert st["stale"] is False
+
+
+def test_run_state_orfao_fica_stale():
+    data = {"outcome": "succeeded", "time": {"busy": 200, "idle": 100}}
+    rows = [{"type": "assistant", "time": {"created": 1000}}]
+    st = ocweb.compute_run_state(data, rows, now_ms=10_000_000, stale_ms=120_000)
+    assert st["running"] is False
+    assert st["stale"] is True
+
+
+def test_run_state_ignora_mensagem_do_usuario():
+    rows = [{"type": "user", "time": {"created": 1000}}]
+    st = ocweb.compute_run_state({}, rows, now_ms=2000)
+    assert st["running"] is False and st["stale"] is False
+
+
+def test_boot_js_tem_rede_de_seguranca_para_o_parar():
+    js = ocweb._BOOT_JS
+    assert "_stopFallback" in js
+    assert "/interrupt?resume=true" in js
+    assert "run-state" in js
+
+
+def test_boot_js_destrava_working_com_limite():
+    js = ocweb._BOOT_JS
+    assert "ufvai.unstuck." in js
+    assert "location.reload()" in js
+    assert "30000" in js
+
+
 def test_boot_js_reporta_navegacao_do_usuario_na_hora():
     """pushState/replaceState/popstate publicam o foco imediatamente."""
     js = ocweb._BOOT_JS

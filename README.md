@@ -1,4 +1,7 @@
-
+> 🖥️ **Variante web (`0.7.11-web`):** a pasta `UFVAI-v0.7.11-web/` troca o
+> `ttyd` pela **SPA oficial do OpenCode** na janela principal. Um proxy local
+> (porta 8002) injeta a autenticação e o **tema UFVAI** (navy + dourado) sem
+> expor a senha ao navegador. Guia: [`docs/OPENCODE_WEB.md`](docs/OPENCODE_WEB.md).
 
 <div align="center">
 
