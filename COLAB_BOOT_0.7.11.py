@@ -37,7 +37,17 @@ if _here and os.path.isfile(os.path.join(_here, "pesquisai", "ocweb.py")):
 elif os.path.isfile(os.path.join(os.getcwd(), "pesquisai", "ocweb.py")):
     SRC = os.getcwd()
 else:
-    SRC = "/content/drive/My Drive/PesquisAI/UFVAI-v0.7.11-web"
+    # Quando o arquivo é executado fora do clone (por exemplo, aberto pelo
+    # Drive), nunca use silenciosamente uma árvore antiga do Drive. Clone a
+    # main atual; o Drive fica apenas como fallback explícito sem rede.
+    SRC = "/tmp/ufvai-github-source"
+    _clone = subprocess.run(
+        ["git", "clone", "--depth", "1", "--branch", "main",
+         "https://github.com/gustavobraga-byte/PesquisAI.git", SRC],
+        capture_output=True, text=True, timeout=300,
+    )
+    if _clone.returncode or not os.path.isfile(os.path.join(SRC, "pesquisai", "ocweb.py")):
+        SRC = "/content/drive/My Drive/PesquisAI/UFVAI-v0.7.11-web"
 
 DST = "/tmp/pesquisai"
 
