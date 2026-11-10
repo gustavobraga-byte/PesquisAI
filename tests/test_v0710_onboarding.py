@@ -234,3 +234,14 @@ def test_ui_espera_termos_antes_de_aparecer():
     assert "terms-overlay" in UI
     assert "welcome-overlay" in UI
     assert "ufvai_ob_skip" in UI
+
+
+def test_new_user_boot_starts_engine_before_onboarding():
+    """Usuário novo ainda precisa do motor para ver modelos/conectores públicos."""
+    from pathlib import Path
+
+    source = Path(__file__).resolve().parents[1] / "pesquisai" / "run_fast.py"
+    text = source.read_text(encoding="utf-8")
+    assert "needs_onboarding_now as _needs_ob" in text
+    assert "if _skip_engine:" not in text
+    assert "ensure_service_project_dir(folder_path)" in text

@@ -1583,19 +1583,19 @@ def run() -> None:
         logger.debug("VPN: cleanup_stale falhou (%s)", _vpn_exc)
     # v0.7.7 (27/10/2026 — SEM bump): o serviço do motor nasce no PesquisAI,
     # não em /root — é dele que as sessões herdam o diretório de projeto.
-    # v0.7.10: sem chave, o motor NÃO nasce — o onboarding espera a chave.
+    # v0.8.0/web15: o motor NASCE mesmo sem chave. O OpenCode possui catálogo
+    # público (OpenCode/free) e o usuário novo precisa ver os modelos antes de
+    # escolher um provedor próprio. O onboarding continua aparecendo por cima
+    # da interface, mas não pode impedir /api/model e o seletor da web.
     try:
         from .launch_app import needs_onboarding_now as _needs_ob
         _skip_engine = _needs_ob()
     except Exception:  # noqa: BLE001
         _skip_engine = False
-    if _skip_engine:
-        logger.info("Onboarding pendente: serviço do motor não iniciado (sem chave).")
-    else:
-        try:
-            ensure_service_project_dir(folder_path)
-        except Exception as _svc_exc:  # noqa: BLE001
-            logger.exception("ensure_service_project_dir falhou (%s)", _svc_exc)
+    try:
+        ensure_service_project_dir(folder_path)
+    except Exception as _svc_exc:  # noqa: BLE001
+        logger.exception("ensure_service_project_dir falhou (%s)", _svc_exc)
     for _nome, _fn in (
         ("setup_skills", setup_skills),
         ("setup_custom_skills", setup_custom_skills),
