@@ -24,6 +24,34 @@ Compatível com o PesquisAI principal (v0.2.1+).
 ═════════════════════════════════════════════════════════════════════════
 Histórico de versões:
 ═══════════════════════════════════════════════════════════════════════
+  v0.7.11 — 06/11/2026: 🛡 VPN da UFV no Colab (OpenVPN em namespace isolado)
+    • PEDIDO DO AUTOR: "o servidor do Colab conecte via internet via VPN da UFV"
+      e, depois, "vai abrir uma tela logo quando iniciar para escolher se ele é
+      aluno da UFV ou não; se clicar em aluno, aparece a interface solicitando
+      o CPF e a senha, que são as credenciais para entrar no VPN".
+    • DIAGNÓSTICO: o Colab não tem `/dev/net/tun` nem `CAP_NET_ADMIN`
+      (`CapEff=00000000a82c25fb`); `ip tuntap add` falha. `mknod` funciona e
+      `unshare -Urn` + `slirp4netns` resolvem.
+    • ARQUITETURA: OpenVPN dentro de user+net namespace + slirp4netns +
+      proxy SOCKS5 (stdlib) publicado em `127.0.0.1:1081` via `add_hostfwd`.
+      O tráfego só entra na VPN quando o processo usa o proxy — não é túnel
+      transparente (impossível sem NET_ADMIN no namespace raiz).
+    • UFV: perfil oficial `https://vpn.ufvnet.ufv.br/configs/UFV-linux.ovpn`
+      (OpenVPN, `vpn.ufvnet.ufv.br:1195/UDP`, CPF + senha, split tunnel,
+      1 dispositivo por CPF).
+    • TELA INICIAL: "Você é aluno(a) da UFV?" (Sim → painel CPF/senha;
+      Não → segue sem VPN). A escolha fica em `prefs.json` + localStorage.
+    • PAINEL: status ao vivo, avisos (1 dispositivo, split tunnel, senha),
+      conectar/desconectar, testar acesso interno (`sistemas.ufv.br`),
+      baixar/colar perfil .ovpn, esquecer credenciais.
+    • SEGURANÇA: senha nunca em log/linha de comando; arquivo `auth` 0600
+      apagado ao desconectar; "lembrar" grava CPF/senha cifrados no
+      `keys_store.json` com prefixo `vpn_ufv_` (filtrado de `/api/apikey`).
+    • API: `GET /api/vpn`; `POST /api/vpn/{connect,disconnect,profile,test,
+      forget,answer}`.
+    • CLI: `python -m pesquisai.vpn status|connect|disconnect|profile|test`.
+    • TESTES: `tests/test_v0711_vpn.py` (15 testes offline; o teste real
+      depende das credenciais do usuário).
   v0.7.10 — 05/11/2026: 🧭 Onboarding de primeiro uso (provedor + chave)
     • REGRA DO AUTOR: "um novo user, quero que ele use a apikey dele, mas de
       modo simples"; a tela aparece no primeiro uso e também para quem já usa
@@ -517,13 +545,13 @@ Histórico de versões:
 """
 
 # ── Versão semântica (SemVer) ──────────────────────────────────
-__version__: str = "0.7.10"
+__version__: str = "0.7.11"
 __brand__: str = "UFVAI"
 __brand_tagline__: str = "Pesquisa científica com integridade."
 
 # ── Metadados do release ───────────────────────────────────────
-__release_date__: str = "2026-11-05"
-__codename__: str = "Onboarding de primeiro uso: provedor e chave em um só lugar"
+__release_date__: str = "2026-11-06"
+__codename__: str = "VPN da UFV no Colab: OpenVPN em namespace isolado + tela de vínculo"
 
 # ── Identidade do projeto ──────────────────────────────────────
 __author__: str = "Gustavo Bastos Braga"
@@ -558,6 +586,7 @@ __components__: dict[str, str] = {
     "sessions_loader": "0.1.0",           # NOVO v0.4.2.2: openSessions faz fetch
     "lang_aware_greeting": "0.1.0",       # NOVO v0.4.2.2: saudação no idioma
     "drive_guard": "0.7.7",               # NOVO v0.7.7: My Drive só em PesquisAI
+    "vpn_ufv": "0.7.11",                  # NOVO v0.7.11: OpenVPN em namespace + SOCKS5
 }
 
 # ── Idiomas suportados ─────────────────────────────────────────
@@ -647,6 +676,13 @@ __api_endpoints__: list[str] = [
     "GET  /api/obsidian/search",    # NOVO v0.5.1.4: busca BM25
     "GET  /api/obsidian/tags",      # NOVO v0.5.1.4: lista de tags
     "POST /api/obsidian/note",      # NOVO v0.5.1.4: save/create/delete
+    "GET  /api/vpn",                # NOVO v0.7.11: status da VPN da UFV
+    "POST /api/vpn/connect",        # NOVO v0.7.11: conecta (CPF + senha)
+    "POST /api/vpn/disconnect",     # NOVO v0.7.11: desconecta
+    "POST /api/vpn/profile",        # NOVO v0.7.11: baixa/cola perfil .ovpn
+    "POST /api/vpn/test",           # NOVO v0.7.11: testa acesso interno
+    "POST /api/vpn/forget",         # NOVO v0.7.11: apaga credenciais
+    "POST /api/vpn/answer",         # NOVO v0.7.11: resposta da tela inicial
 ]
 
 

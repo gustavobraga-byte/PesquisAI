@@ -25,6 +25,7 @@ import http.client
 import json
 import os
 import queue
+import re
 import select
 import socket
 import threading
@@ -32,7 +33,7 @@ import time
 import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, quote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlencode, urlparse
 
 from .constants import (
     ACTIVE_SESSION_FILE,
@@ -121,10 +122,27 @@ def service_file() -> Path:
     return Path("/root/.local/state/opencode/service.json")
 
 
+_SERVICE_CACHE: dict = {"key": None, "value": (UPSTREAM_HOST, 0, "")}
+
+
 def service_info() -> tuple[str, int, str]:
-    """(host, porta, senha) do serviço em execução; ``(host, 0, '')`` se ausente."""
+    """(host, porta, senha) do serviço em execução; ``(host, 0, '')`` se ausente.
+
+    v0.7.11-web10: o ``service.json`` é lido em *toda* requisição do proxy
+    (dezenas por navegação). O cache por ``mtime``/tamanho elimina esse I/O
+    sem esconder a troca de porta quando o motor reinicia.
+    """
+    path = service_file()
     try:
-        data = json.loads(service_file().read_text(encoding="utf-8"))
+        st = path.stat()
+        key = (str(path), st.st_mtime_ns, st.st_size)
+    except OSError:
+        return UPSTREAM_HOST, 0, ""
+    cached = _SERVICE_CACHE.get("value")
+    if _SERVICE_CACHE.get("key") == key and cached:
+        return cached
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return UPSTREAM_HOST, 0, ""
     url = str(data.get("url") or "")
@@ -134,7 +152,10 @@ def service_info() -> tuple[str, int, str]:
             port = int(url.rsplit(":", 1)[1].strip("/"))
         except ValueError:
             port = 0
-    return UPSTREAM_HOST, port, str(data.get("password") or "")
+    info = (UPSTREAM_HOST, port, str(data.get("password") or ""))
+    _SERVICE_CACHE["key"] = key
+    _SERVICE_CACHE["value"] = info
+    return info
 
 
 def _basic(password: str) -> str:
@@ -153,7 +174,6 @@ def _inject_html(data: bytes, session_id: str = "") -> bytes:
     if "</body>" in text:
         text = text.replace("</body>", _BOOT_TAG + _BADGE + "</body>", 1)
     return text.encode("utf-8")
-
 
 
 _BOOT_JS = """(function(){
@@ -180,70 +200,137 @@ _BOOT_JS = """(function(){
   // v0.7.11-web9: a TUI publica a sessão que está exibindo; o proxy faz
   // push por SSE (/__ufvai/live) e a web troca na hora — sem polling e sem
   // inferir a sessão: é exatamente o que o terminal mostra.
+  // O "key" da rota é o base64url da PRÓPRIA origem (é assim que a SPA monta
+  // os links). Usar a URL do motor aqui deixava a rota sem servidor
+  // registrado e a sessão abria em branco.
   function curSid(){
-    var m=location.pathname.match(/^\\/server\\/[^\\/]+\\/session\\/([^\\/]+)/);
+    var m=location.pathname.match(/^\\/server\\/[^\\/]+\\/session\\/([^\\/?#]+)/);
+    return m?m[1]:"";
+  }
+  function originKey(){
+    try{return b64(location.origin)}catch(e){return ""}
+  }
+  function routeBase(){
+    var m=location.pathname.match(/^(\\/server\\/[^\\/]+)\\/session\\//);
     return m?m[1]:"";
   }
   function canNav(){
+    // Só não troca quando o usuário está com um rascunho no prompt — o texto
+    // digitado seria perdido. (A checagem antiga por "Working" no texto da
+    // página dava falso positivo e travava a sincronização.)
     var ed=document.querySelector('[contenteditable="true"][aria-label="Prompt"]');
     if(ed&&(ed.textContent||"").trim())return false;
-    var body=document.body.innerText||"";
-    if(/\\b(Working|Trabalhando)\\b/.test(body))return false;
     return true;
   }
+  var _pushedSid="";
+  function markPush(sid){
+    _pushedSid=sid;
+    try{sessionStorage.setItem("ufvai-pushed",sid)}catch(e){}
+  }
+  function wasPushed(sid){
+    try{
+      if(sessionStorage.getItem("ufvai-pushed")===sid){sessionStorage.removeItem("ufvai-pushed");return true}
+    }catch(e){}
+    return false;
+  }
+  function mainText(){
+    var m=document.querySelector("main");return m?(m.innerText||""):"";
+  }
   function navTo(sid){
-    var m=location.pathname.match(/^(\\/server\\/[^\\/]+)\\/session\\//);
-    if(!m||!sid||sid===curSid())return;
+    if(!sid||sid===curSid())return false;
+    var base=routeBase()||("/server/"+originKey());
+    if(!base||base==="/server/")return false;
+    markPush(sid);
+    var path=base+"/session/"+sid;
+    // 1) Dentro da SPA: pushState + popstate troca de sessão SEM recarregar
+    //    (rota interna). Se em 700 ms o conteúdo não mudou, a SPA ignorou o
+    //    evento e caímos para a navegação normal.
+    if(routeBase()){
+      try{
+        var before=mainText();
+        history.pushState({},"",path);
+        window.dispatchEvent(new PopStateEvent("popstate",{state:{}}));
+        setTimeout(function(){
+          if(mainText()===before&&curSid()===sid){try{location.replace(path)}catch(e){}}
+        },700);
+        return true;
+      }catch(e){}
+    }
+    // 2) Fora de uma sessão (lista de projetos): o link da SPA resolve a rota.
     try{
       var a=document.querySelector('a[href*="/session/'+sid+'"]');
-      if(a){a.click();return}
+      if(a){a.click();return true}
     }catch(e){}
-    location.replace(m[1]+"/session/"+sid);
+    // 3) Último recurso.
+    location.replace(path);
+    return true;
   }
-  var _live=null;
+  var _live=null,_lastLive=0,_lastFocus="";
+  function liveOk(){
+    // "Saudável" = conexão aberta E mensagem (ou ping) recente. Sem isso, o
+    // polling assume — se o navegador enfileirar a conexão SSE (limite por
+    // host), o push fica mudo e não podemos ficar esperando para sempre.
+    return !!_live&&_live.readyState===1&&(Date.now()-_lastLive)<5000;
+  }
   function startLive(){
-    if(!curSid()||typeof window.EventSource!=="function")return false;
+    if(typeof window.EventSource!=="function")return false;
     try{
       if(_live){try{_live.close()}catch(e){}}
       _live=new window.EventSource("/__ufvai/live");
-      var _first=true;
+      _live.onopen=function(){_lastLive=Date.now()};
       _live.onmessage=function(ev){
+        _lastLive=Date.now();
         var d=null;try{d=JSON.parse(ev.data)}catch(e){return}
-        // O 1º foco é o estado atual da TUI: ao ABRIR a página, a URL da web
-        // é a intenção do usuário e ela reporta o foco ao terminal. Só os
-        // focos seguintes (trocas reais na TUI) navegam a web.
-        if(_first){_first=false;return}
-        if(!d||!d.sid||d.sid===curSid()||!canNav())return;
+        if(!d||!d.sid||d.sid===curSid())return;
+        _lastFocus=d.sid;
+        if(!canNav())return;
         navTo(d.sid);
       };
     }catch(e){return false}
     return true;
   }
-  function liveOk(){try{return !!_live&&_live.readyState===1}catch(e){return false}}
   startLive();
   if(window.addEventListener)window.addEventListener("pageshow",function(){startLive()});
-  // Reserva: sem push (EventSource indisponível), consulta a cada 2,5 s.
+  // Reserva: sem push saudável, consulta a cada 1,2 s (funciona também fora
+  // de uma rota de sessão: a lista de projetos segue o terminal).
   setInterval(function(){
-    if(!curSid()||liveOk())return;
+    // O foco pode ter chegado enquanto havia rascunho no prompt (e foi
+    // ignorado). Assim que o prompt esvazia, aplica o último foco pendente.
+    if(_lastFocus&&_lastFocus!==curSid()&&canNav()){navTo(_lastFocus);_lastFocus="";return}
     if(!_live||_live.readyState===2)startLive();
     if(liveOk())return;
     fetch("/__ufvai/session?fallback=1",{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).then(function(d){
       if(d&&d.active&&d.active!==curSid()&&d.active_age_ms<30000&&canNav())navTo(d.active);
     }).catch(function(){});
-  },2500);
+  },1200);
   // v0.7.11-web9: web → terminal — o plugin da TUI segue este foco.
-  var _reported=location.pathname,_lastSid=curSid(),_forceReport=true;
+  // Só navegação feita pelo USUÁRIO é publicada: um push do terminal não
+  // volta para o terminal (evita ping-pong entre as duas telas).
+  var _reported="",_lastSid="";
   function reportFocus(){
     var sid=curSid();
-    if(!sid||(!_forceReport&&location.pathname===_reported&&sid===_lastSid))return;
-    _forceReport=false;_reported=location.pathname;_lastSid=sid;
+    if(!sid)return;
+    // Primeira leitura da página: publica o que está na tela (o terminal
+    // segue), exceto se esta navegação veio de um push do próprio terminal.
+    var first=!_reported;
+    if(!first&&location.pathname===_reported&&sid===_lastSid)return;
+    _reported=location.pathname;_lastSid=sid;_lastFocus="";
+    if(sid===_pushedSid||wasPushed(sid)){_pushedSid="";return}
     try{
       fetch("/__ufvai/focus",{method:"POST",headers:{"Content-Type":"application/json"},
         body:JSON.stringify({sid:sid,ts:Date.now(),source:"web"}),cache:"no-store"});
     }catch(e){}
   }
-  setInterval(reportFocus,400);
-  setTimeout(function(){_forceReport=true;reportFocus();},900);
+  setInterval(reportFocus,1200);
+  // v0.7.11-web12: a troca de sessão feita pelo USUÁRIO é publicada na hora
+  // (pushState/replaceState/popstate), em vez de esperar o próximo tique.
+  try{
+    var _ps=history.pushState,_rs=history.replaceState;
+    history.pushState=function(){var r=_ps.apply(this,arguments);try{reportFocus()}catch(e){}return r};
+    history.replaceState=function(){var r=_rs.apply(this,arguments);try{reportFocus()}catch(e){}return r};
+    window.addEventListener("popstate",function(){try{reportFocus()}catch(e){}});
+  }catch(e){}
+
   // Sessão: espera o catálogo de provedores/modelos antes de navegar.
   var n=0,t=setInterval(function(){
     n++;
@@ -286,20 +373,42 @@ def current_session() -> str:
         return ""
 
 
+_EXISTS_CACHE: dict = {}
+_EXISTS_LOCK = threading.Lock()
+_EXISTS_TTL = 15.0
+
+
 def _session_exists(host: str, port: int, password: str, sid: str) -> bool:
+    """Existência da sessão (cache de 15 s).
+
+    Chamada a cada HTML servido; sem cache virava uma ida ao motor dentro do
+    caminho crítico do primeiro paint.
+    """
     if not sid:
         return False
+    key = (port, sid)
+    now = time.time()
+    with _EXISTS_LOCK:
+        item = _EXISTS_CACHE.get(key)
+        if item and now - item[0] < _EXISTS_TTL:
+            return item[1]
     conn = http.client.HTTPConnection(host, port, timeout=3)
+    ok = False
     try:
         conn.request("GET", f"/api/session/{sid}",
                      headers={"Authorization": _basic(password)})
         resp = conn.getresponse()
         resp.read()
-        return resp.status == 200
+        ok = resp.status == 200
     except OSError:
-        return False
+        ok = False
     finally:
         conn.close()
+    with _EXISTS_LOCK:
+        if len(_EXISTS_CACHE) > 256:
+            _EXISTS_CACHE.clear()
+        _EXISTS_CACHE[key] = (now, ok)
+    return ok
 
 
 def _api_json(path: str, timeout: float = 5.0):
@@ -541,6 +650,243 @@ def latest_session() -> str:
     return ""
 
 
+# ── páginas de mensagens: agregação e pré-busca (v0.7.11-web10) ─────
+# A SPA carrega a conversa inteira ao abrir uma sessão:
+#   message.list({limit:200, order:"asc"}) e depois
+#   message.list({limit:200, cursor:...}) até `cursor.next` ser nulo.
+# Em conversa longa isso são várias idas sequenciais e ~3,5 MB de JSON
+# (medido: 779 mensagens). Aqui o proxy busca as páginas seguintes no
+# motor (loopback, ~30 ms cada), devolve UMA resposta e ainda a mantém
+# comprimida. O número de idas pelo túnel do Colab cai a 1.
+_MESSAGE_PATH = re.compile(r"^/api/session/[^/]+/message$")
+_AGG_MAX_PAGES = int(os.environ.get("UFVAI_AGG_MAX_PAGES", "12") or 12)
+_AGG_MIN_LIMIT = 100
+_PREFETCH: dict = {}
+_PREFETCH_READY: dict = {}
+_PREFETCH_LAST: dict = {}
+_PREFETCH_LOCK = threading.Lock()
+_PREFETCH_TTL = float(os.environ.get("UFVAI_PREFETCH_TTL", "8") or 0)
+_LAST_DIRECTORY: dict = {"value": "", "header": ""}
+
+
+def _directory_of(path: str) -> str:
+    qs = parse_qs(urlparse(path).query)
+    for key in ("location[directory]", "directory"):
+        value = qs.get(key)
+        if value:
+            return value[0]
+    return ""
+
+
+def _session_of(path: str) -> str:
+    m = re.match(r"^/api/session/([^/]+)(?:/|$)", urlparse(path).path)
+    return m.group(1) if m else ""
+
+
+def _is_message_first_page(path: str) -> bool:
+    parsed = urlparse(path)
+    if not _MESSAGE_PATH.match(parsed.path):
+        return False
+    qs = parse_qs(parsed.query)
+    if qs.get("cursor"):
+        return False
+    if (qs.get("order") or [""])[0] != "asc":
+        return False
+    try:
+        limit = int((qs.get("limit") or ["0"])[0])
+    except ValueError:
+        limit = 0
+    return limit >= _AGG_MIN_LIMIT
+
+
+def _get_upstream(
+    path: str,
+    timeout: float = 30.0,
+    extra_headers: dict | None = None,
+) -> tuple[int, bytes]:
+    host, port, password = service_info()
+    if not port:
+        return 0, b""
+    conn = http.client.HTTPConnection(host, port, timeout=timeout)
+    try:
+        headers = {
+            "Authorization": _basic(password),
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+        }
+        if extra_headers:
+            headers.update(extra_headers)
+        conn.request("GET", path, headers=headers)
+        resp = conn.getresponse()
+        raw = resp.read()
+        if raw[:2] == b"\x1f\x8b" or (resp.getheader("Content-Encoding") or "") == "gzip":
+            try:
+                raw = gzip.decompress(raw)
+            except OSError:
+                pass
+        return resp.status, raw
+    except OSError:
+        return 0, b""
+    finally:
+        conn.close()
+
+
+def aggregate_message_pages(
+    path: str, first: bytes, extra_headers: dict | None = None
+) -> bytes:
+    """Junta as páginas seguintes de ``message.list`` numa única resposta.
+
+    O cursor do motor é opaco e não pode ser combinado com ``order`` — por
+    isso a primeira página usa ``order=asc`` e as seguintes apenas
+    ``limit``+``cursor``, exatamente como a SPA faz. Se algo falhar, devolve
+    a primeira página intacta (o cursor original continua no JSON).
+    """
+    try:
+        payload = json.loads(first.decode("utf-8", "replace"))
+    except (ValueError, UnicodeDecodeError):
+        return first
+    if not isinstance(payload, dict):
+        return first
+    items = payload.get("data")
+    cursor = ((payload.get("cursor") or {}).get("next") or "")
+    if not isinstance(items, list) or not cursor:
+        return first
+    parsed = urlparse(path)
+    qs = parse_qs(parsed.query)
+    base = {k: v[0] for k, v in qs.items() if k != "cursor"}
+    base.pop("order", None)
+    pages = 1
+    while cursor and pages < _AGG_MAX_PAGES:
+        status, raw = _get_upstream(
+            parsed.path + "?" + urlencode({**base, "cursor": cursor}),
+            extra_headers=extra_headers,
+        )
+        if status != 200 or not raw:
+            break
+        try:
+            page = json.loads(raw.decode("utf-8", "replace"))
+        except (ValueError, UnicodeDecodeError):
+            break
+        chunk = page.get("data") if isinstance(page, dict) else None
+        if not isinstance(chunk, list):
+            break
+        cursor = ((page.get("cursor") or {}).get("next") or "")
+        if not chunk:
+            break
+        items.extend(chunk)
+        pages += 1
+    payload["data"] = items
+    current = payload.get("cursor")
+    current = current if isinstance(current, dict) else {}
+    current["next"] = cursor or None
+    payload["cursor"] = current
+    return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+
+def prefetch_session(sid: str, ready: threading.Event | None = None) -> None:
+    """Pré-busca a conversa que a TUI acabou de exibir (uso único).
+
+    Roda em paralelo com o push do SSE. Se a requisição da SPA chegar antes
+    de terminar, ela espera em ``wait_prefetch`` — o resultado é o primeiro
+    paint da conversa já com os bytes na mão, sem ida extra ao motor.
+    """
+    sid = str(sid or "").strip()
+    directory = _LAST_DIRECTORY.get("value") or ""
+    header = _LAST_DIRECTORY.get("header") or ""
+    try:
+        if not sid or _PREFETCH_TTL <= 0:
+            return
+        with _PREFETCH_LOCK:
+            last = _PREFETCH_LAST.get(sid, 0.0)
+            if time.time() - last < 30.0:
+                return
+            _PREFETCH_LAST[sid] = time.time()
+            if len(_PREFETCH_LAST) > 64:
+                _PREFETCH_LAST.clear()
+        query = {"limit": "200", "order": "asc"}
+        extra: dict = {}
+        if header:
+            extra["x-opencode-directory"] = header
+        elif directory:
+            extra["x-opencode-directory"] = quote(directory, safe="")
+        else:
+            return
+        path = f"/api/session/{quote(sid, safe='')}/message?" + urlencode(query)
+        status, raw = _get_upstream(path, extra_headers=extra)
+        if status != 200 or not raw:
+            return
+        raw = aggregate_message_pages(path, raw, extra_headers=extra)
+        gz = b""
+        if len(raw) > 131072:
+            try:
+                gz = gzip.compress(raw, 6)
+            except OSError:
+                gz = b""
+        with _PREFETCH_LOCK:
+            if len(_PREFETCH) > 8:
+                _PREFETCH.clear()
+            _PREFETCH[sid] = (
+                time.time(),
+                unquote(header) if header else directory,
+                raw,
+                gz,
+            )
+    finally:
+        if ready is not None:
+            ready.set()
+
+
+def _prefetch_state() -> dict:
+    now = time.time()
+    with _PREFETCH_LOCK:
+        return {
+            sid: {"age_s": round(now - ts, 2), "bytes": len(raw)}
+            for sid, (ts, _dir, raw, _gz) in _PREFETCH.items()
+        }
+
+
+def wait_prefetch(path: str, timeout: float = 2.5) -> None:
+    """Espera (curto) a pré-busca em andamento da sessão pedida."""
+    if not _is_message_first_page(path):
+        return
+    sid = _session_of(path)
+    with _PREFETCH_LOCK:
+        event = _PREFETCH_READY.get(sid)
+    if event is not None:
+        event.wait(timeout)
+
+
+def take_prefetch(path: str, directory: str = "") -> tuple[bytes, bytes] | None:
+    """Consome (uma vez) a pré-busca se o pedido casa com ela."""
+    if not _is_message_first_page(path):
+        return None
+    sid = _session_of(path)
+    if not sid:
+        return None
+    directory = directory or _directory_of(path)
+    now = time.time()
+    with _PREFETCH_LOCK:
+        item = _PREFETCH.pop(sid, None)
+        _PREFETCH_READY.pop(sid, None)
+    if not item:
+        return None
+    ts, saved_dir, raw, gz = item
+    if now - ts > _PREFETCH_TTL:
+        return None
+    if directory and saved_dir and directory != saved_dir:
+        return None
+    return raw, gz
+
+
+def drop_prefetch(path: str) -> None:
+    sid = _session_of(path)
+    if not sid:
+        return
+    with _PREFETCH_LOCK:
+        _PREFETCH.pop(sid, None)
+        _PREFETCH_READY.pop(sid, None)
+
+
 # ── foco da TUI ↔ web (v0.7.11-web9) ─────────────────────────
 # A TUI (plugin ufvai-sync) grava a sessão que está exibindo em
 # ``FOCUS_FILE``. Um observador lê o arquivo e faz *push* imediato para as
@@ -551,8 +897,14 @@ _LIVE_LOCK = threading.Lock()
 _FOCUS_STOP = threading.Event()
 
 
-def read_focus() -> dict:
-    """Foco publicado pela TUI (``{}`` se ausente/ inválido)."""
+# A TUI reescreve o foco a cada 5 s (heartbeat). Passados 15 s sem
+# atualização, o arquivo é resíduo de uma TUI encerrada e não deve arrastar a
+# web para uma sessão antiga.
+FOCUS_MAX_AGE_MS = 15000
+
+
+def read_focus(max_age_ms: int = FOCUS_MAX_AGE_MS) -> dict:
+    """Foco publicado pela TUI (``{}`` se ausente, inválido ou vencido)."""
     try:
         raw = Path(FOCUS_FILE).read_text(encoding="utf-8")
     except OSError:
@@ -561,7 +913,61 @@ def read_focus() -> dict:
         data = json.loads(raw)
     except ValueError:
         return {}
-    return data if isinstance(data, dict) else {}
+    if not isinstance(data, dict):
+        return {}
+    try:
+        ts = int(data.get("ts") or 0)
+    except (TypeError, ValueError):
+        ts = 0
+    if max_age_ms > 0 and (not ts or int(time.time() * 1000) - ts > max_age_ms):
+        return {}
+    return data
+
+
+def write_focus(sid: str, route: str = "session") -> bool:
+    """Grava o foco publicado pela TUI (mesmo formato do plugin).
+
+    Usado quando o plugin entrega o foco por HTTP (``POST /__ufvai/focus`` com
+    ``source: "tui"``) — o arquivo continua sendo escrito para que o polling e
+    o ``/__ufvai/session`` enxerguem o mesmo estado.
+    """
+    sid = str(sid or "").strip()
+    if not sid:
+        return False
+    payload = {
+        "sid": sid,
+        "ts": int(time.time() * 1000),
+        "route": str(route or "session"),
+        "source": "tui",
+    }
+    try:
+        tmp = f"{FOCUS_FILE}.{os.getpid()}.{threading.get_ident()}.tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh)
+        os.replace(tmp, FOCUS_FILE)
+        return True
+    except OSError:
+        return False
+
+
+def apply_tui_focus(sid: str, route: str = "session") -> bool:
+    """Registra o foco da TUI e publica no SSE imediatamente.
+
+    É o caminho rápido do ``POST /__ufvai/focus`` (``source: "tui"``): grava o
+    arquivo, memoriza a sessão atual e empurra para as páginas abertas — tudo
+    em uma chamada, sem esperar o polling de 50 ms.
+    """
+    if not write_focus(sid, route):
+        return False
+    _remember_session(sid)
+    _publish_live(
+        {
+            "sid": sid,
+            "ts": int(time.time() * 1000),
+            "source": "tui",
+        }
+    )
+    return True
 
 
 def write_web_focus(sid: str) -> bool:
@@ -591,7 +997,12 @@ def _publish_live(payload: dict) -> None:
 
 
 def _watch_focus() -> None:
-    """Observa ``FOCUS_FILE`` (0,25 s) e publica mudanças de sessão."""
+    """Observa ``FOCUS_FILE`` (0,05 s) e publica mudanças de sessão.
+
+    O caminho rápido é o ``POST /__ufvai/focus`` do plugin (publicação
+    imediata). Este laço é a rede de segurança para plugins antigos, para
+    quem escreve o arquivo à mão e para quando o POST falha.
+    """
     last = ""
     while not _FOCUS_STOP.is_set():
         data = read_focus()
@@ -606,7 +1017,19 @@ def _watch_focus() -> None:
                     "source": data.get("source") or "tui",
                 }
             )
-        _FOCUS_STOP.wait(0.15)
+            with _LIVE_LOCK:
+                has_pages = bool(_LIVE_SUBS)
+            if has_pages:
+                ready = threading.Event()
+                with _PREFETCH_LOCK:
+                    _PREFETCH_READY[sid] = ready
+                threading.Thread(
+                    target=prefetch_session,
+                    args=(sid, ready),
+                    name="ufvai-prefetch",
+                    daemon=True,
+                ).start()
+        _FOCUS_STOP.wait(0.05)
 
 
 _SYNC_EVENTS = {
@@ -814,6 +1237,29 @@ class _Handler(BaseHTTPRequestHandler):
             length = 0
         return self.rfile.read(length) if length > 0 else None
 
+    def _accept_encoding(self) -> str:
+        """Codificações que o navegador aceita (só as que o proxy entende).
+
+        v0.7.11-web10: antes o proxy pedia ``identity`` ao motor e servia
+        **tudo sem compressão**. Só o bundle da SPA passa de 3,3 MB (0,9 MB
+        em gzip) e uma página de mensagens longas chega a ~350 kB (89 kB em
+        gzip). No proxy do Colab isso é a diferença entre "instantâneo" e
+        "dezenas de segundos". ``br``/``zstd`` ficam de fora porque o proxy
+        precisa inspecionar algumas respostas (HTML, /api/model, /api/provider).
+        """
+        raw = (self.headers.get("Accept-Encoding") or "").lower()
+        if "gzip" in raw:
+            return "gzip, deflate"
+        if "deflate" in raw:
+            return "deflate"
+        return "identity"
+
+    def _accepts(self, encoding: str) -> bool:
+        raw = (self.headers.get("Accept-Encoding") or "").lower()
+        if encoding == "deflate":
+            return "deflate" in raw
+        return "gzip" in raw
+
     def _forward_headers(self, password: str) -> dict[str, str]:
         headers: dict[str, str] = {}
         for key, value in self.headers.items():
@@ -821,7 +1267,7 @@ class _Handler(BaseHTTPRequestHandler):
                 continue
             headers[key] = value
         headers["Authorization"] = _basic(password)
-        headers["Accept-Encoding"] = "identity"
+        headers["Accept-Encoding"] = self._accept_encoding()
         headers["Connection"] = "close"
         return headers
 
@@ -933,7 +1379,8 @@ class _Handler(BaseHTTPRequestHandler):
             "model": {"scoped": _count(model_scoped), "global": _count(model_global)},
             "provider": {"scoped": _count(provider_scoped), "global": _count(provider_global)},
             "fallback": _count(model_scoped) in (0,) or _count(provider_scoped) in (0,),
-            "focus": read_focus(),
+            "focus": read_focus(0),
+            "prefetch": _prefetch_state(),
         }).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -1028,7 +1475,13 @@ class _Handler(BaseHTTPRequestHandler):
         except (ValueError, UnicodeDecodeError):
             data = {}
         sid = str((data or {}).get("sid") or "").strip() if isinstance(data, dict) else ""
-        ok = write_web_focus(sid)
+        source = str((data or {}).get("source") or "web") if isinstance(data, dict) else "web"
+        if source == "tui":
+            # v0.7.11-web12: a TUI entrega o foco por HTTP → o proxy publica no
+            # SSE na hora (~1 ms), sem esperar o polling do arquivo.
+            ok = apply_tui_focus(sid, str((data or {}).get("route") or "session"))
+        else:
+            ok = write_web_focus(sid)
         self.send_response(204 if ok else 400)
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", "0")
@@ -1036,6 +1489,20 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _handle(self, method: str) -> None:
         rota = self.path.split("?", 1)[0]
+        # Escopo do projeto (a pré-busca precisa dele para consultar o motor).
+        # A SPA manda `x-opencode-directory` (encodeURIComponent) nas rotas
+        # de sessão; algumas rotas usam `location[directory]` na query.
+        dir_header = self.headers.get("x-opencode-directory") or ""
+        _dir = _directory_of(self.path)
+        if dir_header:
+            _LAST_DIRECTORY["header"] = dir_header
+            _LAST_DIRECTORY["value"] = unquote(dir_header)
+        elif _dir:
+            _LAST_DIRECTORY["value"] = _dir
+            _LAST_DIRECTORY["header"] = quote(_dir, safe="")
+        if method in ("POST", "PUT", "PATCH", "DELETE"):
+            # Qualquer escrita invalida a conversa pré-buscada da sessão.
+            drop_prefetch(self.path)
         if rota == "/__ufvai_ready":
             self._health()
             return
@@ -1131,6 +1598,30 @@ class _Handler(BaseHTTPRequestHandler):
                 if not titulo or titulo.lower() == "opencode":
                     req["title"] = "UFVAI"
                     body = json.dumps(req, ensure_ascii=False).encode("utf-8")
+        if method == "GET" and _is_message_first_page(self.path):
+            # v0.7.11-web10: a conversa que a TUI acabou de exibir já está
+            # aqui (a SPA espera no máximo 2,5 s por ela).
+            wait_prefetch(self.path)
+            hit = take_prefetch(
+                self.path, unquote(dir_header) if dir_header else _dir
+            )
+            if hit:
+                raw, gz = hit
+                accept = (self.headers.get("Accept-Encoding") or "").lower()
+                use_gz = bool(gz) and "gzip" in accept
+                payload = gz if use_gz else raw
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-UFVAI-Prefetch", "hit")
+                if use_gz:
+                    self.send_header("Content-Encoding", "gzip")
+                    self.send_header("Vary", "Accept-Encoding")
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+
         headers = self._forward_headers(password)
         conn = http.client.HTTPConnection(host, port, timeout=600)
         try:
@@ -1214,15 +1705,24 @@ class _Handler(BaseHTTPRequestHandler):
                             except OSError:
                                 pass
                             closed = True
-                        for obj in (self.connection, conn):
-                            try:
-                                obj.shutdown(socket.SHUT_RDWR)
-                            except OSError:
-                                pass
-                            try:
-                                obj.close()
-                            except OSError:
-                                pass
+                        # ``self.connection`` é o socket do cliente (tem
+                        # shutdown); ``conn`` é um HTTPConnection — fechá-lo
+                        # encerra o lado do motor. Antes chamávamos
+                        # ``conn.shutdown()``, que não existe: a exceção matava
+                        # a thread e a SPA ficava sem reconectar (o stream
+                        # caía em "disconnected" para sempre).
+                        try:
+                            self.connection.shutdown(socket.SHUT_RDWR)
+                        except OSError:
+                            pass
+                        try:
+                            conn.close()
+                        except Exception:  # noqa: BLE001
+                            pass
+                        try:
+                            self.connection.close()
+                        except OSError:
+                            pass
 
                     threading.Thread(
                         target=_force_reconnect, name="ufvai-reconnect", daemon=True
@@ -1230,7 +1730,7 @@ class _Handler(BaseHTTPRequestHandler):
 
                 try:
                     while True:
-                        chunk = resp.read1(4096)
+                        chunk = resp.read1(65536)
                         if not chunk:
                             break
                         if tail or b'"type":"session.' in chunk:
@@ -1252,19 +1752,42 @@ class _Handler(BaseHTTPRequestHandler):
 
             data = resp.read()
             encoding = (resp.getheader("Content-Encoding") or "").lower().strip()
-            if encoding in ("gzip", "x-gzip"):
-                try:
-                    data = gzip.decompress(data)
-                except OSError:
-                    pass
-            elif encoding == "deflate":
-                try:
-                    data = zlib.decompress(data)
-                except zlib.error:
+            # Só estas rotas precisam ser abertas pelo proxy (título/tema no
+            # HTML, catálogo reparado, título da sessão recém-criada). Todo o
+            # resto segue comprimido de ponta a ponta: menos bytes no túnel do
+            # Colab e zero custo de descompressão/recompressão.
+            aggregate = method == "GET" and _is_message_first_page(self.path)
+            transform = (
+                ctype.startswith("text/html")
+                or rota_api in ("/api/model", "/api/provider")
+                or aggregate
+                or (method == "POST" and rota_api == "/api/session")
+            )
+            passthrough = ""
+            if encoding in ("gzip", "x-gzip", "deflate"):
+                normalized = "deflate" if encoding == "deflate" else "gzip"
+                if not transform and self._accepts(normalized):
+                    passthrough = normalized
+                elif normalized == "gzip":
                     try:
-                        data = zlib.decompress(data, -zlib.MAX_WBITS)
-                    except zlib.error:
+                        data = gzip.decompress(data)
+                    except OSError:
                         pass
+                else:
+                    try:
+                        data = zlib.decompress(data)
+                    except zlib.error:
+                        try:
+                            data = zlib.decompress(data, -zlib.MAX_WBITS)
+                        except zlib.error:
+                            pass
+            if aggregate and resp.status == 200:
+                # Uma resposta só, com todas as páginas que a SPA pediria
+                # em sequência (cursor oculto até o limite de segurança).
+                extra = (
+                    {"x-opencode-directory": dir_header} if dir_header else None
+                )
+                data = aggregate_message_pages(self.path, data, extra_headers=extra)
             created_sid = ""
             status_out = resp.status
             if method in ("GET", "HEAD") and rota_api in ("/api/model", "/api/provider"):
@@ -1289,10 +1812,15 @@ class _Handler(BaseHTTPRequestHandler):
             # v0.7.11-web7: /api/model pode passar de 1 MB. Compactar reduz
             # o risco de o proxy do Colab truncar/estourar timeout.
             gzip_out = False
+            _accepts_gzip = "gzip" in (
+                self.headers.get("Accept-Encoding") or ""
+            ).lower()
             if (
-                rota_api in ("/api/model", "/api/provider")
+                (rota_api in ("/api/model", "/api/provider") or aggregate)
                 and len(data) > 262144
-                and "gzip" in (self.headers.get("Accept-Encoding") or "").lower()
+                and _accepts_gzip
+            ) or (
+                ctype.startswith("text/html") and len(data) > 4096 and _accepts_gzip
             ):
                 try:
                     data = gzip.compress(data, 6)
@@ -1309,7 +1837,10 @@ class _Handler(BaseHTTPRequestHandler):
             # /api/model vazio (motor subindo) ficaria "grudado" no reload.
             if self.path.startswith("/api/") or self.path.startswith("/__ufvai/"):
                 self.send_header("Cache-Control", "no-store")
-            if gzip_out:
+            if passthrough:
+                self.send_header("Content-Encoding", passthrough)
+                self.send_header("Vary", "Accept-Encoding")
+            elif gzip_out:
                 self.send_header("Content-Encoding", "gzip")
                 self.send_header("Vary", "Accept-Encoding")
             self.send_header("Content-Length", str(len(data)))

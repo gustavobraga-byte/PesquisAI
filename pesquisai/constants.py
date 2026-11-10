@@ -85,9 +85,9 @@ CURRENT_SESSION_FILE: str = "/tmp/ufvai-current-session"
 ACTIVE_SESSION_FILE: str = "/tmp/ufvai-active-session"
 # v0.7.11-web9: a TUI (plugin) publica aqui a sessão que está exibindo;
 # o proxy repassa isso à web por SSE (push em tempo real).
-FOCUS_FILE: str = "/tmp/ufvai-focus.json"
+FOCUS_FILE: str = os.environ.get("UFVAI_FOCUS_FILE", "/tmp/ufvai-focus.json")
 # Foco escolhido na web; o plugin da TUI segue (web → terminal).
-WEB_FOCUS_FILE: str = "/tmp/ufvai-web-focus.json"
+WEB_FOCUS_FILE: str = os.environ.get("UFVAI_WEB_FOCUS_FILE", "/tmp/ufvai-web-focus.json")
 
 # ── Skills registradas ─────────────────────────────────────
 # Formato: (repo_url, nome_destino, requerida)

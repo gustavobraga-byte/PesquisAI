@@ -5,6 +5,7 @@ seletor de gratuitos e o modelo padrão sejam testáveis.
 
 Regras:
 - OpenRouter: só modelos com sufixo ``:free`` e o roteador ``openrouter/free``.
+- Google: modelos ``google/*`` (Gemini) com free tier no AI Studio.
 - NVIDIA: modelos ``nvidia/*`` do catálogo NVIDIA (uso gratuito com chave NVIDIA;
   limites e termos são do provedor).
 - OpenCode Go é PAGO e aparece só como link.
@@ -17,9 +18,10 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-FREE_PROVIDER_IDS: tuple[str, ...] = ("nvidia", "openrouter")
+FREE_PROVIDER_IDS: tuple[str, ...] = ("google", "nvidia", "openrouter")
 
 KEY_LINKS: dict[str, str] = {
+    "google": "https://aistudio.google.com/api-keys",
     "nvidia": "https://build.nvidia.com/",
     "openrouter": "https://openrouter.ai/keys",
     "opencode_go": "https://opencode.ai/go",
@@ -38,6 +40,9 @@ def is_free_model(model_id: str) -> bool:
         return rest == "free" or rest.endswith(":free")
     if mid.startswith("nvidia/"):
         return len(mid) > len("nvidia/")
+    if mid.startswith("google/"):
+        # Gemini tem free tier no AI Studio; a cota é do provedor.
+        return len(mid) > len("google/")
     return False
 
 

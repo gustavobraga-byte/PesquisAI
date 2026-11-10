@@ -6688,6 +6688,41 @@ def _shutdown_start(
     threading.Thread(target=_worker, daemon=True, name="ufvai-sair").start()
 
 
+def _vpn_autoconnect_startup(delay: float = 4.0) -> None:
+    """v0.7.11-web12: reconecta a VPN sozinho no boot — uma vez, sem perguntar.
+
+    Condições (todas gravadas em ``backups/ufvai_vpn_prefs.json``, no Drive):
+    o usuário respondeu "sou aluno(a) da UFV", a conexão já funcionou alguma
+    vez e as credenciais ficaram salvas ("lembrar"). Se ele desconectar de
+    propósito, a preferência é desligada e isto não roda mais.
+
+    Nunca bloqueia o boot, nunca abre modal e nunca derruba a UI: em caso de
+    falha (UFV fora do ar, senha trocada, 1 dispositivo por CPF) o estado fica
+    em "error" e o botão 🛡 mostra o motivo.
+    """
+
+    def _run() -> None:
+        try:
+            time.sleep(max(0.0, float(delay)))
+            from . import vpn as _vpn
+
+            if not _vpn.should_auto_connect(DRIVE_BACKUP_DIR):
+                return
+            _st = _vpn.connect(use_saved=True, backup_dir=DRIVE_BACKUP_DIR)
+            logger.info(
+                "VPN: reconexão automática iniciada (%s)", _st.get("state", "?")
+            )
+        except Exception as exc:  # noqa: BLE001 — é conveniência, não requisito
+            logger.info("VPN: reconexão automática indisponível: %s", exc)
+
+    try:
+        threading.Thread(
+            target=_run, name="ufvai-vpn-autoconnect", daemon=True
+        ).start()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def launch():
     global _drive_url
     
@@ -6835,6 +6870,10 @@ def launch():
     boot.finish()  # 100% + "✨ UFVAI pronto!"
 
     show_launch_button(banner_url)
+
+    # v0.7.11-web12: se o usuário já decidiu ("sou aluno da UFV") e salvou as
+    # credenciais, a VPN volta sozinha — sem repetir a pergunta a cada acesso.
+    _vpn_autoconnect_startup()
 
     # v0.6.21: cookies de terceiros — ÚLTIMO item do fluxo. O botão "ABRIR O
     # UFVAI" já está na tela e o diagnóstico fecha a sequência com o veredito

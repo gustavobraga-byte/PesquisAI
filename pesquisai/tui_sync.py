@@ -1,4 +1,4 @@
-"""pesquisai/tui_sync.py — v0.7.11-web9: sincronização em tempo real TUI ↔ web.
+"""pesquisai/tui_sync.py — v0.7.11-web12: sincronização em tempo real TUI ↔ web.
 
 O problema de sincronizar as duas interfaces não é de transporte (as duas já
 falam com o mesmo motor), é de **intenção**: o motor não sabe qual sessão a
@@ -10,8 +10,9 @@ atraso.
 A TUI do OpenCode V2 expõe a rota atual ao plugin (`context.ui.router`), então
 o próprio terminal **publica** a sessão que está na tela:
 
-* a cada 400 ms (barato: leitura em memória) e imediatamente no evento
-  `session.execution.started`, grava ``/tmp/ufvai-focus.json``;
+* a cada 100 ms (barato: leitura em memória) e imediatamente no evento
+  `session.execution.started`, publica a sessão por ``POST /__ufvai/focus``
+  (``source: "tui"``) **e** grava ``/tmp/ufvai-focus.json`` como reserva;
 * o proxy da web (``ocweb``) observa o arquivo a cada 250 ms e faz *push*
   para as páginas abertas por ``/__ufvai/live`` (SSE) — a troca acontece em
   milissegundos, não em segundos;
@@ -45,12 +46,13 @@ SYNC_PLUGIN_TUI_TS: str = r'''import { Plugin } from "@opencode/plugin/tui"
 import { readFileSync, renameSync, writeFileSync } from "node:fs"
 
 /**
- * UFVAI — sincronização em tempo real TUI <-> web (v0.7.11-web9).
+ * UFVAI — sincronização em tempo real TUI <-> web (v0.7.11-web12).
  *
- * Publica em FOCUS_FILE a sessão que a TUI está exibindo (a cada 400 ms e
- * imediatamente em `session.execution.started`). O proxy da web lê o arquivo
- * e faz push por SSE para as páginas abertas — a web troca de sessão em
- * milissegundos, sem polling.
+ * Publica a sessão que a TUI está exibindo de duas formas:
+ *   1. `POST /__ufvai/focus` (source "tui") — caminho rápido: o proxy publica
+ *      no SSE na hora (~1 ms), sem esperar o polling do arquivo;
+ *   2. FOCUS_FILE — reserva para plugins antigos e para quando o POST falha.
+ * A checagem da rota é feita a cada 100 ms (leitura em memória).
  *
  * No sentido inverso, lê WEB_FOCUS_FILE (gravado pela web) e navega para a
  * sessão escolhida no navegador, desde que o foco seja recente.
@@ -58,9 +60,30 @@ import { readFileSync, renameSync, writeFileSync } from "node:fs"
 
 const FOCUS = process.env.UFVAI_FOCUS_FILE || "/tmp/ufvai-focus.json"
 const WEB = process.env.UFVAI_WEB_FOCUS_FILE || "/tmp/ufvai-web-focus.json"
-const PUBLISH_MS = 250
-const FOLLOW_MS = 400
+const FOCUS_URL =
+  process.env.UFVAI_FOCUS_URL || "http://127.0.0.1:8002/__ufvai/focus"
+const PUBLISH_MS = 100
+const FOLLOW_MS = 250
 const FOLLOW_MAX_AGE = 5000
+
+/** Entrega o foco ao proxy por HTTP (não bloqueia a TUI se falhar). */
+function postFocus(sid: string, route: string) {
+  try {
+    const f = (globalThis as any).fetch
+    if (typeof f !== "function") return
+    const p = f(FOCUS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sid,
+        ts: Date.now(),
+        route: route || "session",
+        source: "tui",
+      }),
+    })
+    if (p && typeof p.catch === "function") p.catch(() => {})
+  } catch {}
+}
 
 function atomicWrite(path: string, text: string) {
   const tmp = `${path}.${process.pid}.tmp`
@@ -116,6 +139,8 @@ export default Plugin.define({
       } catch {
         // melhor esforço: nunca derruba a TUI por causa do arquivo
       }
+      // caminho rápido: o proxy publica no SSE imediatamente
+      postFocus(now.sid, now.route)
     }
 
     const follow = () => {
@@ -137,10 +162,13 @@ export default Plugin.define({
       } catch {}
     }
 
-    let off: any
-    try {
-      off = context.data.on("session.execution.started", () => publish())
-    } catch {}
+    const offs: any[] = []
+    for (const evt of ["session.execution.started", "session.viewed", "session.created"]) {
+      try {
+        const fn = context.data.on(evt, () => publish())
+        if (typeof fn === "function") offs.push(fn)
+      } catch {}
+    }
     publish()
     const t1 = setInterval(() => publish(), PUBLISH_MS)
     const t2 = setInterval(() => follow(), FOLLOW_MS)
@@ -149,9 +177,11 @@ export default Plugin.define({
       stopped = true
       clearInterval(t1)
       clearInterval(t2)
-      try {
-        if (typeof off === "function") off()
-      } catch {}
+      for (const fn of offs) {
+        try {
+          fn()
+        } catch {}
+      }
     }
   },
 })

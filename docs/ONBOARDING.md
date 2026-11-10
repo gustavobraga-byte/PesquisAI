@@ -14,8 +14,9 @@
 | `UFVAI_SKIP_ONBOARDING=1` | Não |
 | Usuário clicou em **✕ (Agora não)** | Não nesta aba (`sessionStorage`); volta na próxima abertura sem chave |
 
-A ordem de abertura é sempre: **Termos → (Bem-vindo de volta) → Onboarding**.
-O script espera os dois overlays anteriores saírem da frente (poll de 500 ms).
+A ordem de abertura é sempre: **Termos → (Bem-vindo de volta) → VPN da UFV
+("é aluno?") → Onboarding**. O script do onboarding espera os overlays
+anteriores e a resposta da VPN saírem da frente (poll de 500 ms).
 
 ## 2. Fluxo
 
@@ -51,6 +52,29 @@ para colar a chave.
 | NVIDIA NIM | `https://build.nvidia.com/` | `nvapi-` | `NVIDIA_API_KEY` | — (escolher no seletor) |
 | OpenRouter | `https://openrouter.ai/keys` | `sk-or-` | `OPENROUTER_API_KEY` | `openrouter/free` |
 | OpenCode Go | `https://opencode.ai/go` | `sk-` | `OPENCODE_API_KEY` | — (pago) |
+
+### Outros provedores (v0.7.11)
+
+Abaixo dos quatro cards principais há **“Outro provedor (OpenAI, Anthropic,
+Groq, Mistral…)”**. A lista é curada e cada item leva ao mesmo tutorial com
+link oficial + campo da chave:
+
+| Provedor | Variável | Prefixo |
+|---|---|---|
+| OpenAI | `OPENAI_API_KEY` | `sk-` / `sk-proj-` |
+| Anthropic | `ANTHROPIC_API_KEY` | `sk-ant-` |
+| Groq | `GROQ_API_KEY` | `gsk_` |
+| Mistral | `MISTRAL_API_KEY` | — |
+| DeepSeek | `DEEPSEEK_API_KEY` | `sk-` |
+| Together AI | `TOGETHER_API_KEY` | — |
+| Fireworks AI | `FIREWORKS_API_KEY` | `fw_` |
+| xAI | `XAI_API_KEY` | `xai-` |
+| Cohere | `COHERE_API_KEY` | — |
+
+Esses provedores **não trocam o modelo padrão automaticamente** (o id do
+modelo depende do catálogo do motor): escolha o modelo depois em
+**🎛️ Modelo gratuito padrão** (Google, NVIDIA, OpenRouter) ou no seletor do
+terminal.
 
 No Google, o texto é explícito: **Criar chave → clicar em Copiar → voltar para esta
 janela → colar**. A tela mostra o **print real** do Google AI Studio

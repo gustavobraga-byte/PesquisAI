@@ -14,6 +14,13 @@ não cobra, não garante limites nem disponibilidade. Não compartilhe sua chave
 
 ## 🆓 Como obter uma chave gratuita
 
+### Google Gemini (free tier no AI Studio)
+1. Acesse https://aistudio.google.com/api-keys.
+2. Clique em **Criar chave de API** e copie (começa com `AIza`).
+3. Cole em **UFVAI → Provedores → Google Gemini**.
+4. O modelo padrão vira **Gemini Flash-Lite Latest · high**; outros modelos
+   Google aparecem no seletor **🎛️ Modelo gratuito padrão**.
+
 ### OpenRouter (modelos com sufixo `:free`)
 1. Crie uma conta em https://openrouter.ai.
 2. Acesse https://openrouter.ai/keys e clique em **Create key**.
@@ -26,6 +33,13 @@ não cobra, não garante limites nem disponibilidade. Não compartilhe sua chave
 3. Cole a chave (começa com `nvapi-`) em **UFVAI → Provedores → NVIDIA**.
 
 Os limites de uso gratuito são definidos pelo provedor e podem mudar.
+
+### Outros provedores (chave própria)
+No onboarding, abra **“Outro provedor (OpenAI, Anthropic, Groq, Mistral…)”**.
+A lista inclui OpenAI, Anthropic, Groq, Mistral, DeepSeek, Together,
+Fireworks, xAI e Cohere; cada um tem link oficial e campo para colar a chave.
+A chave é salva cifrada na variável padrão do provedor (ex.:
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`).
 
 ## 💳 Opções pagas
 

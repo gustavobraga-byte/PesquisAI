@@ -5635,7 +5635,7 @@ def create_wrapper_html(
       <span class="va-arrow" aria-hidden="true">→</span>
     </button>
 
-    <p class="va-note" data-i18n="vpn.ask_note">Você pode mudar isso depois no botão 🛡 VPN, na barra superior.</p>
+    <p class="va-note" data-i18n="vpn.ask_note">Perguntamos isto <b>uma vez</b> — a resposta fica salva no seu Drive. Dá para mudar depois no botão 🛡 VPN.</p>
   </div>
 </div>
 
@@ -6109,6 +6109,10 @@ def create_wrapper_html(
         extra.textContent = bits.join(" · ");
       } else {
         extra.textContent = last.progress || (state === "error" ? (last.last_error || "") : "");
+        if (last.auto_connect_ready){
+          extra.textContent = (extra.textContent ? extra.textContent + " · " : "") +
+            tr("vpn.auto_armed", "reconecta sozinho ao abrir");
+        }
       }
     }
 
@@ -6204,7 +6208,13 @@ def create_wrapper_html(
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({choice: choice})
     }).then(function(r){ return r.json(); }).then(render).catch(function(){});
-    if (choice === "ufv") window.openVpn();
+    if (choice === "ufv"){
+      // v0.7.11-web12: "ativar uma vez" só funciona se as credenciais forem
+      // lembradas — o padrão passa a ser lembrar (dá para desmarcar).
+      var rem = $("vpn-remember");
+      if (rem && !(last && last.has_saved_credentials)) rem.checked = true;
+      window.openVpn();
+    }
   };
 
   window.vpnConnect = function(){
@@ -6863,7 +6873,8 @@ def create_wrapper_html(
             "vpn.ask_yes_sub": "Informar CPF e senha da VPN",
             "vpn.ask_no": "Não, continuar sem VPN",
             "vpn.ask_no_sub": "O UFVAI funciona normalmente com a internet do Colab",
-            "vpn.ask_note": "Você pode mudar isso depois no botão 🛡 VPN, na barra superior.",
+            "vpn.auto_armed": "reconecta sozinho ao abrir",
+            "vpn.ask_note": "Perguntamos isto uma vez — a resposta fica salva no seu Drive. Dá para mudar depois no botão 🛡 VPN.",
             "vpn.off": "Desconectado",
             "vpn.connecting": "Conectando…",
             "vpn.on": "Conectado à VPN da UFV",
@@ -7071,7 +7082,8 @@ def create_wrapper_html(
             "vpn.ask_yes_sub": "Enter CPF and VPN password",
             "vpn.ask_no": "No, continue without VPN",
             "vpn.ask_no_sub": "UFVAI works normally with Colab's internet",
-            "vpn.ask_note": "You can change this later with the 🛡 VPN button in the top bar.",
+            "vpn.auto_armed": "reconnects automatically on open",
+            "vpn.ask_note": "We ask this once — the answer is saved in your Drive. You can change it later with the 🛡 VPN button.",
             "vpn.off": "Disconnected",
             "vpn.connecting": "Connecting…",
             "vpn.on": "Connected to the UFV VPN",
@@ -7279,7 +7291,8 @@ def create_wrapper_html(
             "vpn.ask_yes_sub": "Informar CPF y contraseña de la VPN",
             "vpn.ask_no": "No, continuar sin VPN",
             "vpn.ask_no_sub": "UFVAI funciona normalmente con la internet de Colab",
-            "vpn.ask_note": "Puedes cambiarlo después con el botón 🛡 VPN de la barra superior.",
+            "vpn.auto_armed": "se reconecta solo al abrir",
+            "vpn.ask_note": "Preguntamos esto una vez — la respuesta queda guardada en tu Drive. Puedes cambiarlo con el botón 🛡 VPN.",
             "vpn.off": "Desconectado",
             "vpn.connecting": "Conectando…",
             "vpn.on": "Conectado a la VPN de la UFV",
@@ -7487,7 +7500,8 @@ def create_wrapper_html(
             "vpn.ask_yes_sub": "Saisir le CPF et le mot de passe du VPN",
             "vpn.ask_no": "Non, continuer sans VPN",
             "vpn.ask_no_sub": "UFVAI fonctionne normalement avec l'internet de Colab",
-            "vpn.ask_note": "Vous pouvez changer cela plus tard avec le bouton 🛡 VPN de la barre supérieure.",
+            "vpn.auto_armed": "se reconnecte tout seul à l'ouverture",
+            "vpn.ask_note": "Nous posons la question une seule fois — la réponse est enregistrée dans votre Drive. Modifiable via le bouton 🛡 VPN.",
             "vpn.off": "Déconnecté",
             "vpn.connecting": "Connexion…",
             "vpn.on": "Connecté au VPN de l'UFV",
@@ -7690,7 +7704,8 @@ def create_wrapper_html(
             "vpn.ask_yes_sub": "输入 CPF 和 VPN 密码",
             "vpn.ask_no": "否，不使用 VPN 继续",
             "vpn.ask_no_sub": "UFVAI 可正常使用 Colab 的网络",
-            "vpn.ask_note": "之后可通过顶部栏的 🛡 VPN 按钮更改。",
+            "vpn.auto_armed": "打开时自动重连",
+            "vpn.ask_note": "只询问一次，答案保存在你的 Drive 中；之后可通过顶部栏的 🛡 VPN 按钮更改。",
             "vpn.off": "未连接",
             "vpn.connecting": "连接中…",
             "vpn.on": "已连接到 UFV VPN",
