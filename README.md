@@ -10,14 +10,14 @@
 **Agente de IA para pesquisa científica · Universidade Federal de Viçosa**
 
 [![Site oficial](https://img.shields.io/badge/🌐_Site-ufvaisite-2E3242?style=for-the-badge)](https://der.ufv.br/ufvai/)
-[![Abrir no Colab](https://img.shields.io/badge/▶️_Começar_agora-Google_Colab-brightgreen?style=for-the-badge)](https://colab.research.google.com/github/gustavobraga-byte/versaoteste/blob/main/PesquisAI.ipynb)
+[![Abrir no Colab](https://img.shields.io/badge/▶️_Começar_agora-Google_Colab-brightgreen?style=for-the-badge)](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb)
 [![Apresentação](https://img.shields.io/badge/📊_Slides-ver_apresentação-C9A227?style=for-the-badge)](https://der.ufv.br/ufvai/#apresentacao)
 
 [![Versão](https://img.shields.io/badge/versão-0.7.11-orange.svg)]() [![Licença MIT](https://img.shields.io/badge/licença-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![SisPPG/UFV](https://img.shields.io/badge/SisPPG-10356285004-blue.svg)](http://sisppg.ufv.br) [![LGPD](https://img.shields.io/badge/LGPD-conforme-success.svg)](PRIVACY.md)
 
 > Consulta dados oficiais do Brasil e literatura validada, cita cada fonte e declara honestamente quando não há evidência suficiente.
 
-[🌐 Site](https://der.ufv.br/ufvai/) · [📓 Colab](https://colab.research.google.com/github/gustavobraga-byte/versaoteste/blob/main/PesquisAI.ipynb) · [📘 Manual](MANUAL.md) · [📜 Termos v3](docs/TERMS_OF_USE.md) · [🔒 Privacidade v1.1](PRIVACY.md) · [📊 Telemetria](TELEMETRY.md) · [📝 Changelog](CHANGELOG.md)
+[🌐 Site](https://der.ufv.br/ufvai/) · [📓 Colab](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb) · [📘 Manual](MANUAL.md) · [📜 Termos v3](docs/TERMS_OF_USE.md) · [🔒 Privacidade v1.1](PRIVACY.md) · [📊 Telemetria](TELEMETRY.md) · [📝 Changelog](CHANGELOG.md)
 
 </div>
 
@@ -80,7 +80,7 @@ O **UFVAI** (marca) roda sobre o motor **PesquisAI** (este código, arquitetura 
 
 ### Opção 1 — Google Colab (recomendada, ~2 min)
 
-1. Clique em **Começar agora** (badge no topo) ou acesse o [notebook](https://colab.research.google.com/github/gustavobraga-byte/versaoteste/blob/main/PesquisAI.ipynb);
+1. Clique em **Começar agora** (badge no topo) ou acesse o [notebook](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb);
 2. No Colab: **Ambiente de execução → Executar tudo** (`Ctrl+F9`);
 3. Aguarde a tela com a logomarca do UFVAI (~2 min) e clique em **ABRIR O UFVAI**;
 4. Na primeira vez: aceite os **Termos v2.2** informando **nome + e-mail** (LGPD art. 7º, V). Nas próximas: **"Bem-vindo de volta"** → *Continuar* (registra 1 linha `usuario_ativo` por clique).
@@ -88,7 +88,7 @@ O **UFVAI** (marca) roda sobre o motor **PesquisAI** (este código, arquitetura 
 ### Opção 2 — Local (`uv`, desenvolvedores)
 
 ```bash
-git clone https://github.com/gustavobraga-byte/versaoteste.git
+git clone https://github.com/gustavobraga-byte/PesquisAI.git
 cd PesquisAI
 uv sync
 # consulte o MANUAL.md para detalhes
@@ -102,7 +102,7 @@ Funciona **100% offline** em Debian/Ubuntu com LLM local (Ollama). Ideal para si
 
 ```bash
 # amd64 (x86_64)
-wget https://github.com/gustavobraga-byte/versaoteste/raw/main/debs/pesquisai_0.7.11-web2_amd64.deb -O /tmp/pesquisai.deb && \
+wget https://github.com/gustavobraga-byte/PesquisAI/raw/main/debs/pesquisai_0.7.11-web12_amd64.deb -O /tmp/pesquisai.deb && \
 sudo apt install /tmp/pesquisai.deb -y && rm /tmp/pesquisai.deb
 
 ufvai --doctor          # confere Python, ttyd, motor e portas
@@ -243,7 +243,7 @@ Interface web `:8001` (Colab) com tela de Termos v2.2 (nome+e-mail+IP, opt-out) 
 ```
 BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para pesquisa
 científica. Versão 0.7.11. Viçosa: Universidade Federal de Viçosa, 2026.
-Disponível em: https://colab.research.google.com/github/gustavobraga-byte/versaoteste/.
+Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
 Projeto registrado no SisPPG/UFV sob nº 10356285004.
@@ -260,7 +260,7 @@ Verificar autenticidade em: http://sisppg.ufv.br
   year         = {2026},
   version      = {0.7.11},
   institution  = {Universidade Federal de Vi{\c{c}}osa (UFV)},
-  url          = {https://colab.research.google.com/github/gustavobraga-byte/versaoteste/}
+  url          = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/}
 }
 ```
 

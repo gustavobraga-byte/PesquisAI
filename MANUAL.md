@@ -1,6 +1,6 @@
 # 📘 Manual do UFVAI
 
-> **Agente de Pesquisa Científica de Alta Performance · v0.7.7 · Outubro 2026**
+> **Agente de Pesquisa Científica de Alta Performance · v0.7.10 · Novembro 2026**
 > Registro SisPPG/UFV nº 10356285004 · Universidade Federal de Viçosa
 
 ---
@@ -433,6 +433,7 @@ O UFVAI é uma **ferramenta de amplificação**. Ele tira de você o trabalho re
 9. [Declaração de Uso de IA](#9-declaração-de-uso-de-inteligência-artificial-ia)
 10. [Disclaimer](#10-disclaimer-do-ufvai--termos-de-uso-e-isenção-de-responsabilidade)
 11. [Memória Persistente](#11--memória-persistente-minha-memória--desde-a-v0518)
+11-A. [VPN da UFV](#11-a--vpn-da-ufv-desde-a-v0711)
 12. [Histórico de Versões](#12-histórico-de-versões)
 
 ---
@@ -545,6 +546,63 @@ O que você vê e o que cada elemento significa:
 - Quando a versão dos Termos muda, o UFVAI solicita **re-consentimento** na próxima abertura — seu aceite anterior não é reutilizado silenciosamente;
 - O consentimento fica registrado localmente (`~/.config/ufvai_consent.json`) e o perfil persistente no SEU Drive/máquina (`backups/ufvai_consentimento.json`), nunca em servidores do desenvolvedor.
 
+### 1.5.1 Primeiro uso — escolha do provedor (v0.7.10)
+
+Se o UFVAI ainda **não tem nenhuma chave de API** (primeiro uso, troca de conta Google ou
+chaves apagadas), ele mostra — **depois dos Termos** — a tela:
+
+> **"Para usar o UFVAI você precisa de um provedor de IA"**
+
+| Escolha | O que acontece |
+|---|---|
+| **Já tenho um provedor de IA** | Abre o modal **🔌 Conectar Provedor de IA** de sempre (lista completa, 15 provedores) |
+| **Não tenho / não sei o que é isso** | Abre as opções guiadas com tutorial em cada uma |
+
+As opções guiadas são:
+
+| Provedor | Situação | O que a tela mostra |
+|---|---|---|
+| **Google Gemini** | **RECOMENDADO** · grátis no AI Studio | link para `aistudio.google.com/api-keys`, passo a passo (Criar chave → **Copiar** → voltar) e o campo para colar `AIza…` |
+| **NVIDIA NIM** | grátis com conta NVIDIA | link `build.nvidia.com`, passo a passo do **Get API Key** e campo `nvapi-…` |
+| **OpenRouter** | grátis nos modelos `:free` | link `openrouter.ai/keys`, passo a passo do **Create Key** e campo `sk-or-…` |
+| **OpenCode Go** | **PAGA** (assinatura à parte) | link `opencode.ai/go` e o aviso de que o UFVAI não intermedeia pagamento |
+
+**O que acontece ao salvar**
+
+1. a chave é validada no formato, **cifrada** e gravada em `backups/keys_store.json`
+   (Drive no Colab; `~/PesquisAI` no offline);
+2. a variável do provedor é injetada no processo e no **serviço do motor** (v0.7.8);
+3. com chave do **Google**, o modelo padrão passa a ser **`google/gemini-flash-lite-latest`** —
+   e continua valendo nas próximas aberturas;
+4. o terminal reinicia e a tela de onboarding **não volta mais** (existe chave).
+
+> **"Agora não" (✕):** esconde apenas nesta aba. Na próxima abertura, se ainda não houver
+> chave, a tela volta — é o comportamento desejado para quem perdeu a chave.
+>
+> **Trocar depois:** 🔌 Provedores, a qualquer momento. **Remover:** o mesmo modal
+> (a chave deixa de ser usada e o serviço é reerguido sem ela).
+
+#### Retry automático de cota (429)
+
+O plano gratuito do Google limita a cota **por minuto**. **Só quando a mensagem
+é de cota** (“You exceeded your current quota”, `RESOURCE_EXHAUSTED`,
+`free_tier`, `per minute`) o plugin **`ufvai-retry`** intercepta o hook `retry`
+do motor e espera a janela do provedor antes de tentar de novo. **Sobrecarga**
+(“high demand”, “overloaded”, “temporarily”) espera só **5 s**. Outros `429`/`503`
+seguem o retry padrão do motor:
+
+- padrão **~62 s** (1 minuto da cota gratuita), com teto de 3 min;
+- se a mensagem trouxer `retry in 23s` / `retryDelay`, usa esse valor + 3 s;
+- até **8 tentativas**; depois disso o erro é mostrado normalmente;
+- **fallback**: se as **5 primeiras** tentativas no modelo principal falharem,
+  a sessão troca para **`google/gemini-3.1-flash-lite`** e repete a requisição
+  (uma troca por sessão a cada 30 min).
+
+Nada é configurado à mão: o plugin é instalado no boot em
+`~/.config/opencode/plugins/ufvai-retry/` e registrado em `plugins` no
+`opencode.json`. Ajustes opcionais: `UFVAI_RETRY_DELAY_MS` e
+`UFVAI_RETRY_MAX_ATTEMPTS`.
+
 ### 1.6 A interface de trabalho
 
 Após o aceite, você acessa a interface com **terminal interativo do agente**, painel de sessão e botões de backup:
@@ -562,14 +620,18 @@ Após o aceite, você acessa a interface com **terminal interativo do agente**, 
 Para usar **sem internet e sem Colab** (requisito de privacidade máxima — nada sai da sua máquina):
 
 ```bash
-sudo dpkg -i pesquisai_0.6.19-offline_amd64.deb   # ou versão mais recente
+sudo apt install ./pesquisai_0.7.10-offline1_amd64.deb   # ou _arm64.deb
+ufvai --doctor                              # Python, ttyd, motor e portas
+ufvai --engine-install                      # motor OpenCode 2.x (sem sudo)
 ufvai                                       # abre a interface (UI 8001 · terminal 8000)
 ```
 
-- Configurações ficam em `~/PesquisAI/config/ufvai.env`
+- Dados e configurações ficam em `~/PesquisAI/` (vault, outputs, backups, logs)
 - Modelo de linguagem via **Ollama local** (`http://localhost:11434/v1`)
 - Sem credenciais de nuvem, a telemetria fica inerte por padrão (nada é enviado)
-- Atalhos: `ufvai` (e alias compatível `pesquisa`)
+- Atalhos: `ufvai` (e alias compatível `pesquisai`)
+- O pacote traz `ttyd` embutido e não usa `pip`; o motor OpenCode é instalado
+  com `ufvai --engine-install` (ou no primeiro boot com internet)
 
 ---
 
@@ -781,12 +843,13 @@ No topo da interface do UFVAI, há 3 botões importantes:
 
 > **Dica:** Use o menu `Ctrl + P` → `switch session` para alternar entre sessões.
 
-### 5.4 Autosave automático (a cada 1 minuto)
+### 5.4 Autosave automático (intervalo configurável de 1 a 60 minutos)
 
 | Item | Comportamento |
 |------|---------------|
 | **Chave no rodapé** | Liga/desliga o autosave. **Ligado por padrão**; só desliga se você desativar. A preferência fica no navegador (`localStorage`). |
-| **Gravação** | A cada **1 minuto** a sessão é exportada para `Meu Drive/PesquisAI/backups/autosave/`. |
+| **⚙ Configurar** (desde a v0.7.9) | Botão ao lado da chave: escolha o **intervalo** (1, 3, 5, 10, 15, 30 ou 60 min) e **quais conversas salvar** — *sessão ativa*, *todas as conversas abertas* ou *escolher conversas* (lista com caixas de seleção). As preferências ficam em `ufvai_autosave_interval_min`, `ufvai_autosave_scope` e `ufvai_autosave_session_ids`. |
+| **Gravação** | A cada intervalo escolhido (**1 min** por padrão) a sessão é exportada para `Meu Drive/PesquisAI/backups/autosave/`. |
 | **3 slots vivos** | `autosave_1/2/3.json` guardam as **3 últimas versões distintas** da conversa atual (conteúdo idêntico não é regravado — a interface avisa "sem novidades"). Se o mais recente estiver corrompido, o anterior assume. |
 | **3 slots de histórico** | `autosave_4..6.json` guardam o **último backup de cada uma das 3 interações anteriores** (v0.7.3). Ao trocar de conversa, o autosave atual **não** destrói o backup da sessão anterior — ele é copiado para cá, com a data original preservada. |
 | **Um arquivo por conversa** (v0.7.4) | `autosave/sessions/<id>.json` — com **várias sessões** abertas, o autosave antigo guardava **só a do terminal**; agora **cada conversa** viva que tenha conteúdo novo recebe o seu próprio arquivo (e todas entram na lista do "Restaurar"). |
@@ -798,6 +861,25 @@ No topo da interface do UFVAI, há 3 botões importantes:
 > mesma conversa aparece com ids diferentes. Por isso a comparação entre backups usa
 > `info.time.created` (quando a conversa nasceu) e não o `id`; sem isso, a mesma conversa
 > seria gravada como "versões distintas" e os slots se misturariam.
+
+#### 🔑 Chaves de API e modelos gratuitos (desde a v0.7.9)
+
+O UFVAI **não fornece** chaves de API: elas são emitidas pelo provedor escolhido e são
+**de sua responsabilidade** (sem vínculo com a plataforma). Ao abrir **🔌 Provedores**
+sem nenhuma chave salva, o próprio modal mostra **como obter uma gratuita**:
+
+| Provedor | Como obter | Modelos gratuitos |
+|---|---|---|
+| **OpenRouter** | [openrouter.ai/keys](https://openrouter.ai/keys) (chave `sk-or-…`) | `openrouter/free` e qualquer modelo com sufixo `:free` |
+| **NVIDIA** | [build.nvidia.com](https://build.nvidia.com) (**Get API Key**, `nvapi-…`) | modelos `nvidia/*` |
+
+- **Modelo padrão:** escolha o provedor e o modelo no seletor **🎛️ Modelo gratuito
+  padrão** e clique em **Definir como padrão**. O UFVAI grava o campo `model` do
+  `opencode.json` **preservando o restante** da configuração.
+- **Opção paga:** [OpenCode Go](https://opencode.ai/go) — o UFVAI não emite, não cobra
+  e não garante limites de nenhum provedor.
+- **Onde a chave fica:** cifrada em `backups/` do seu Drive (ou `~/PesquisAI` no modo
+  offline). Guia completo: [`docs/CHAVES_API.md`](docs/CHAVES_API.md).
 
 ### 5.5 Retomada da sessão (automática)
 
@@ -949,14 +1031,17 @@ Todos os arquivos gerados são salvos **exclusivamente** nesses locais — nunca
 - Para abrir manualmente: execute `ufvai` de novo (reabre a UI se já estiver rodando)
 - Kill-switch: `UFVAI_NO_OPEN=1` desabilita a abertura automática
 
-### Problema 10 (.deb): "Instalação reclama de python3-pip"
+### Problema 10 (.deb): "Instalação reclama de dependências Python"
 
 **Solução:**
 ```bash
-sudo apt install python3-pip        # resolve o Depends
-sudo dpkg -i pesquisai_0.6.19-offline_amd64.deb
+sudo apt install ./pesquisai_0.7.10-offline1_amd64.deb   # resolve o Depends
+# se necessário:
+sudo apt --fix-broken install
 ```
-Ou, em último caso: `sudo dpkg -i --force-depends pesquisai_*.deb` (o pip já estar presente é suficiente).
+A partir do pacote **0.7.8**, o `postinst` **não usa `pip`**: as dependências
+(`python3-cryptography`, `python3-requests`, `python3-bs4`, `python3-yaml`) vêm
+do `apt`. Diagnóstico: `ufvai --doctor`.
 
 > ⚠️ Use apenas pacotes oficiais publicados no repositório GitHub. O `.deb` 0.6.5-1 e o 0.6.8-1 foram **vetados** (launcher regressivo) — instale ≥ 0.6.8-2.
 
@@ -970,7 +1055,7 @@ Ou, em último caso: `sudo dpkg -i --force-depends pesquisai_*.deb` (o pip já e
 
 ```
 BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para pesquisa
-científica. Versão 0.7.7. Viçosa: Universidade Federal de Viçosa, 2026.
+científica. Versão 0.7.10. Viçosa: Universidade Federal de Viçosa, 2026.
 Disponível em: https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Acesso em: DD mês. AAAA.
 
@@ -981,7 +1066,7 @@ Verificar autenticidade em: http://sisppg.ufv.br
 **Formato simplificado (nota de rodapé):**
 
 ```
-UFVAI, versão 0.7.7, desenvolvido por Gustavo Bastos Braga (UFV, 2026). Disponível em:
+UFVAI, versão 0.7.10, desenvolvido por Gustavo Bastos Braga (UFV, 2026). Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 ```
 
@@ -1010,7 +1095,7 @@ https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 | **Tipo** | Software / Computer Program |
 | **Autor** | Braga, Gustavo Bastos |
 | **Título** | UFVAI: agente de inteligência artificial para pesquisa científica |
-| **Versão** | 0.7.7 |
+| **Versão** | 0.7.10 |
 | **Ano** | 2026 |
 | **Instituição** | Universidade Federal de Viçosa (UFV) |
 | **URL** | https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/ |
@@ -1026,7 +1111,7 @@ https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 author = {Gustavo Bastos Braga},
 title = {{UFVAI}: Agente de Intelig{\^e}ncia Artificial para Pesquisa Cient{\'\i}fica},
 year = {2026},
-version = {0.7.7},
+version = {0.7.10},
 institution = {Universidade Federal de Vi{\c{c}}osa (UFV)},
 url = {https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/},
 note = {Acessado em: DD m{\^e}s AAAA}
@@ -1083,7 +1168,7 @@ Ethics (COPE).
 
 Referência da ferramenta:
 BRAGA, Gustavo Bastos. UFVAI: agente de inteligência artificial para
-pesquisa científica. Versão 0.7.7. Viçosa: UFV, 2026. Disponível em:
+pesquisa científica. Versão 0.7.10. Viçosa: UFV, 2026. Disponível em:
 https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/.
 Registro SisPPG/UFV nº 10356285004 — http://sisppg.ufv.br
 ```
@@ -1363,12 +1448,104 @@ O UFVAI suporta **5 idiomas** (chinês adicionado na v0.6.0):
 
 Desde a v0.6.1, o **idioma do sistema é detectado automaticamente** na primeira execução (`$LANG`, `navigator.language`) e a preferência é persistida. Para alterar, use o seletor de idioma na interface ou defina `PESQUISAI_LANG=en_US`.
 
+## 11-A. 🛡 VPN da UFV (desde a v0.7.11)
+
+O UFVAI pode conectar o **servidor do Colab** à **VPN da UFV** para acessar
+sistemas e periódicos restritos. A conexão é **opt-in** e usa as suas
+credenciais pessoais do portal `vpn.ufvnet.ufv.br` (**CPF + senha**).
+
+### Como conectar
+1. Logo **depois dos Termos** (nome/e-mail + aceite), responda
+   **“Sim, sou aluno(a) da UFV”** — antes da tela de provedor/chave.
+2. Informe **CPF** e **senha da VPN** no painel 🛡.
+3. Clique em **Conectar** e aguarde o status **Conectado à VPN da UFV**.
+4. Use **Testar acesso** para conferir `https://sistemas.ufv.br/`.
+
+Se responder **“Não”**, a pergunta não volta; o botão **🛡 VPN** da barra
+superior reabre o painel quando você quiser.
+
+### Modo total (todo o UFVAI na VPN) — PADRÃO = split + serviço no netns
+A opção **“Usar a VPN em todo o UFVAI (terminal + OpenCode)”** já vem
+**marcada**. Ao conectar, o UFVAI reinicia o terminal e o serviço do OpenCode
+**dentro** do namespace da VPN em **split tunnel**: só a rede da UFV sai por
+`tun0`; a internet comum (LLM, GitHub, PyPI) continua pelo Colab. O wrapper
+(8001) e o kernel do notebook continuam fora.
+
+> ⚠️ Isso reinicia o terminal/agente por alguns segundos. Para voltar,
+> clique em **Desconectar**.
+>
+> ☑️ **“Túnel total” (opcional, desmarcado):** manda TODO o tráfego pela UFV.
+> Medido em 07/11/2026, a UFV **bloqueia a saída externa** nesse modo
+> (OpenRouter, Google, OpenAI, GitHub e PyPI dão timeout) — só use para
+> modelos/serviços internos da UFV, sem LLM em nuvem.
+
+### Modelo local da UFV
+Em **🛡 VPN → Detalhes técnicos → Modelo/serviço na rede da UFV**, informe o
+host interno (ex.: `10.0.0.10`), a porta (ex.: `11434`) e a porta local
+(ex.: `11435`). O UFVAI publica `127.0.0.1:11435` dentro do túnel; no
+OpenCode, use `http://127.0.0.1:11435/v1` como `baseURL` do provedor
+OpenAI-compatible.
+
+### O que passa pela VPN
+No **modo total (padrão = split)**, a rede da UFV sai por `tun0` e a
+internet comum (LLM, `pip`, `git`, `curl` público) continua pelo Colab.
+Para comandos fora do OpenCode (kernel do notebook ou wrapper), use o
+proxy local:
+
+```bash
+curl --socks5-hostname 127.0.0.1:1081 https://sistemas.ufv.br/
+# ou
+ALL_PROXY=socks5h://127.0.0.1:1081 seu-comando
+```
+
+O kernel do notebook e o wrapper continuam na internet normal do Colab — o
+contêiner raiz não pode ser roteado sem `CAP_NET_ADMIN`. No **split tunnel**
+(opção desmarcada), só a rede da UFV entra no túnel.
+
+### Avisos importantes
+- **1 dispositivo por CPF:** conectar o Colab pode desconectar o seu computador.
+- A senha **não é gravada**, a menos que você marque **“Lembrar neste Drive”**
+  (aí fica cifrada no `keys_store.json`).
+- A conexão usa as credenciais **da VPN**, não a senha do e-mail/Portal UFV.
+- Respeite as regras da UFV/DTI e da CAPES Periódicos.
+
+### Problemas comuns
+- **CPF ou senha recusados** → confira a senha da VPN no portal.
+- **Tempo esgotado** → veja `~/.config/ufvai/vpn/openvpn.log` e tente de novo.
+- **Teste interno falha, público passa** → DNS interno não empurrado;
+  desconecte/reconecte.
+
+Guia completo (arquitetura, API, CLI, testes e diagnóstico):
+[`docs/VPN_UFV.md`](docs/VPN_UFV.md).
+
+---
+
+## 11-B. 🖥️ Interface web do OpenCode (v0.7.11-web)
+
+Variante da 0.7.11: a janela principal mostra a **SPA do OpenCode** em vez do
+terminal `ttyd`. O proxy `pesquisai/ocweb.py` (porta **8002**) lê o
+`service.json`, injeta o **Basic auth** e repassa `/_assets`, `/api/*` e o SSE
+`/api/event`; o navegador nunca recebe a senha.
+
+> **Revisão `web2`:** a célula `COLAB_BOOT_0.7.11.py` agora copia a própria
+> pasta (antes copiava `UFVAI-v0.7.11`, sem a UI web) e aborta com aviso se a
+> porta 8001 já estiver ocupada por uma sessão antiga.
+
+O tema do UFVAI é aplicado por CSS sobre os tokens `--v2-*` (navy/dourado/
+creme, claro e escuro), com barra superior e badge **UFV·AI**. O `ttyd`
+continua ativo em segundo plano como fallback. Guia completo:
+[`docs/OPENCODE_WEB.md`](docs/OPENCODE_WEB.md).
+
 ## 12. Histórico de Versões
 
-Resumo das versões da série 0.6.x (detalhes completos no `CHANGELOG.md` do repositório):
+Resumo das versões da série 0.7.x (detalhes completos no `CHANGELOG.md` do repositório):
 
 | Versão | Data | Destaques |
 |--------|------|-----------|
+| **0.7.11** | 06/11/2026 | 🛡 **VPN da UFV no Colab** — OpenVPN em namespace isolado (`unshare -Urn` + `slirp4netns`) + SOCKS5 local; tela inicial **“Você é aluno(a) da UFV?”** e painel **CPF/senha**; credenciais cifradas opcionais; aviso de **1 dispositivo por CPF** ([`docs/VPN_UFV.md`](docs/VPN_UFV.md)) |
+| **0.7.10** | 05/11/2026 | 🧭 **Onboarding de primeiro uso** — depois dos Termos, quem está sem chave escolhe **já tenho provedor** ou **não tenho / não sei**; opções **Google Gemini (recomendado)**, **NVIDIA**, **OpenRouter** e **OpenCode Go (pago)** com tutorial, link e campo de colar; chave do Google → `GOOGLE_GENERATIVE_AI_API_KEY` e modelo padrão **Gemini Flash-Lite Latest · high** |
+| **0.7.9** | 04/11/2026 | 🔑 **Chaves de API e free tier para novos usuários** — o modal de Provedores mostra **como obter uma chave gratuita** (OpenRouter `:free`, NVIDIA) quando não há nenhuma salva; **seletor de modelos gratuitos** e **modelo padrão** (`/api/free_models`, `/api/default_model`); aviso de responsabilidade na abertura ([`docs/CHAVES_API.md`](docs/CHAVES_API.md)) · 💾 **⚙ Autosave** com intervalo de **1–60 min** e escopo (sessão ativa / todas / escolhidas) |
+| **0.7.8** | 29/10/2026 | 🔑 **Chaves do Drive no serviço do motor (OpenCode v2.2)** — as chaves são injetadas no `env` do `opencode serve` e no boot; **auto-cura** reinicia o serviço que nasceu sem elas; salvar/remover chave reergue o serviço atualizado · ⌨️ **Ctrl+C copia / Ctrl+V cola** no terminal (ttyd + xterm.js) |
 | **0.7.7** | 27/10/2026 | 🔒 **Drive Guard** — o agente não acessa mais “My Drive” fora de `My Drive/PesquisAI` (nem com `--auto`): regras `permissions` com `deny` **final** no `opencode.json` + hooks `permission.evaluate` e `tool.execute.before`; alias `MyDrive`, `..`, `file://`, `~` e comandos de shell resolvidos antes da decisão; referência ofuscada cai em **falha fechada**; auditoria em `~/.local/state/ufvai/drive-guard.log` · 🧪 35 verificações em Node + 20 testes Python |
 | **0.7.6** | 24/10/2026 | 🏷️ **Rebrand do agente: opencode → ufvai** — as Diretrizes (`AGENTS.md` + `agents/*` nos 5 idiomas + **novo** `agents/UFVAI.md`) agora se referem ao motor como **UFVAI** em todos os caminhos e comandos (`~/.config/ufvai/`, `ufvai.json`, `~/.local/share/ufvai/`, `ufvai auth export`); novo `scripts/ufvai-alias.sh` cria os symlinks e o comando `ufvai` por cima do motor físico, sem tocar no runtime (banco/crédenciais intactos) |
 | **0.7.5** | 23/10/2026 | 🪟 **Telas de abertura e retomada uma vez por sessão** — marca em **três camadas** (sessionStorage + localStorage 12 h + cookie), gravada antes de exibir; recargas internas não a consomem e o **↻** reoferece · 🧊 HTML com `Cache-Control: no-store` |
@@ -1425,5 +1602,5 @@ O UFVAI usa estes marcadores para indicar o nível de confiança:
 
 ---
 
-*Documentação atualizada: Setembro 2026*  
-*UFVAI v0.7.7 · Registro SisPPG/UFV nº 10356285004*
+*Documentação atualizada: Novembro 2026*  
+*UFVAI v0.7.10 · Registro SisPPG/UFV nº 10356285004*
