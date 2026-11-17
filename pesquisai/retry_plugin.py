@@ -37,6 +37,22 @@ def _digest(path: str) -> str:
     return hasher.hexdigest()
 
 
+def _ensure_mode(path: str) -> None:
+    """Garante ``0644`` no plugin instalado.
+
+    v0.7.11-web16: o motor carrega o plugin num runtime que **não** lê arquivo
+    com modo ``0600``. O import devolvia um módulo sem exports e o motor
+    registrava ``Plugin must export a default definition`` — o plugin ficava
+    silenciosamente inativo e a sessão "pending" voltava a durar minutos.
+    O mesmo bug não acontecia no drive-guard porque o instalador dele já
+    gravava com ``0644``.
+    """
+    try:
+        os.chmod(path, 0o644)
+    except OSError:
+        pass
+
+
 def install_plugin(dest: str = DEFAULT_INSTALL_DIR, src: str = PLUGIN_SRC_DIR) -> list[str]:
     """Copia os arquivos do plugin; só reescreve o que mudou."""
     if not os.path.isdir(src):
@@ -49,6 +65,7 @@ def install_plugin(dest: str = DEFAULT_INSTALL_DIR, src: str = PLUGIN_SRC_DIR) -
             raise FileNotFoundError(f"arquivo do plugin ausente: {origin}")
         target = os.path.join(dest, name)
         if os.path.exists(target) and _digest(origin) == _digest(target):
+            _ensure_mode(target)
             continue
         with open(origin, "rb") as fh:
             payload = fh.read()
@@ -56,6 +73,7 @@ def install_plugin(dest: str = DEFAULT_INSTALL_DIR, src: str = PLUGIN_SRC_DIR) -
         with open(tmp, "wb") as fh:
             fh.write(payload)
         os.replace(tmp, target)
+        _ensure_mode(target)
         written.append(target)
     return written
 

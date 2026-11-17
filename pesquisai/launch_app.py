@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import time
 import threading
 import json
@@ -210,16 +211,20 @@ def _recover_stale_sessions(max_idle_ms: int = 900_000) -> int:
 
 
 def _warm_engine_catalog(timeout_s: float = 8.0) -> bool:
-    """Aquece provedores/modelos antes de a SPA abrir a sessão."""
+    """Aquece provedores/modelos antes de a web abrir a sessão.
+
+    v0.7.11-web17: o aquecimento usa o catálogo compacto do gateway novo
+    (``pesquisai.webapi``), o mesmo que alimenta o seletor de modelos.
+    """
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         try:
-            from . import ocweb
-            data = ocweb.catalog(force=True)
-            if data.get("ready"):
+            from . import webapi
+            data = webapi.catalog(force=True)
+            if data.get("total"):
                 logger.info(
                     "Catálogo do motor pronto: %s modelos, %s provedores",
-                    data.get("models"), data.get("providers"),
+                    data.get("total"), len(data.get("providers") or []),
                 )
                 return True
         except Exception:  # noqa: BLE001
@@ -2339,6 +2344,73 @@ def _revive_ttyd(force: bool = False) -> bool:
         return False
 
 
+# v0.7.11-web32: vigia do TERMINAL no servidor.
+_TTYD_WATCHDOG: "threading.Thread | None" = None
+
+
+def _start_ttyd_watchdog(interval_s: float = 30.0) -> None:
+    """Mantém o TERMINAL sempre rodando, mesmo com a web à frente.
+
+    v0.7.11-web32: a versão web passou a ser a visão padrão. A vigia que
+    existia no cliente (``_ttydWatch``, em ``/api/ttyd_ready``) só roda
+    enquanto a aba do navegador estiver aberta — e ela existia para
+    recarregar a moldura do terminal. Aqui, no **servidor**, uma thread
+    checa a porta do ttyd de tempos em tempos e o religa (anexando à sessão
+    tmux, sem derrubar a conversa) se ele morrer.
+
+    Garantia: o terminal fica vivo com ou sem navegador aberto.
+    """
+    global _TTYD_WATCHDOG
+    if _TTYD_WATCHDOG is not None and _TTYD_WATCHDOG.is_alive():
+        return
+
+    def _loop() -> None:
+        while True:
+            time.sleep(interval_s)
+            try:
+                if _wait_port_open(TERMINAL_PORT, timeout_s=0.5):
+                    continue
+                logger.warning(
+                    "vigia do terminal: ttyd fora do ar em %s — religando",
+                    TERMINAL_PORT,
+                )
+                _revive_ttyd(force=True)
+            except Exception as exc:  # noqa: BLE001 — a vigia nunca derruba a UI
+                logger.warning("vigia do terminal falhou: %s", exc)
+
+    _TTYD_WATCHDOG = threading.Thread(
+        target=_loop, daemon=True, name="ufvai-ttyd-watchdog")
+    _TTYD_WATCHDOG.start()
+    logger.info("vigia do terminal iniciada (a cada %ss)", int(interval_s))
+
+
+def _start_ttyd_watchdog_process() -> None:
+    """Sobe a vigia EXTERNA do terminal (v0.7.11-web32).
+
+    A vigia do processo (`_start_ttyd_watchdog`) morre junto com o
+    UFVAI. Esta — um script shell independente — sobrevive e religa o
+    ttyd se ele cair, com o mesmo comando (anexa à sessão tmux, sem
+    derrubar a conversa do agente).
+    """
+    try:
+        _script = Path(__file__).resolve().parent.parent / "scripts" / "ttyd_watchdog.py"
+        if not _script.exists():
+            return
+        import subprocess as _subprocess
+
+        _log = Path("/tmp/ufvai-ttyd-watchdog.log")
+        with open(_log, "ab") as _f:
+            _subprocess.Popen(
+                [sys.executable, str(_script)],
+                stdout=_f, stderr=_f, stdin=_subprocess.DEVNULL,
+                start_new_session=True,
+                env={**os.environ, "UFVAI_TTYD_PORT": str(TERMINAL_PORT)},
+            )
+        logger.info("vigia externa do terminal iniciada (porta %s)", TERMINAL_PORT)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("vigia externa do terminal não iniciou: %s", exc)
+
+
 def _seed_greeting_async(session_id: str, lang: str, delay: float = 0.8) -> None:
     """Semeia a saudação padrão do idioma na sessão, em segundo plano.
 
@@ -2462,12 +2534,23 @@ def _build_ttyd_cmd(lang: str | None = None, session_id: str | None = None,
     # mesmo com a interface em português.
     _pref_lang = str((_read_prefs() or {}).get("lang") or "").strip()
     _env_lang = str(os.environ.get("PESQUISAI_LANG") or "").strip()
+    # v0.7.11-web25: o idioma escolhido pelo PLUGIN da TUI (``/idioma``,
+    # gravado em ``~/.config/opencode/ufvai-language.json``) também é uma
+    # escolha explícita do usuário — a saudação do terminal precisa acompanhá-
+    # la. Antes, a interface ficava em francês e a saudação saía em português.
+    _plugin_lang = ""
+    try:
+        from .tui_pt import read_saved_locale as _read_tui_locale
+
+        _plugin_lang = str(_read_tui_locale() or "").strip()
+    except Exception:  # noqa: BLE001 — o módulo pode não estar no pacote
+        _plugin_lang = ""
     if lang is None:
-        lang = _env_lang or _pref_lang or _current_lang or _detect_system_lang()
-    # Idioma CONFIRMADO = escolha explícita (env) ou preferência salva no Drive.
-    # Sem confirmação, a saudação espera o cliente (/api/lang) — nunca o locale
-    # do servidor.
-    lang_confident = bool(_env_lang or _pref_lang)
+        lang = _env_lang or _pref_lang or _plugin_lang or _current_lang or _detect_system_lang()
+    # Idioma CONFIRMADO = escolha explícita (env, preferência do Drive ou o
+    # idioma do plugin da TUI). Sem confirmação, a saudação espera o cliente
+    # (/api/lang) — nunca o locale do servidor.
+    lang_confident = bool(_env_lang or _pref_lang or _plugin_lang)
     # Normaliza para o conjunto canônico
     short = (lang or "pt_BR").split("_")[0].lower()
     full_lang = _LANG_MAP.get(short, lang if lang in _LANG_MAP.values() else "pt_BR")
@@ -3031,6 +3114,28 @@ def _opencode_auth_export_text() -> "str | None":
                        r.returncode, (r.stderr or "")[:200])
         return None
     return r.stdout
+
+
+def _agent_state() -> dict:
+    """Estado do agente para o cabeçalho do wrapper (v0.7.11-web30).
+
+    ``busy`` = há execução em curso no motor; ``sid`` = a sessão que está
+    trabalhando; ``sessions`` = quantas estão ativas.
+    """
+    try:
+        from .webapi import active_sessions
+
+        ativos = active_sessions()
+        if isinstance(ativos, dict) and ativos.get("error"):
+            return {"busy": False, "sid": "", "sessions": 0, "error": str(ativos["error"])}
+        sids = list(ativos.keys()) if isinstance(ativos, dict) else []
+        return {
+            "busy": bool(sids),
+            "sid": sids[0] if sids else "",
+            "sessions": len(sids),
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"busy": False, "sid": "", "sessions": 0, "error": str(exc)}
 
 
 def _json_has_items(text: "str | None") -> bool:
@@ -3616,6 +3721,13 @@ def start_wrapper_server():
             if p.startswith("/api/") and not self._authorized():
                 return self._reject_token()
 
+            if p == "/__ufvai/agent-state":
+                # v0.7.11-web30: o cabeçalho do wrapper passa a dizer se o
+                # agente está **ATIVO** (trabalhando) ou **ocioso** — antes
+                # era um texto fixo ("agente ativo"), que não dizia nada
+                # sobre o que o modelo estava fazendo.
+                return self._json(200, _agent_state())
+
             if p == "/vendor/marked.min.js":
                 # v0.6.0: asset embutido para funcionamento offline
                 try:
@@ -3829,11 +3941,12 @@ def start_wrapper_server():
                 return
 
             if p == "/api/ocweb_ready":
-                # v0.7.11-web: o splash da UI espera este endpoint (proxy 8002)
+                # v0.7.11-web17: o splash da UI espera este endpoint (servidor
+                # web novo na porta 8002).
                 try:
-                    from . import ocweb
-                    _st = ocweb.status()
-                    _ready = bool(_st.get("running")) and ocweb.ready(
+                    from . import webui_server
+                    _st = webui_server.status()
+                    _ready = bool(_st.get("running")) and webui_server.ready(
                         OCWEB_PORT, timeout=0.25
                     )
                 except Exception:
@@ -5948,9 +6061,14 @@ def start_wrapper_server():
     # com ERR_CONNECTION_REFUSED (regressão v0.6.0; padrão herdado do
     # launcher 0.5.x). IPv4 principal + loopback IPv6 adicional (offline).
     _servers_started = 0
+
+    # v0.7.11-web35 (fix): o bind ocorre na THREAD PRINCIPAL (antes o construtor
+    # do servidor rodava dentro da thread, a exceção escapava e o contador
+    # marcava um listener que nunca subiu).
     try:
+        _v4 = ThreadingHTTPServer((_bind_host, WRAPPER_PORT), Handler)
         threading.Thread(
-            target=lambda: ThreadingHTTPServer((_bind_host, WRAPPER_PORT), Handler).serve_forever(),
+            target=_v4.serve_forever,
             daemon=True,
             name="ufvai-wrapper",
         ).start()
@@ -5958,15 +6076,27 @@ def start_wrapper_server():
     except OSError as e:
         logger.error("Falha ao bindar wrapper em %s:%s — %s", _bind_host, WRAPPER_PORT, e)
 
-    # v0.6.9-6: tenta IPv6 também — 0.0.0.0 só cobre IPv4, localhost pode ser ::1
+    # v0.6.9-6: tenta IPv6 também — 0.0.0.0 só cobre IPv4, localhost pode ser ::1.
+    # v0.7.11-web35 (fix): IPV6_V6ONLY=1 é obrigatório. Sem ele, o socket IPv6
+    # dual-stack (::) tenta cobrir o IPv4 já ligado em 0.0.0.0:WRAPPER_PORT e o
+    # bind falha com EADDRINUSE ("Address already in use"). Com V6ONLY=1, cada
+    # família fica no seu socket e as duas coexistem na mesma porta.
     try:
         import socket as _s
 
         class _LoopbackV6(ThreadingHTTPServer):
             address_family = _s.AF_INET6
 
+            def server_bind(self):
+                try:
+                    self.socket.setsockopt(_s.IPPROTO_IPV6, _s.IPV6_V6ONLY, 1)
+                except (AttributeError, OSError):
+                    pass  # kernel sem IPV6_V6ONLY: segue como antes
+                super().server_bind()
+
+        _v6 = _LoopbackV6(("::", WRAPPER_PORT), Handler)
         threading.Thread(
-            target=lambda: _LoopbackV6(("::", WRAPPER_PORT), Handler).serve_forever(),
+            target=_v6.serve_forever,
             daemon=True,
             name="ufvai-wrapper-v6",
         ).start()
@@ -6829,6 +6959,11 @@ def launch():
             logger.info("Onboarding pendente: terminal não iniciado (sem chave).")
         elif _engine_ok:
             start_ttyd()
+            # v0.7.11-web32: o terminal tem de ficar RODANDO mesmo com a
+            # versão web à frente (e mesmo sem navegador aberto) — a vigia
+            # do servidor religa o ttyd se ele morrer.
+            _start_ttyd_watchdog()
+            _start_ttyd_watchdog_process()
         else:
             logger.info("Terminal não iniciado: motor OpenCode ausente.")
         boot.done(97)
@@ -6855,14 +6990,48 @@ def launch():
             ttyd_url = f"http://localhost:{TERMINAL_PORT}"
             banner_url = f"http://localhost:{WRAPPER_PORT}"
 
-        # v0.7.11-web: a janela principal mostra a SPA do OpenCode (não o ttyd).
-        # O proxy em 8002 injeta Basic auth + tema UFVAI e repassa SSE/assets.
+        # v0.7.11-web17: a janela principal mostra a **web nova** (cliente
+        # UFVAI escrito do zero). O servidor em 8002 serve o cliente, o
+        # contrato /api/ufvai/* e o stream SSE do motor — a senha do motor
+        # nunca chega ao navegador.
         try:
-            from . import ocweb
-            if not ocweb.start(OCWEB_PORT):
-                logger.warning("ocweb: porta %s indisponível; a interface web não subiu", OCWEB_PORT)
+            from . import webui_server
+            if not webui_server.start(OCWEB_PORT):
+                logger.warning(
+                    "webui: porta %s indisponível; a interface web não subiu", OCWEB_PORT
+                )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("ocweb: falha ao iniciar o proxy (%s)", exc)
+            logger.warning("webui: falha ao iniciar o servidor web (%s)", exc)
+
+        # v0.7.11-web30: o **supervisor** mantém uma segunda cópia do
+        # servidor web (porta 8003) rodando com o código mais recente —
+        # ele sobrevive à queda do próprio processo e é religado pelo
+        # wrapper quando a instância reinicia. Sem ele, a interface ficava
+        # presa no código do boot.
+        try:
+            _supervisor = Path(__file__).resolve().parent.parent / "scripts" / "webui_supervisor.sh"
+            if _supervisor.exists():
+                import subprocess as _subprocess
+
+                _supervisor_log = Path("/tmp/webui-8003.log")
+                _supervisor_log.parent.mkdir(parents=True, exist_ok=True)
+                with open(_supervisor_log, "ab") as _log:
+                    _subprocess.Popen(
+                        ["bash", str(_supervisor)],
+                        stdout=_log,
+                        stderr=_log,
+                        stdin=_subprocess.DEVNULL,
+                        start_new_session=True,
+                        # o supervisor serve o código a partir da MESMA
+                        # pasta do pacote que o boot está usando
+                        env={
+                            **os.environ,
+                            "UFVAI_WEBUI_SRC": str(Path(__file__).resolve().parent.parent),
+                        },
+                    )
+                logger.info("webui: supervisor da porta 8003 iniciado")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("webui: supervisor 8003 não iniciou (%s)", exc)
 
         boot.active("Preparando a interface web", 98)
         global _SESSION_TOKEN

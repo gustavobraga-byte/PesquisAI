@@ -102,7 +102,9 @@ RESPONSIVE_CSS: str = """
     position: fixed;
     top: 50px; right: 0;
     width: 280px; max-width: 85vw;
-    height: calc(100vh - 50px);
+    /* v0.7.11-web33: o menu do celular acompanha o viewport visível. */
+    height: calc(100vh - var(--topbar-h));
+    height: calc(var(--vp-h, 100dvh) - var(--topbar-h));
     background: var(--rail);
     border-left: 1px solid var(--line);
     transform: translateX(100%);
@@ -163,7 +165,10 @@ RESPONSIVE_CSS: str = """
     .mobile-menu .tb-btn svg,
     .mobile-menu .btn-provider svg { display: none !important; }
     .hamburger { display: inline-flex; }
-    #footer { padding: 0 8px; height: 36px; gap: 12px; }
+    /* v0.7.11-web33: a altura do rodapé vira VARIÁVEL — assim a moldura
+       (que usa --footer-h) continua encaixada exatamente acima dele. */
+    :root { --footer-h: 36px; }
+    #footer { padding: 0 8px; height: calc(var(--footer-h) + var(--safe-b)); gap: 12px; }
     /* v0.6.20-fix: rodapé mobile = SOMENTE ÍCONES (todo texto escondido).
        - .footer-link font-size:0 colapsa o texto do link; o SVG mantém tamanho fixo em px.
        - .footer-loc ("UFV · Viçosa, MG") sai TAMBÉM no mobile intermediário (480–767px),
@@ -181,8 +186,11 @@ RESPONSIVE_CSS: str = """
     .footer-right { gap: 10px; }
     .footer-right .btn-provider { gap: 0; }
     .footer-right .btn-provider span { display: none; }  /* "+ provedor" vira só o ícone */
-    /* terminal: ocupa mais espaço em mobile */
-    #terminal-frame { height: calc(100vh - 50px - 36px) !important; }
+    /* terminal: ocupa mais espaço em mobile.
+       v0.7.11-web33: a altura NÃO é mais calculada com 100vh (que no
+       celular é a altura MÁXIMA, com a barra de endereço escondida) —
+       quem manda é --frame-h, medido pelo viewport REALMENTE visível. */
+    #terminal-frame, #web-frame { height: var(--frame-h) !important; }
     /* modais: largura quase total */
     #modal, #provider-overlay > div, #health-overlay > div,
     #sessions-overlay > div, #shortcuts-overlay > div, #lang-overlay > div {
@@ -213,10 +221,11 @@ RESPONSIVE_CSS: str = """
 
   /* === Landscape em mobile (altura < 500px) === */
   @media (max-height: 500px) and (orientation: landscape) {
-    #topbar { height: 40px; }
+    :root { --topbar-h: 40px; --footer-h: 28px; }
+    #topbar { height: var(--topbar-h); }
     .logo { font-size: 12px; }
-    #footer { height: 28px; font-size: 9px; }
-    #terminal-frame { height: calc(100vh - 40px - 28px) !important; }
+    #footer { height: calc(var(--footer-h) + var(--safe-b)); font-size: 9px; }
+    #terminal-frame, #web-frame { height: var(--frame-h) !important; }
   }
 
   /* === Tablet/iPad portrait: esconde UFV footer === */
@@ -502,7 +511,7 @@ RESPONSIVE_CSS: str = """
     #memory-editor-body #memory-preview:not([style*="display: none"]) { display:block !important; }
   }
   @media (max-width: 479px) {
-    #memory-overlay > div { width: 100vw !important; max-width: 100vw !important; height: 100vh !important; max-height: 100vh !important; border-radius: 0 !important; }
+    #memory-overlay > div { width: 100vw !important; max-width: 100vw !important; height: var(--vp-h, 100dvh) !important; max-height: var(--vp-h, 100dvh) !important; border-radius: 0 !important; }
     #memory-sidebar { max-height: 42vh; }
   }
   @media (max-width: 380px) {
@@ -539,6 +548,7 @@ def create_wrapper_html(
     boot_id: str | None = None,
     web_mode: bool = False,
     ttyd_url: str | None = None,
+    web_url: str | None = None,
 ) -> str:
     """Cria a versão v0.4.1 do wrapper HTML do PesquisAI.
 
@@ -664,6 +674,19 @@ def create_wrapper_html(
       --red:        #e07070;
       --red-dim:    rgba(224,112,112,.12);
       --ov-dim:     rgba(4,7,11,.8);      /* v0.6.5: backdrop de modais no escuro */
+      /* v0.7.11-web33: geometria da interface no TELEFONE.
+         --frame-top/--frame-h são reescritos por JS a partir do
+         "viewport visual" (a área realmente visível da tela, já fora a
+         barra de endereço/teclado). É isso que impede o campo de texto
+         de ficar ATRÁS do rodapé: antes as molduras usavam
+         `calc(100vh - …)`, e 100vh no celular é a altura MÁXIMA (sem a
+         barra de endereço) — o rodapé da interface acabava 100 px abaixo
+         da tela e o compositor (campo de escrita) ficava fora de vista. */
+      --topbar-h:   50px;
+      --footer-h:   40px;
+      --safe-b:     env(safe-area-inset-bottom, 0px);
+      --frame-top:  var(--topbar-h);
+      --frame-h:    calc(100dvh - var(--topbar-h) - var(--footer-h) - var(--safe-b));
       --radius:     5px;
       --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
       --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -683,7 +706,7 @@ def create_wrapper_html(
 
     #topbar {
       position: fixed; inset: 0 0 auto 0;
-      height: 50px;
+      height: var(--topbar-h);
       background: var(--rail);
       border-bottom: 1px solid var(--line);
       display: flex; align-items: center;
@@ -704,6 +727,20 @@ def create_wrapper_html(
     .status-dot {
       width:7px; height:7px; border-radius:50%; background:var(--green);
       animation: pulse 2.4s ease infinite;
+    }
+    /* v0.7.11-web30: o ponto reflete o estado REAL do agente — verde e
+       pulsante = trabalhando; cinza e parado = ocioso. */
+    .status-dot.idle {
+      background: var(--ink-dim);
+      animation: none;
+    }
+    .status-dot.busy {
+      background: var(--amber);
+      animation: pulse-amber 1.1s ease infinite;
+    }
+    @keyframes pulse-amber {
+      0%,100% { box-shadow:0 0 0 0 rgba(209,167,5,.55); }
+      50%     { box-shadow:0 0 0 6px rgba(209,167,5,0); }
     }
     @keyframes pulse {
       0%,100% { box-shadow:0 0 0 0 rgba(93,186,126,.5); }
@@ -959,16 +996,30 @@ def create_wrapper_html(
     }
     .btn-ghost:hover { background: rgba(255,255,255,.08); color: var(--ink); }
 
-    #terminal-frame {
-      position: absolute;
-      inset: 50px 0 40px 0;
-      width: 100%; height: calc(100% - 90px);
+    /* v0.7.11-web33: as molduras são FIXAS e ocupam exatamente a faixa
+       visível entre o cabeçalho e o rodapé. Antes elas usavam
+       `inset: 50px 0 40px 0` + `height: calc(100% - 90px)`: a altura
+       vencia o `bottom` e, no telefone, 100% = altura MÁXIMA da tela —
+       o rodapé da interface ficava 100 px abaixo da área visível e o
+       CAMPO DE TEXTO (que fica no fim do compositor) ficava atrás do
+       rodapé, impossível de tocar. */
+    #terminal-frame, #web-frame {
+      position: fixed;
+      top: var(--frame-top);
+      left: 0; right: 0;
+      width: 100%;
+      height: var(--frame-h) !important;
       border: none;
     }
+    #terminal-frame { }
+    #terminal-frame.ufvai-hidden, #web-frame.ufvai-hidden { display: none; }
 
     #footer {
       position: fixed; inset: auto 0 0 0;
-      height: 40px;
+      /* v0.7.11-web33: a "safe area" do iPhone (o indicador home) é
+         somada ao rodapé — sem isso o rodapé cobre o compositor. */
+      height: calc(var(--footer-h) + var(--safe-b));
+      padding-bottom: var(--safe-b);
       background: var(--rail);
       border-top: 1px solid var(--line);
       display: flex; align-items: center;
@@ -1186,9 +1237,9 @@ def create_wrapper_html(
       <span>  <a href="https://github.com/gustavobraga-byte/PesquisAI/blob/main/CHANGELOG.md" target="_blank" class="logo-tag"> v{__VERSION__} </a> </span>
     </div>
 
-    <div class="status">
-      <span class="status-dot"></span>
-      <span data-i18n="ui.status_active">agente ativo</span>
+    <div class="status" id="agent-status" title="Estado do agente">
+      <span class="status-dot idle" id="agent-status-dot"></span>
+      <span data-i18n="ui.status_active" id="agent-status-text">agente ativo</span>
     </div>
 
     <div class="tb-icons">
@@ -1303,7 +1354,7 @@ def create_wrapper_html(
     <img class="boot-logo" src="/assets/logo-oficial-288.jpg" alt="UFVAI"
          onerror="this.style.display='none'">
     <div class="boot-spinner" aria-hidden="true"></div>
-    <div class="boot-status" id="boot-status" data-i18n="boot.starting">Iniciando terminal…</div>
+    <div class="boot-status" id="boot-status" data-i18n="boot.starting_web">Carregando a interface…</div>
     <div class="boot-bar" aria-hidden="true"></div>
     <div class="boot-error" id="boot-error" style="display:none;"></div>
     <button class="boot-retry" id="boot-retry" style="display:none;"
@@ -1314,6 +1365,20 @@ def create_wrapper_html(
   id="terminal-frame"
   src="about:blank"
   data-terminal-url="{__TERMINAL_URL__}"
+  allow="clipboard-read; clipboard-write"
+  tabindex="0"
+  style="width:100%; height:calc(100% - 90px); border:none; outline:none;">
+</iframe>
+
+ <!-- v0.7.11-web18: terminal e web convivem em DUAS molduras.
+      Alternar a visão alterna a VISIBILIDADE: nenhuma das duas é
+      recarregada — a sessão do agente continua viva no ttyd e a web
+      mantém o stream SSE aberto em segundo plano. -->
+ <iframe
+  id="web-frame"
+  class="ufvai-hidden"
+  src="about:blank"
+  data-web-url="{__WEB_URL__}"
   allow="clipboard-read; clipboard-write"
   tabindex="0"
   style="width:100%; height:calc(100% - 90px); border:none; outline:none;">
@@ -1572,6 +1637,20 @@ def create_wrapper_html(
         <div class="shortcut-row"><span data-i18n="shortcuts.model">Alterar modelo</span><span class="shortcut-key">Ctrl+X m</span></div>
         <div class="shortcut-row"><span data-i18n="shortcuts.history_prev">Histórico anterior</span><span class="shortcut-key">↑</span></div>
         <div class="shortcut-row"><span data-i18n="shortcuts.history_next">Histórico seguinte</span><span class="shortcut-key">↓</span></div>
+      </div>
+      <!-- v0.7.11-web23: atalhos da interface web (o cliente novo) -->
+      <div style="border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;">
+        <div class="shortcut-row" style="font-weight:700;"><span data-i18n="shortcuts.web">Interface web</span><span class="shortcut-key">web</span></div>
+        <div class="shortcut-row"><span data-i18n="shortcuts.web_send">Enviar mensagem</span><span class="shortcut-key">Enter</span></div>
+        <div class="shortcut-row"><span data-i18n="shortcuts.web_newline">Nova linha</span><span class="shortcut-key">Shift+Enter</span></div>
+        <div class="shortcut-row"><span data-i18n="shortcuts.web_commands">Abrir comandos</span><span class="shortcut-key">/</span></div>
+        <div class="shortcut-row"><span data-i18n="shortcuts.web_mention">Mencionar habilidade/arquivo</span><span class="shortcut-key">@</span></div>
+        <div class="shortcut-row"><span data-i18n="shortcuts.web_expand">Expandir/recolher tudo</span><span class="shortcut-key">Ctrl+Shift+A</span></div>
+        <div class="shortcut-row"><span data-i18n="shortcuts.web_sidebar">Ocultar/mostrar sessões</span><span class="shortcut-key">Ctrl+\\</span></div>
+        <div class="shortcut-row"><span data-i18n="shortcuts.web_attach">Anexar arquivo</span><span class="shortcut-key">Ctrl+U</span></div>
+        <div class="shortcut-row"><span data-i18n="shortcuts.web_search">Buscar sessões</span><span class="shortcut-key">Ctrl+K</span></div>
+        <div class="shortcut-row"><span data-i18n="shortcuts.web_focus">Focar o campo de mensagem</span><span class="shortcut-key">Ctrl+L</span></div>
+        <div class="shortcut-row"><span data-i18n="shortcuts.web_interrupt">Interromper / fechar menus</span><span class="shortcut-key">Esc</span></div>
       </div>
       <button onclick="closeShortcuts()" class="modal-close" data-i18n="ui.close">Fechar</button>
     </div>
@@ -1959,6 +2038,109 @@ def create_wrapper_html(
 
     let _currentLang = getCurrentLang();
 
+    // v0.7.11-web30: estado REAL do agente no cabeçalho do wrapper.
+    // O texto era fixo ("agente ativo") e não dizia nada sobre o que o
+    // modelo estava fazendo. Agora o ponto e o rótulo seguem o motor:
+    // verde pulsante = trabalhando · âmbar = ocupado · cinza = ocioso.
+    var _agentStateTimer = null;
+    var _agentStateBusy = null;
+
+    function _agentStateText(busy) {
+      var dict = I18N[_currentLang] || I18N["pt_BR"] || {};
+      var key = busy ? "ui.status_active" : "ui.status_idle";
+      var txt = dict[key];
+      if (!txt) txt = busy ? "agente ativo" : "agente ocioso";
+      return txt;
+    }
+
+    function _renderAgentState(busy) {
+      if (_agentStateBusy === busy) return;
+      _agentStateBusy = busy;
+      var dot = document.getElementById("agent-status-dot");
+      var txt = document.getElementById("agent-status-text");
+      if (dot) {
+        dot.classList.toggle("idle", !busy);
+        dot.classList.toggle("busy", !!busy);
+      }
+      if (txt) txt.textContent = _agentStateText(!!busy);
+    }
+
+    function _pollAgentState() {
+      // v0.7.11-web30: pergunta ao GATEWAY (a web nova), que é sempre a
+      // versão atual — o servidor do wrapper pode ser de um boot antigo.
+      var webUrl = "";
+      var frame = document.getElementById("web-frame");
+      if (frame) webUrl = frame.getAttribute("data-web-url") || "";
+      var urls = [];
+      if (webUrl) urls.push(webUrl.replace(/[/]+$/, "") + "/api/ufvai/agent-state");
+      urls.push(BASE + "/__ufvai/agent-state");
+      var i = 0;
+      function tentar() {
+        if (i >= urls.length) return;
+        var url = urls[i++];
+        fetch(url, { cache: "no-store" })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) {
+            if (d) { _renderAgentState(!!d.busy); return; }
+            tentar();
+          })
+          .catch(function () { tentar(); });
+      }
+      tentar();
+    }
+
+    function _startAgentStatePoll() {
+      _pollAgentState();
+      if (_agentStateTimer) clearInterval(_agentStateTimer);
+      _agentStateTimer = setInterval(_pollAgentState, 2000);
+    }
+
+    // ── v0.7.11-web33: a moldura (web OU terminal) ocupa exatamente a
+    // faixa VISÍVEL entre o cabeçalho e o rodapé.
+    //
+    // Por que isso importa no telefone: a barra de endereço do navegador
+    // (ou o teclado) come uma fatia da tela. Com `height: calc(100vh - …)`
+    // a moldura usava a altura MÁXIMA e o rodapé da interface ficava
+    // ~100 px ABAIXO da área visível — o campo de escrita (que fica no
+    // fim do compositor) ficava atrás do rodapé, impossível de tocar.
+    //
+    // Aqui a altura vem do "viewport visual" (a área realmente visível,
+    // já fora a barra de endereço e o teclado) e é medida a partir do
+    // cabeçalho/rodapé REAIS (renderizados) — com a "safe area" do
+    // iPhone já embutida.
+    function _syncViewport() {
+      try {
+        var vv = window.visualViewport;
+        var head = document.getElementById("topbar");
+        var foot = document.getElementById("footer");
+        var hh = head ? head.getBoundingClientRect().height : 50;
+        var fh = foot ? foot.getBoundingClientRect().height : 40;
+        var vh = vv ? vv.height : window.innerHeight;
+        var offTop = vv ? (vv.offsetTop || 0) : 0;
+        var frameTop = offTop + hh;
+        var frameH = Math.max(140, Math.round(vh - offTop - hh - fh));
+        var root = document.documentElement;
+        root.style.setProperty("--frame-top", frameTop + "px");
+        root.style.setProperty("--frame-h", frameH + "px");
+        /* a altura realmente visível (menu, folhas de tela cheia) */
+        root.style.setProperty("--vp-h", Math.round(vh - offTop) + "px");
+      } catch (err) {}
+    }
+    function _watchViewport() {
+      _syncViewport();
+      try {
+        window.addEventListener("resize", _syncViewport);
+        window.addEventListener("orientationchange", function () {
+          setTimeout(_syncViewport, 120);
+          setTimeout(_syncViewport, 400);
+        });
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener("resize", _syncViewport);
+          window.visualViewport.addEventListener("scroll", _syncViewport);
+        }
+      } catch (err) {}
+    }
+
     function applyLang(lang) {
       if (!LANGS[lang]) lang = "pt_BR";
       _currentLang = lang;
@@ -1971,6 +2153,10 @@ def create_wrapper_html(
         const key = el.getAttribute("data-i18n");
         if (dict[key]) el.textContent = dict[key];
       });
+      // 2.1 v0.7.11-web30: o rótulo do estado do agente depende do
+      // estado real (não é só a tradução) — reaplica com o texto certo.
+      var _st = document.getElementById("agent-status-text");
+      if (_st) _st.textContent = _agentStateText(!!_agentStateBusy);
       // 3. Atualiza títulos (data-i18n-title)
       document.querySelectorAll("[data-i18n-title]").forEach(el => {
         const key = el.getAttribute("data-i18n-title");
@@ -2005,6 +2191,8 @@ def create_wrapper_html(
           renderRestore();
         }
       } catch (e) {}
+      // v0.7.11-web23: propaga o idioma para a interface web (moldura).
+      try { _postLangToFrame(); } catch (e) {}
       // v0.7.11: o status da VPN é dinâmico — o applyLang() acima reescreveu
       // o texto fixo; pede ao painel para redesenhar com o estado real.
       try { if (window.vpnRefresh) window.vpnRefresh(); } catch (e) {}
@@ -2825,12 +3013,15 @@ def create_wrapper_html(
 
     // Recarrega o iframe do ttyd (usado após salvar key/trocar tema/restaurar sessão)
     async function reloadTerminalFrame() {
+      // v0.7.11-web18: recarrega SÓ o terminal — a web continua viva
+      // (stream SSE aberto, mensagens carregadas, rolagem preservada).
       const fr = document.getElementById("terminal-frame");
       if (!fr) return;
       const theme = document.documentElement.getAttribute("data-theme") || "pesquisai";
-      // v0.6.5: fonte da verdade agora é data-terminal-url (src pode ser
-      // about:blank enquanto o splash aguarda /api/ttyd_ready).
-      let origSrc = _frameUrl(_console);
+      // v0.7.11-web32: a moldura do TERMINAL aponta SEMPRE para o ttyd.
+      // Antes usava `_frameUrl(_console)`, que com a web à frente (novo
+      // padrão) colocava a WEB dentro da moldura do terminal.
+      let origSrc = _frameUrl("ttyd");
       if (!origSrc && fr.src && fr.src.indexOf("about:") !== 0) origSrc = fr.src;
       origSrc = (origSrc || "{__TERMINAL_URL__}").split("?")[0];
       if (!origSrc || origSrc === "about:blank") return;
@@ -2839,7 +3030,8 @@ def create_wrapper_html(
       _sessionsCache = { data: null, ts: 0 };
       // v0.6.5: reconecta somente com a porta respondendo (evita erro do
       // Chrome dentro do iframe); se morto, delega ao boot com splash.
-      const quick = await waitTerminalReady(3000);
+      // v0.7.11-web32: espera a PRONTIDÃO DO TTYD (não a da vista visível).
+      const quick = await waitTerminalReady(3000, _readyUrlTtyd());
       if (!quick) { bootTerminal(25000); return; }
       fr.src = origSrc + "?theme=" + theme + "&t=" + Date.now();
     }
@@ -4255,6 +4447,9 @@ def create_wrapper_html(
           applyWrapperTheme(next);
           setCookie(THEME_COOKIE, next);
           try { localStorage.setItem(THEME_COOKIE, next); } catch (e) {}
+          // v0.7.11-web20: o tema vai para as DUAS molduras imediatamente —
+          // o botão do cabeçalho tem de mudar o tema da web em qualquer modo.
+          _postThemeToFrame();
 
           // 2. 🐛 FIX: Recarrega iframe do ttyd para que o terminal
           //    seja renderizado com o novo tema. Mesmo padrão usado em
@@ -4275,6 +4470,8 @@ def create_wrapper_html(
             fr.src = "about:blank";
             setTimeout(() => {
               fr.src = origSrc + "?theme=" + next + "&t=" + Date.now();
+              // v0.7.11-web18: a web escondida também recebe o tema.
+              _postThemeToFrame();
               toast("✅ " + (dict["theme.terminal_reloaded"] || "Terminal recarregado com novo tema"), "ok");
             }, 3500);
           }
@@ -4379,7 +4576,11 @@ def create_wrapper_html(
     const TERMINAL_URL = (document.getElementById("terminal-frame") || {}).dataset
       ? (document.getElementById("terminal-frame").dataset.terminalUrl || "")
       : "";
-    const WEB_URL = TERMINAL_URL;
+    // v0.7.11-web18: a web tem URL própria (pode ser outra porta); se não
+    // houver, cai na URL do proxy (8002).
+    const WEB_URL = (document.getElementById("web-frame") || {}).dataset
+      ? (document.getElementById("web-frame").dataset.webUrl || TERMINAL_URL)
+      : TERMINAL_URL;
     const TTYD_URL = (function () {
       var u = "{__TTYD_URL__}";
       if (u) return u;
@@ -4388,37 +4589,86 @@ def create_wrapper_html(
       if (/:8001$/.test(o)) return o.replace(":8001", ":8000") + "/";
       return "";
     })();
-    // v0.8.0 (web15): o TERMINAL é a visão padrão ao abrir a interface.
-    // A chave v2 ignora o "web" gravado por versões anteriores (migração
-    // única); depois disso, a escolha feita no botão continua valendo.
-    const _CONSOLE_KEY = "ufvai.console.v2";
+    // v0.7.11-web32: a VERSÃO WEB é a visão padrão ao abrir a interface.
+    //
+    // Antes (web15) o padrão era o TERMINAL e a escolha ficava gravada em
+    // "ufvai.console.v2" — o que mantinha o terminal à frente mesmo depois
+    // das correções da web (botão de parar, spirale, caminhos clicáveis).
+    // Agora:
+    //   · a WEB abre por padrão (a chave antiga é ignorada de propósito);
+    //   · ?view=terminal (ou ?view=ttyd) abre no terminal, sob demanda;
+    //   · o TERMINAL CONTINUA RODANDO em segundo plano (a moldura fica
+    //     carregada e o ttyd conectado) — a sessão do agente não morre
+    //     enquanto a web está à frente.
+    const _CONSOLE_KEY = "ufvai.console.v3";
     const READY_URL_WEB = "{__READY_URL__}";
-    let _console = (function () {
+    const READY_URL_TTYD = "/api/ttyd_ready";
+    const _VIEW_PARAM = (function () {
       try {
-        var saved = localStorage.getItem(_CONSOLE_KEY);
-        if (saved === "ttyd" || saved === "web") return saved;
-      } catch (e) {}
-      return TTYD_URL ? "ttyd" : "web";
+        return String(new URLSearchParams(location.search).get("view") || "").toLowerCase();
+      } catch (e) { return ""; }
+    })();
+    let _console = (function () {
+      if ((_VIEW_PARAM === "terminal" || _VIEW_PARAM === "ttyd") && TTYD_URL) return "ttyd";
+      return "web";
     })();
     function _readyUrl() {
-      return (_console === "ttyd" && TTYD_URL) ? "/api/ttyd_ready" : READY_URL_WEB;
+      return (_console === "ttyd" && TTYD_URL) ? READY_URL_TTYD : READY_URL_WEB;
     }
+    // v0.7.11-web32: o terminal tem endpoints PRÓPRIOS — a vigia do ttyd
+    // (e a recarga da moldura do terminal) nunca podem depender da vista
+    // visível, senão o terminal deixa de ser vigiado quando a web está à
+    // frente (e é exatamente quando ele precisa continuar vivo).
+    function _readyUrlTtyd() { return READY_URL_TTYD; }
     function _currentTheme() {
       return (document.documentElement.getAttribute("data-theme") === "pesquisai-light")
         ? "light" : "dark";
     }
     function _postThemeToFrame() {
-      const fr = document.getElementById("terminal-frame");
-      if (!fr || !fr.contentWindow) return;
-      try {
-        fr.contentWindow.postMessage({ type: "ufvai-theme", theme: _currentTheme() }, "*");
-      } catch (e) {}
+      // v0.7.11-web18: as duas molduras (mesmo a que está escondida) recebem
+      // o tema — ao alternar, a visão escondida já está pronta.
+      // v0.7.11-web20: envia o valor CANÔNICO do UFVAI ("pesquisai" /
+      // "pesquisai-light"); antes era "light"/"dark" e a web não reconhecia.
+      var _t = (document.documentElement.getAttribute("data-theme") === "pesquisai-light")
+        ? "pesquisai-light" : "pesquisai";
+      ["terminal-frame", "web-frame"].forEach(function (id) {
+        const fr = document.getElementById(id);
+        if (!fr || !fr.contentWindow) return;
+        try {
+          fr.contentWindow.postMessage({ type: "ufvai-theme", theme: _t }, "*");
+        } catch (e) {}
+      });
     }
     (function _bindThemeSync() {
-      const fr = document.getElementById("terminal-frame");
-      if (!fr) return;
-      fr.addEventListener("load", function () {
-        setTimeout(_postThemeToFrame, 60);
+      ["terminal-frame", "web-frame"].forEach(function (id) {
+        const fr = document.getElementById(id);
+        if (!fr) return;
+        fr.addEventListener("load", function () {
+          setTimeout(_postThemeToFrame, 60);
+        });
+      });
+    })();
+    // v0.7.11-web23: o idioma da interface principal é a fonte da verdade
+    // para a web — trocar o idioma aqui troca o da interface web na hora
+    // (sem recarregar a moldura).
+    function _postLangToFrame() {
+      var _map = { pt_BR: "pt-BR", en_US: "en", es_ES: "es", fr_FR: "fr", zh_CN: "zh" };
+      var _l = _map[_currentLang] || _currentLang || "pt-BR";
+      ["terminal-frame", "web-frame"].forEach(function (id) {
+        const fr = document.getElementById(id);
+        if (!fr || !fr.contentWindow) return;
+        try {
+          fr.contentWindow.postMessage({ type: "ufvai-lang", lang: _l }, "*");
+        } catch (e) {}
+      });
+    }
+    (function _bindLangSync() {
+      ["terminal-frame", "web-frame"].forEach(function (id) {
+        const fr = document.getElementById(id);
+        if (!fr) return;
+        fr.addEventListener("load", function () {
+          setTimeout(_postLangToFrame, 80);
+        });
       });
     })();
     function _frameUrl(mode) {
@@ -4426,16 +4676,152 @@ def create_wrapper_html(
       const sep = WEB_URL.indexOf("?") < 0 ? "?" : "&";
       return WEB_URL + sep + "theme=" + _currentTheme();
     }
-    function applyConsole(mode) {
-      const fr = document.getElementById("terminal-frame");
-      if (!fr) return;
-      _console = (mode === "ttyd" && TTYD_URL) ? "ttyd" : "web";
-      try { localStorage.setItem(_CONSOLE_KEY, _console); } catch (e) {}
+    // v0.7.11-web32: carrega uma moldura UMA vez e nunca a descarrega.
+    // O terminal é carregado SEMPRE (mesmo escondido) para que o ttyd
+    // fique conectado e a sessão do agente continue viva com a web à frente.
+    function _ensureFrameLoaded(mode, id) {
+      var fr = document.getElementById(id);
+      if (!fr || fr.dataset.loaded) return fr;
+      // v0.7.11-web32: sem URL do ttyd não há terminal para carregar —
+      // (nunca cai para a URL da web dentro da moldura do terminal).
+      if (mode === "ttyd" && !TTYD_URL) return fr;
+      fr.dataset.loaded = "1";
+      fr.src = _frameUrl(mode);
+      if (mode === "web") _watchWebFrame(fr);
+      return fr;
+    }
+    function applyConsole(mode, userInitiated) {
+      const target = (mode === "ttyd" && TTYD_URL) ? "ttyd" : "web";
+      _console = target;
+      // v0.7.11-web32: a preferência só é gravada quando o USUÁRIO troca
+      // a visão — e ela não define a visão inicial (a web é o padrão).
+      try {
+        if (userInitiated) localStorage.setItem(_CONSOLE_KEY, _console);
+        else localStorage.removeItem("ufvai.console.v2");
+      } catch (e) {}
       const b = document.getElementById("console-toggle");
       if (b) { b.dataset.mode = _console; b.setAttribute("aria-label", _console); }
-      fr.src = _frameUrl(_console);
+      // v0.7.11-web18: cada visão tem sua própria moldura e é carregada UMA
+      // vez. Alternar só muda a visibilidade — o ttyd mantém a sessão do
+      // agente e a web mantém o SSE aberto (nada recarrega, nada reconecta).
+      // v0.7.11-web32: as DUAS molduras são carregadas no boot (a web à
+      // frente, o terminal em segundo plano) — o terminal segue rodando.
+      [["ttyd", "terminal-frame"], ["web", "web-frame"]].forEach(function (pair) {
+        _ensureFrameLoaded(pair[0], pair[1]);
+      });
+      [["ttyd", "terminal-frame"], ["web", "web-frame"]].forEach(function (pair) {
+        const fr = document.getElementById(pair[1]);
+        if (!fr) return;
+        if (pair[0] === target) {
+          fr.classList.remove("ufvai-hidden");
+        } else {
+          fr.classList.add("ufvai-hidden");
+        }
+      });
+      // v0.7.11-web24: avisa as molduras qual vista está visível — a web só
+      // segue o foco do terminal quando o terminal está à frente (sem isso
+      // ela puxava o usuário para outra sessão no meio do turno).
+      ["terminal-frame", "web-frame"].forEach(function (id) {
+        const fr = document.getElementById(id);
+        if (!fr || !fr.contentWindow) return;
+        try {
+          fr.contentWindow.postMessage({ type: "ufvai-view", view: target }, "*");
+        } catch (e) {}
+      });
     }
-    function toggleConsole() { applyConsole(_console === "web" ? "ttyd" : "web"); }
+    // v0.7.11-web23: a web pede a troca para o terminal (comandos que só
+    // existem na TUI, como /undo, /themes, /diff).
+    window.addEventListener("message", function (e) {
+      var d = e && e.data;
+      if (!d) return;
+      if (d.type === "ufvai-show-terminal") {
+        try { applyConsole("ttyd", true); } catch (err) {}
+        var cmd = String(d.command || "");
+        if (!cmd) return;
+        // escreve o comando no terminal (ttyd) — o TUI completa o resto
+        try {
+          var fr = document.getElementById("terminal-frame");
+          if (fr && fr.contentWindow) fr.contentWindow.postMessage({ type: "ufvai-type", text: cmd }, "*");
+        } catch (err) {}
+        return;
+      }
+      // v0.7.11-web25: a web mostra/edita a configuração de autosave (que
+      // vive no wrapper — origens diferentes não compartilham localStorage).
+      if (d.type === "ufvai-autosave-get") {
+        _replyAutosaveState(e);
+        return;
+      }
+      if (d.type === "ufvai-autosave-set") {
+        _applyAutosaveFromWeb(d.payload || {});
+        try { if (e.source) e.source.postMessage({ type: "ufvai-autosave-saved" }, "*"); } catch (err) {}
+      }
+    });
+    // Estado do autosave para a interface web.
+    function _replyAutosaveState(e) {
+      var payload = {
+        enabled: autosaveEnabled(),
+        intervalMin: Math.max(1, Math.round(autosaveIntervalMs() / 60000)),
+        scope: autosaveScope(),
+        selectedIds: autosaveSelectedIds(),
+        sessions: []
+      };
+      try {
+        var list = [];
+        fetch(BASE + "/api/sessions").then(function (r) { return r.json(); }).then(function (d) {
+          (d.sessions || []).forEach(function (s) { list.push({ id: s.id, title: s.title || s.id }); });
+        }).catch(function () {});
+      } catch (err) {}
+      if (e && e.source) {
+        try { e.source.postMessage({ type: "ufvai-autosave-state", payload: payload }, "*"); } catch (err) {}
+      }
+    }
+    // Aplica o que veio da web.
+    function _applyAutosaveFromWeb(p) {
+      try {
+        if (typeof p.enabled === "boolean") {
+          localStorage.setItem(AUTOSAVE_KEY, p.enabled ? "1" : "0");
+        }
+        if (p.intervalMin) {
+          var min = Math.max(1, parseInt(p.intervalMin, 10) || 1);
+          localStorage.setItem(AUTOSAVE_INTERVAL_KEY, String(min));
+        }
+        if (p.scope) {
+          localStorage.setItem(AUTOSAVE_SCOPE_KEY, String(p.scope));
+          localStorage.setItem(AUTOSAVE_ALL_KEY, p.scope === "all" ? "1" : "0");
+        }
+        if (Array.isArray(p.selectedIds)) {
+          localStorage.setItem(AUTOSAVE_SELECTED_KEY, JSON.stringify(p.selectedIds));
+        }
+      } catch (e) {}
+      try { setAutosaveAllUI(autosaveScope() === "all"); } catch (e) {}
+      try { if (autosaveEnabled()) startAutosaveTimer(); else stopAutosaveTimer(); } catch (e) {}
+    }
+    // v0.7.11-web18b: confirma que a web respondeu. Se a URL da web não
+    // existir (porta trocada, proxy antigo), a moldura cai no proxy 8002
+    // em vez de ficar em branco.
+    function _watchWebFrame(fr) {
+      if (!fr) return;
+      fr.addEventListener("load", function () {
+        var answered = false;
+        var onMsg = function (e) {
+          if (!e.data || e.data.type !== "ufvai-pong") return;
+          answered = true;
+          window.removeEventListener("message", onMsg);
+        };
+        window.addEventListener("message", onMsg);
+        try { fr.contentWindow.postMessage({ type: "ufvai-ping" }, "*"); }
+        catch (e) { answered = true; }
+        setTimeout(function () {
+          if (answered) return;
+          window.removeEventListener("message", onMsg);
+          var fallback = TERMINAL_URL;
+          if (!fallback || fr.src.indexOf(fallback) === -1) return;
+          var sep = fallback.indexOf("?") < 0 ? "?" : "&";
+          fr.src = fallback + sep + "theme=" + _currentTheme();
+        }, 4000);
+      }, { once: true });
+    }
+    function toggleConsole() { applyConsole(_console === "web" ? "ttyd" : "web", true); }
 
     function _bootEls() {
       return {
@@ -4476,12 +4862,15 @@ def create_wrapper_html(
     let _ttydPid = null;
     let _ttydWatch = null;
 
-    async function waitTerminalReady(maxMs) {
+    async function waitTerminalReady(maxMs, url) {
       const t0 = Date.now();
       maxMs = maxMs || 30000;
+      // v0.7.11-web32: o endpoint pode ser explicitado (prontidão do ttyd
+      // para a vigia do terminal, independentemente da vista visível).
+      const endpoint = url || _readyUrl();
       while (Date.now() - t0 < maxMs) {
         try {
-          const r = await fetch(BASE + _readyUrl(), { cache: "no-store" });
+          const r = await fetch(BASE + endpoint, { cache: "no-store" });
           if (r.ok) {
             const d = await r.json();
             if (d.ready) { if (d.pid) _ttydPid = d.pid; return true; }
@@ -4492,10 +4881,44 @@ def create_wrapper_html(
       return false;
     }
 
+    // v0.7.11-web32: vigia do TERMINAL. É armada SEMPRE (na inicialização),
+    // e não só quando o boot tem sucesso — se a web demorar ou falhar, o
+    // terminal continua Precisionado: é ele que religa a moldura quando o
+    // ttyd é reiniciado por baixo.
+    function _startTtydWatch() {
+      if (_ttydWatch) return;
+      _ttydWatch = setInterval(async () => {
+        try {
+          // v0.7.11-web32: a vigia do terminal SEMPRE consulta o ttyd —
+          // mesmo com a web à frente. É ela que mantém o terminal vivo.
+          const r = await fetch(BASE + _readyUrlTtyd(), { cache: "no-store" });
+          if (!r.ok) return;
+          const d = await r.json();
+          if (!d.ready || !d.pid) return;
+          if (_ttydPid === null) { _ttydPid = d.pid; return; }
+          if (d.pid === _ttydPid) return;
+          _ttydPid = d.pid;                 // ttyd reiniciado por baixo
+          const f = document.getElementById("terminal-frame");
+          // v0.7.11-web18: só mexe na moldura do terminal (e só se ela
+          // já tiver sido carregada uma vez).
+          if (f && f.dataset.loaded) {
+            try { f.contentWindow.location.reload(); }
+            catch (e) { f.src = _frameUrl("ttyd"); }
+          }
+        } catch (e) {}
+      }, 20000);
+    }
+
     async function bootTerminal(maxMs) {
       const el = _bootEls();
       if (!el.frame || !TERMINAL_URL) { hideBootSplash(); return; }
-      showBootSplash(_bootDict()["boot.starting"] || "Iniciando terminal…");
+      // v0.7.11-web32: o splash anuncia a VISÃO que está abrindo (a web, por
+      // padrão) — e o terminal sobe em paralelo, sem esperar.
+      const dict0 = _bootDict();
+      const webFirst = (_console !== "ttyd");
+      showBootSplash(webFirst
+        ? (dict0["boot.starting_web"] || "Carregando a interface…")
+        : (dict0["boot.starting"] || "Iniciando terminal…"));
       const ok = await waitTerminalReady(maxMs);
       if (!ok) {
         const dict = _bootDict();
@@ -4513,26 +4936,19 @@ def create_wrapper_html(
         return;
       }
       let loaded = false;
-      el.frame.onload = () => { loaded = true; hideBootSplash(); };
-      el.frame.src = _frameUrl(_console);
-      if (!_ttydWatch) {
-        _ttydWatch = setInterval(async () => {
-          try {
-            const r = await fetch(BASE + _readyUrl(), { cache: "no-store" });
-            if (!r.ok) return;
-            const d = await r.json();
-            if (!d.ready || !d.pid) return;
-            if (_ttydPid === null) { _ttydPid = d.pid; return; }
-            if (d.pid === _ttydPid) return;
-            _ttydPid = d.pid;                 // ttyd reiniciado por baixo
-            const f = document.getElementById("terminal-frame");
-            if (f) {
-              try { f.contentWindow.location.reload(); }
-              catch (e) { f.src = _frameUrl(_console); }
-            }
-          } catch (e) {}
-        }, 20000);
-      }
+      // v0.7.11-web32: o splash espera a moldura VISÍVEL (a web, por padrão).
+      const activeFrame = document.getElementById(
+        _console === "web" ? "web-frame" : "terminal-frame");
+      const markLoaded = function () { loaded = true; hideBootSplash(); };
+      if (activeFrame) activeFrame.addEventListener("load", markLoaded);
+      // v0.7.11-web18/web32: applyConsole carrega as DUAS visões (uma vez
+      // só) e deixa visível a atual — o terminal segue rodando em segundo
+      // plano, com o ttyd conectado.
+      applyConsole(_console);
+      if (activeFrame === el.frame) el.frame.onload = markLoaded;
+      // v0.7.11-web32: a vigia do terminal é armada aqui (e também na
+      // inicialização) — nunca depende do sucesso do boot.
+      _startTtydWatch();
       setTimeout(() => { if (!loaded) hideBootSplash(); }, 8000); // fallback visual
     }
 
@@ -4929,6 +5345,16 @@ def create_wrapper_html(
       // 1. Aplica idioma (síncrono, sem flash)
       applyLang(_currentLang);
       buildLangMenu();
+      // 1.0 v0.7.11-web30: o cabeçalho passa a mostrar se o agente está
+      // ATIVO (trabalhando) ou OCIOSO — antes era um texto fixo.
+      _startAgentStatePoll();
+      // 1.05 v0.7.11-web32: a vigia do TERMINAL é armada já na abertura —
+      // o terminal precisa continuar rodando com a web à frente.
+      _startTtydWatch();
+      // 1.06 v0.7.11-web33: a moldura passa a ocupar a faixa VISÍVEL
+      // (viewport real) — no telefone é o que mantém o campo de escrita
+      // acima do rodapé e dentro da tela.
+      _watchViewport();
       // 1.1 v0.7.0/v0.7.3: chave do autosave + timer de 1 min + pergunta de retomada
       setAutosaveUI(autosaveEnabled());
       setAutosaveAllUI(autosaveAllSessions());
@@ -6712,6 +7138,189 @@ def create_wrapper_html(
   }catch(e){}
 })();
 </script>
+<!-- ═══ web34 (2026-11-16): camada visual "Produtividade" ═══
+     ADITIVA: só pintura (cores, bordas, raios, sombras, foco, transições).
+     Não altera geometria (--topbar-h/--footer-h/--frame-h do web33),
+     não remove nenhum seletor, função ou comportamento existente.
+     As variáveis clássicas continuam sendo geridas pelo JS de tema
+     (applyWrapperTheme); aqui usam-se tokens novos --w34-*. -->
+<style id="ufvai-web34">
+  :root {
+    --w34-surface: #0f151c;
+    --w34-rail:    #151d26;
+    --w34-card:    #141c25;
+    --w34-card-2:  #1d2733;
+    --w34-accent:  #c2a057;
+    --w34-bright:  #d9bc7a;
+    --w34-grad:    linear-gradient(135deg, #d9bc7a 0%, #c2a057 48%, #a9883f 100%);
+    --w34-line:    rgba(255,255,255,.08);
+    --w34-line-2:  rgba(255,255,255,.17);
+    --w34-glass:   rgba(21,29,38,.82);
+    --w34-elev-1:  0 1px 2px rgba(0,0,0,.35), 0 4px 14px rgba(0,0,0,.25);
+    --w34-elev-2:  0 6px 24px rgba(0,0,0,.45), 0 18px 48px rgba(0,0,0,.35);
+    --w34-ring:    0 0 0 3px rgba(194,160,87,.28);
+    --w34-t:       .16s cubic-bezier(.4,0,.2,1);
+  }
+  html.theme-light {
+    --w34-surface: #f6f5f1;
+    --w34-rail:    #fdfdfb;
+    --w34-card:    #ffffff;
+    --w34-card-2:  #efeee8;
+    --w34-accent:  #8a6d33;
+    --w34-bright:  #a9883f;
+    --w34-grad:    linear-gradient(135deg, #b8944a 0%, #8a6d33 55%, #6d5626 100%);
+    --w34-line:    rgba(32,38,43,.10);
+    --w34-line-2:  rgba(32,38,43,.22);
+    --w34-glass:   rgba(253,253,251,.85);
+    --w34-elev-1:  0 1px 2px rgba(32,38,43,.07), 0 4px 14px rgba(32,38,43,.08);
+    --w34-elev-2:  0 6px 24px rgba(32,38,43,.14), 0 18px 48px rgba(32,38,43,.12);
+    --w34-ring:    0 0 0 3px rgba(138,109,51,.22);
+  }
+
+  html, body { background: var(--w34-surface); }
+  body {
+    background-image:
+      radial-gradient(1100px 500px at 85% -10%, rgba(194,160,87,.05), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(99,197,134,.035), transparent 55%);
+  }
+  html.theme-light body {
+    background-image:
+      radial-gradient(1100px 500px at 85% -10%, rgba(138,109,51,.06), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(46,125,50,.04), transparent 55%);
+  }
+  ::selection { background: rgba(194,160,87,.30); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--w34-line-2); border-radius: 99px;
+    border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background-color: rgba(194,160,87,.55); }
+  :focus-visible { outline: none; box-shadow: var(--w34-ring); }
+
+  /* ── cabeçalho e rodapé: vidro fosco, hairline ── */
+  #topbar {
+    background: var(--w34-glass);
+    -webkit-backdrop-filter: blur(14px) saturate(1.25);
+    backdrop-filter: blur(14px) saturate(1.25);
+    border-bottom: 1px solid var(--w34-line);
+  }
+  #footer {
+    background: var(--w34-glass);
+    -webkit-backdrop-filter: blur(14px) saturate(1.25);
+    backdrop-filter: blur(14px) saturate(1.25);
+    border-top: 1px solid var(--w34-line);
+  }
+  .logo-p { letter-spacing: -.01em; }
+  .logo-ai { color: var(--w34-accent); }
+  .logo-tag { border-radius: 999px; border-color: var(--w34-line); padding: 2px 8px; }
+  .footer-brand { font-family: "Syne","Montserrat",sans-serif; letter-spacing: .02em; }
+  .footer-link:hover, .footer-oc a:hover { color: var(--w34-bright); }
+
+  /* ── botões do cabeçalho ── */
+  .tb-btn {
+    border-radius: 8px; font-weight: 600;
+    transition: background var(--w34-t), color var(--w34-t),
+                border-color var(--w34-t), transform var(--w34-t), box-shadow var(--w34-t);
+  }
+  .tb-btn:hover { box-shadow: var(--w34-elev-1); }
+  .btn-drive { color: var(--w34-accent); }
+  .tb-icon {
+    border-radius: 8px; border-color: transparent;
+    transition: background var(--w34-t), color var(--w34-t),
+                border-color var(--w34-t), transform var(--w34-t);
+  }
+  .tb-icon:hover { background: var(--w34-card-2); color: var(--w34-bright); border-color: var(--w34-line); }
+  .lang-btn, .hamburger { border-radius: 8px; }
+  .lang-menu, .mobile-menu {
+    background: var(--w34-glass);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    backdrop-filter: blur(16px) saturate(1.2);
+    border: 1px solid var(--w34-line-2);
+    border-radius: 12px;
+    box-shadow: var(--w34-elev-2);
+  }
+  .mobile-menu .tb-btn { border-radius: 8px; }
+
+  /* ── modais e cards ── */
+  #modal-overlay, #sair-overlay, #autosave-overlay {
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  }
+  #modal, #sair-modal, #autosave-modal {
+    background: var(--w34-card);
+    border: 1px solid var(--w34-line-2);
+    border-radius: 16px;
+    box-shadow: var(--w34-elev-2);
+  }
+  .modal-title { font-family: "Syne","Montserrat",sans-serif; letter-spacing: -.01em; }
+  .modal-close, .btn-ghost { border-radius: 8px; }
+  .modal-close:hover, .btn-ghost:hover { background: var(--w34-card-2); }
+  #terms-overlay .t-card, #welcome-overlay .w-card,
+  #vpn-ask-overlay .va-card, #vpn-overlay .va-card {
+    background: var(--w34-card);
+    border: 1px solid rgba(194,160,87,.35);
+    border-radius: 16px;
+    box-shadow: var(--w34-elev-2);
+  }
+  html.theme-light #terms-overlay .t-card, html.theme-light #welcome-overlay .w-card,
+  html.theme-light #vpn-ask-overlay .va-card, html.theme-light #vpn-overlay .va-card {
+    border-color: rgba(138,109,51,.35);
+  }
+  #terms-overlay .t-scroll { border-radius: 10px; border-color: var(--w34-line); }
+  #terms-overlay button, #welcome-overlay button { border-radius: 10px; }
+
+  /* ── listas (backups, sessões, saúde, atalhos) ── */
+  .backup-list, .restore-cal { border-radius: 10px; border-color: var(--w34-line); }
+  .backup-item:hover, .session-item:hover { background: var(--w34-card-2); }
+  .backup-item .restore-lbl { border-radius: 999px; }
+  .backup-item .b-badge { border-radius: 999px; }
+  .backup-item .b-del { border-radius: 6px; }
+  .restore-day { border-radius: 6px; }
+  .restore-months .rmonth-chip { transition: background var(--w34-t), color var(--w34-t); }
+  .restore-toolbar .rnav, .restore-toolbar .rghost,
+  .restore-toolbar input[type="date"] { border-radius: 8px; }
+  .shortcut-key {
+    border-radius: 5px; border: 1px solid var(--w34-line);
+    border-bottom-width: 2px; background: var(--w34-card-2);
+    padding: 2px 7px; font-family: "DM Mono",monospace;
+  }
+  .health-status { border-radius: 999px; }
+  .session-search { border-radius: 8px; transition: border-color var(--w34-t), box-shadow var(--w34-t); }
+  .session-search:focus { border-color: rgba(194,160,87,.55); box-shadow: var(--w34-ring); }
+
+  /* ── toast ── */
+  #toast {
+    border-radius: 10px;
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    box-shadow: var(--w34-elev-2);
+    font-weight: 500;
+  }
+
+  /* ── memória (Minha memória) ── */
+  #memory-overlay > div { border-radius: 16px; box-shadow: var(--w34-elev-2); }
+  .mem-note-item { border-radius: 7px; transition: background var(--w34-t); }
+  .mem-note-item:hover, .mem-folder-card:hover { background: var(--w34-card-2); }
+  .mem-note-item.active { background: rgba(194,160,87,.13); border-left-color: var(--w34-accent); }
+  html.theme-light .mem-note-item.active { background: rgba(138,109,51,.10); }
+  .mem-tab { transition: color var(--w34-t), border-color var(--w34-t); }
+  .mem-tab.active { border-bottom-color: var(--w34-accent); }
+  .mem-preview code { border-radius: 5px; }
+  .mem-preview pre { border-radius: 8px; border: 1px solid var(--w34-line); }
+  .mem-preview .wikilink, .mem-preview .tag { border-radius: 999px; }
+  #memory-search-input { border-radius: 8px; }
+
+  /* ── autosave e provedor ── */
+  .autosave-track { transition: background var(--w34-t), border-color var(--w34-t); }
+  .btn-provider { border-radius: 999px; }
+  #autosave-modal .as-btn { border-radius: 8px; }
+
+  /* ── splash de boot ── */
+  #boot-splash { background: var(--w34-surface); }
+  .boot-logo { border-radius: 16px; box-shadow: var(--w34-elev-2); }
+  .boot-retry { border-radius: 999px; font-weight: 600; }
+
+  /* ── markdown dos modais (Diretrizes/Manual) ── */
+  .markdown-body pre { border-radius: 10px; }
+  .markdown-body code { border-radius: 5px; }
+  .markdown-body table th, .markdown-body table td { border-color: var(--w34-line); }
+</style>
 </body>
 </html>"""
 
@@ -6721,6 +7330,8 @@ def create_wrapper_html(
 
     # Substitui placeholders do template (feito DEPOIS da f-string)
     html = html.replace("{__TERMINAL_URL__}", terminal_url)
+    # v0.7.11-web18: a web pode morar em outra porta que o proxy (8002).
+    html = html.replace("{__WEB_URL__}", web_url or terminal_url)
     html = html.replace("{__TTYD_URL__}", ttyd_url or "")
     html = html.replace("{__READY_URL__}", "/api/ocweb_ready" if web_mode else "/api/ttyd_ready")
     html = html.replace("{__DRIVE_URL__}", drive_url)
@@ -6745,7 +7356,7 @@ def create_wrapper_html(
             "ui.sair": "SAIR",
             "sair.title": "Encerrar sessão", "sair.confirm_q": "Desconectar e excluir o ambiente de execução?", "sair.warn": "Tudo em memória será perdido — os arquivos no seu Google Drive continuam salvos. Não há como desfazer após confirmar.", "sair.yes": "SIM, SAIR", "sair.status": "Encerrando o ambiente… aguarde", "sair.fail": "Falha ao encerrar — use Runtime ▸ Desconectar e excluir ambiente.", "sair.done": "✅ Ambiente encerrado. Para usar o UFVAI de novo: reexecute a célula de boot.",
             "ui.drive": "Drive", "ui.close": "Fechar", "ui.cancel": "Cancelar",
-            "ui.loading": "Carregando…", "ui.status_active": "agente ativo",
+            "ui.loading": "Carregando…", "ui.status_active": "agente ativo", "ui.status_idle": "agente ocioso",
             "ui.exporting": "Exportando sessão…",
             "autosave.title": "Autosave", "autosave.saved": "Sessão salva no Drive",
             "autosave.unchanged": "Sem novidades — o autosave mais recente já é o atual.",
@@ -6818,12 +7429,23 @@ def create_wrapper_html(
             "shortcuts.interrupt": "Interromper comando", "shortcuts.paste": "Colar (Chrome)",
             "shortcuts.menu": "Menu e opções", "shortcuts.model": "Alterar modelo",
             "shortcuts.history_prev": "Histórico anterior", "shortcuts.history_next": "Histórico seguinte",
+            "shortcuts.web": "Interface web",
+            "shortcuts.web_send": "Enviar mensagem",
+            "shortcuts.web_newline": "Nova linha",
+            "shortcuts.web_commands": "Abrir comandos",
+            "shortcuts.web_mention": "Mencionar habilidade/arquivo",
+            "shortcuts.web_expand": "Expandir/recolher tudo",
+            "shortcuts.web_sidebar": "Ocultar/mostrar sessões",
+            "shortcuts.web_attach": "Anexar arquivo",
+            "shortcuts.web_search": "Buscar sessões",
+            "shortcuts.web_focus": "Focar o campo de mensagem",
+            "shortcuts.web_interrupt": "Interromper / fechar menus",
             "theme.toggle": "Alternar tema", "theme.light": "Tema claro (UI + terminal)",
             "theme.dark": "Tema escuro (UI + terminal)",
             "theme.web_applied": "Tema aplicado na versão web",
             "theme.terminal_reloaded": "Terminal recarregado com novo tema",
             # v0.6.5 — Splash de carregamento do terminal
-            "boot.starting": "Iniciando terminal…",
+            "boot.starting": "Iniciando terminal…", "boot.starting_web": "Carregando a interface…",
             "boot.restarting": "Reiniciando terminal…",
             "boot.restoring": "Restaurando sessão…",
             "boot.timeout": "O terminal não respondeu. Verifique ~/PesquisAI/logs/ttyd.log e recarregue.",
@@ -6954,7 +7576,7 @@ def create_wrapper_html(
             "ui.sair": "EXIT",
             "sair.title": "End session", "sair.confirm_q": "Disconnect and delete the execution environment?", "sair.warn": "Everything in memory will be lost — files on your Google Drive remain saved. Cannot be undone once confirmed.", "sair.yes": "YES, EXIT", "sair.status": "Shutting down the environment… please wait", "sair.fail": "Failed to shut down — use Runtime ▸ Disconnect and delete runtime.", "sair.done": "✅ Environment terminated. To use UFVAI again: re-run the boot cell.",
             "ui.drive": "Drive", "ui.close": "Close", "ui.cancel": "Cancel",
-            "ui.loading": "Loading…", "ui.status_active": "agent active",
+            "ui.loading": "Loading…", "ui.status_active": "agent active", "ui.status_idle": "agent idle",
             "ui.exporting": "Exporting session…",
             "autosave.title": "Autosave", "autosave.saved": "Session saved to Drive",
             "autosave.unchanged": "No changes — the latest autosave is already up to date.",
@@ -7027,12 +7649,23 @@ def create_wrapper_html(
             "shortcuts.interrupt": "Interrupt command", "shortcuts.paste": "Paste (Chrome)",
             "shortcuts.menu": "Menu and options", "shortcuts.model": "Change model",
             "shortcuts.history_prev": "Previous history", "shortcuts.history_next": "Next history",
+            "shortcuts.web": "Web interface",
+            "shortcuts.web_send": "Send message",
+            "shortcuts.web_newline": "New line",
+            "shortcuts.web_commands": "Open commands",
+            "shortcuts.web_mention": "Mention skill/file",
+            "shortcuts.web_expand": "Expand/collapse all",
+            "shortcuts.web_sidebar": "Hide/show sessions",
+            "shortcuts.web_attach": "Attach file",
+            "shortcuts.web_search": "Search sessions",
+            "shortcuts.web_focus": "Focus the message field",
+            "shortcuts.web_interrupt": "Interrupt / close menus",
             "theme.toggle": "Toggle theme", "theme.light": "Light theme (UI + terminal)",
             "theme.dark": "Dark theme (UI + terminal)",
             "theme.web_applied": "Theme applied to the web version",
             "theme.terminal_reloaded": "Terminal reloaded with new theme",
             # v0.6.5 — Terminal boot splash
-            "boot.starting": "Starting the terminal…",
+            "boot.starting": "Starting the terminal…", "boot.starting_web": "Loading the interface…",
             "boot.restarting": "Restarting the terminal…",
             "boot.restoring": "Restoring session…",
             "boot.timeout": "The terminal did not respond. Check ~/PesquisAI/logs/ttyd.log and reload.",
@@ -7163,7 +7796,7 @@ def create_wrapper_html(
             "ui.sair": "SALIR",
             "sair.title": "Cerrar sesión", "sair.confirm_q": "¿Desconectar y eliminar el entorno de ejecución?", "sair.warn": "Todo en memoria se perderá — los archivos de tu Google Drive siguen guardados. No se puede deshacer tras confirmar.", "sair.yes": "SÍ, SALIR", "sair.status": "Cerrando el entorno… espere", "sair.fail": "Error al cerrar — usa Runtime ▸ Desconectar y eliminar el entorno.", "sair.done": "✅ Entorno cerrado. Para usar UFVAI de nuevo: reejecuta la celda de arranque.",
             "ui.drive": "Drive", "ui.close": "Cerrar", "ui.cancel": "Cancelar",
-            "ui.loading": "Cargando…", "ui.status_active": "agente activo",
+            "ui.loading": "Cargando…", "ui.status_active": "agente activo", "ui.status_idle": "agente inactivo",
             "ui.exporting": "Exportando sesión…",
             "autosave.title": "Autoguardado", "autosave.saved": "Sesión guardada en Drive",
             "autosave.unchanged": "Sin novedades — el autoguardado más reciente ya es el actual.",
@@ -7236,12 +7869,23 @@ def create_wrapper_html(
             "shortcuts.interrupt": "Interrumpir comando", "shortcuts.paste": "Pegar (Chrome)",
             "shortcuts.menu": "Menú y opciones", "shortcuts.model": "Cambiar modelo",
             "shortcuts.history_prev": "Historial anterior", "shortcuts.history_next": "Historial siguiente",
+            "shortcuts.web": "Interfaz web",
+            "shortcuts.web_send": "Enviar mensaje",
+            "shortcuts.web_newline": "Nueva línea",
+            "shortcuts.web_commands": "Abrir comandos",
+            "shortcuts.web_mention": "Mencionar habilidad/archivo",
+            "shortcuts.web_expand": "Expandir/plegar todo",
+            "shortcuts.web_sidebar": "Ocultar/mostrar sesiones",
+            "shortcuts.web_attach": "Adjuntar archivo",
+            "shortcuts.web_search": "Buscar sesiones",
+            "shortcuts.web_focus": "Enfocar el campo de mensaje",
+            "shortcuts.web_interrupt": "Interrumpir / cerrar menús",
             "theme.toggle": "Alternar tema", "theme.light": "Tema claro (UI + terminal)",
             "theme.dark": "Tema oscuro (UI + terminal)",
             "theme.web_applied": "Tema aplicado a la versión web",
             "theme.terminal_reloaded": "Terminal recargado con nuevo tema",
             # v0.6.5 — Splash de arranque del terminal
-            "boot.starting": "Iniciando el terminal…",
+            "boot.starting": "Iniciando el terminal…", "boot.starting_web": "Cargando la interfaz…",
             "boot.restarting": "Reiniciando el terminal…",
             "boot.restoring": "Restaurando sesión…",
             "boot.timeout": "El terminal no respondió. Revisa ~/PesquisAI/logs/ttyd.log y recarga.",
@@ -7372,7 +8016,7 @@ def create_wrapper_html(
             "ui.sair": "QUITTER",
             "sair.title": "Terminer la session", "sair.confirm_q": "Déconnecter et supprimer l'environnement d'exécution ?", "sair.warn": "Tout en mémoire sera perdu — les fichiers de votre Google Drive restent sauvegardés. Irréversible après confirmation.", "sair.yes": "OUI, QUITTER", "sair.status": "Arrêt de l'environnement… veuillez patienter", "sair.fail": "Échec de l'arrêt — utilisez Runtime ▸ Déconnecter et supprimer l'environnement.", "sair.done": "✅ Environnement terminé. Pour réutiliser UFVAI : relancez la cellule de démarrage.",
             "ui.drive": "Drive", "ui.close": "Fermer", "ui.cancel": "Annuler",
-            "ui.loading": "Chargement…", "ui.status_active": "agent actif",
+            "ui.loading": "Chargement…", "ui.status_active": "agent actif", "ui.status_idle": "agent inactif",
             "ui.exporting": "Exportation de la session…",
             "autosave.title": "Sauvegarde auto", "autosave.saved": "Session enregistrée sur Drive",
             "autosave.unchanged": "Aucune nouveauté — la sauvegarde auto la plus récente est déjà à jour.",
@@ -7445,12 +8089,23 @@ def create_wrapper_html(
             "shortcuts.interrupt": "Interrompre la commande", "shortcuts.paste": "Coller (Chrome)",
             "shortcuts.menu": "Menu et options", "shortcuts.model": "Changer de modèle",
             "shortcuts.history_prev": "Historique précédent", "shortcuts.history_next": "Historique suivant",
+            "shortcuts.web": "Interface web",
+            "shortcuts.web_send": "Envoyer le message",
+            "shortcuts.web_newline": "Nouvelle ligne",
+            "shortcuts.web_commands": "Ouvrir les commandes",
+            "shortcuts.web_mention": "Mentionner compétence/fichier",
+            "shortcuts.web_expand": "Tout déplier/replier",
+            "shortcuts.web_sidebar": "Masquer/afficher les sessions",
+            "shortcuts.web_attach": "Joindre un fichier",
+            "shortcuts.web_search": "Rechercher les sessions",
+            "shortcuts.web_focus": "Placer le curseur dans le message",
+            "shortcuts.web_interrupt": "Interrompre / fermer les menus",
             "theme.toggle": "Basculer le thème", "theme.light": "Thème clair (UI + terminal)",
             "theme.dark": "Thème sombre (UI + terminal)",
             "theme.web_applied": "Thème appliqué à la version web",
             "theme.terminal_reloaded": "Terminal rechargé avec le nouveau thème",
             # v0.6.5 — Écran de démarrage du terminal
-            "boot.starting": "Démarrage du terminal…",
+            "boot.starting": "Démarrage du terminal…", "boot.starting_web": "Chargement de l’interface…",
             "boot.restarting": "Redémarrage du terminal…",
             "boot.restoring": "Restauration de la session…",
             "boot.timeout": "Le terminal n'a pas répondu. Consultez ~/PesquisAI/logs/ttyd.log puis rechargez.",
@@ -7581,7 +8236,7 @@ def create_wrapper_html(
             "ui.sair": "退出",
             "sair.title": "结束会话", "sair.confirm_q": "断开连接并删除执行环境？", "sair.warn": "内存中的所有内容都将丢失 — Google 云端硬盘中的文件仍会保存。确认后无法撤销。", "sair.yes": "确定，退出", "sair.status": "正在关闭环境…请稍候", "sair.fail": "关闭失败 — 请使用 Runtime ▸ 断开连接并删除环境。", "sair.done": "✅ 环境已终止。如需再次使用 UFVAI：重新运行引导单元。",
             "ui.drive": "云端硬盘", "ui.close": "关闭", "ui.cancel": "取消",
-            "ui.loading": "加载中…", "ui.status_active": "智能体运行中",
+            "ui.loading": "加载中…", "ui.status_active": "智能体运行中", "ui.status_idle": "智能体空闲",
             "ui.exporting": "正在导出会话…",
             "autosave.title": "自动保存", "autosave.saved": "会话已保存到 Drive",
             "autosave.unchanged": "没有新内容 —— 最近一次自动保存已是最新。",
@@ -7654,12 +8309,23 @@ def create_wrapper_html(
             "shortcuts.interrupt": "中断命令", "shortcuts.paste": "粘贴（Chrome）",
             "shortcuts.menu": "菜单与选项", "shortcuts.model": "更改模型",
             "shortcuts.history_prev": "上一条历史", "shortcuts.history_next": "下一条历史",
+            "shortcuts.web": "网页界面",
+            "shortcuts.web_send": "发送消息",
+            "shortcuts.web_newline": "换行",
+            "shortcuts.web_commands": "打开命令",
+            "shortcuts.web_mention": "提及技能/文件",
+            "shortcuts.web_expand": "全部展开/收起",
+            "shortcuts.web_sidebar": "隐藏/显示会话",
+            "shortcuts.web_attach": "附加文件",
+            "shortcuts.web_search": "搜索会话",
+            "shortcuts.web_focus": "聚焦消息框",
+            "shortcuts.web_interrupt": "中断 / 关闭菜单",
             "theme.toggle": "切换主题", "theme.light": "浅色主题（界面+终端）",
             "theme.dark": "深色主题（界面+终端）",
             "theme.web_applied": "主题已应用到网页版",
             "theme.terminal_reloaded": "终端已应用新主题并重新加载",
             # v0.6.5 — 终端启动画面
-            "boot.starting": "正在启动终端…",
+            "boot.starting": "正在启动终端…", "boot.starting_web": "正在加载界面…",
             "boot.restarting": "正在重启终端…",
             "boot.restoring": "正在恢复会话…",
             "boot.timeout": "终端无响应。请查看 ~/PesquisAI/logs/ttyd.log 后重新加载。",

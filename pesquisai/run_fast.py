@@ -24,6 +24,7 @@ Uso:
 """
 
 import os
+import sys
 import shutil
 import subprocess
 import threading
@@ -1618,10 +1619,19 @@ def run() -> None:
 
     # v0.6.3: fora do Colab, mantém o processo vivo para que a interface
     # continue acessível (threads daemon morreriam com o fim de run()).
-    if not os.path.isdir("/content/drive"):
-        from .launch_app import IN_COLAB as _in_colab
-        if not _in_colab:
-            _offline_keep_alive(banner_url)
+    #
+    # v0.7.11-web36 (fix): a condição NÃO pode ser "existe /content/drive".
+    # Numa máquina LOCAL com o Drive montado em /content/drive ela é verdadeira,
+    # o keep-alive era pulado, o processo encerrava logo após "UFVAI pronto!" e
+    # a porta 8001 caía (ERR_CONNECTION_REFUSED). O critério correto é "há um
+    # kernel de notebook (Colab/Jupyter) que mantém o processo vivo?".
+    from .launch_app import IN_COLAB as _in_colab
+    try:
+        _em_kernel = _in_colab or ("ipykernel" in sys.modules)
+    except Exception:  # noqa: BLE001
+        _em_kernel = _in_colab
+    if not _em_kernel:
+        _offline_keep_alive(banner_url)
 
 
 if __name__ == "__main__":

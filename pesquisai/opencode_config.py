@@ -250,6 +250,23 @@ def drive_guard_permissions(
     return rules
 
 
+def always_allowed_permissions() -> list[dict[str, str]]:
+    """Regras que liberam sempre o acesso à internet.
+
+    v0.7.11-web24: a busca na internet (``websearch``) e o acesso a páginas
+    (``webfetch``) passavam a pedir licença a cada uso — na interface web a
+    pergunta aparecia como um turno travado, sem as opções. O pedido do autor
+    é explícito: **a busca na internet é sempre permitida**.
+
+    ficam antes das regras do Drive Guard (que tratam de outras ações e
+    precisam continuar por último para vencerem).
+    """
+    return [
+        {"action": "websearch", "effect": "allow"},
+        {"action": "webfetch", "effect": "allow"},
+    ]
+
+
 def merge_drive_guard(
     existing: dict[str, Any],
     plugin_path: str,
@@ -278,7 +295,7 @@ def merge_drive_guard(
     merged["plugins"] = items
     merged.setdefault("$schema", CONFIG_SCHEMA_URL)
 
-    ours = drive_guard_permissions(mount, allowed)
+    ours = always_allowed_permissions() + drive_guard_permissions(mount, allowed)
     current = merged.get("permissions")
     if current is None:
         merged["permissions"] = list(ours)

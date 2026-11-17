@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="pesquisai">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>UFVAI · Web</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Montserrat:wght@600;700&family=Syne:wght@700;800&display=swap">
+<link rel="stylesheet" href="app.css">
+<!-- web34: camada visual "Produtividade" — aditiva, carregada após app.css -->
+<link rel="stylesheet" href="theme34.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23141c24'/%3E%3Ctext x='16' y='22' font-family='sans-serif' font-size='14' font-weight='700' fill='%23b29149' text-anchor='middle'%3EU%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ── barra lateral ─────────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="side-head">
+      <span class="side-label" data-i18n="sidebar.sessions">sessões</span>
+      <button class="icon-btn bulk-toggle" id="bulk-toggle" title="Selecionar sessões" aria-label="Selecionar sessões" data-i18n-title="bulk.select">☑</button>
+    </div>
+
+    <button class="new-session" id="new-session">
+      <span class="plus">＋</span> <span data-i18n="sidebar.newSession">Nova sessão</span>
+    </button>
+
+    <div class="search-wrap">
+      <input id="session-search" type="search" placeholder="Buscar sessão…" autocomplete="off" data-i18n-placeholder="sidebar.search">
+    </div>
+
+    <!-- v0.7.11-web39: seleção em massa de sessões -->
+    <div class="bulk-bar" id="bulk-bar" hidden>
+      <button class="mini-btn" id="bulk-all" data-i18n="bulk.all">Todas</button>
+      <span class="bulk-count" id="bulk-count">0</span>
+      <button class="mini-btn" id="bulk-archive" data-i18n="bulk.archive">Arquivar</button>
+      <button class="mini-btn danger" id="bulk-delete" data-i18n="bulk.delete">Excluir</button>
+      <button class="mini-btn" id="bulk-cancel" data-i18n="bulk.cancel">Cancelar</button>
+    </div>
+
+    <nav class="sessions" id="sessions" aria-label="Sessões"></nav>
+
+    <div class="side-foot">
+      <div class="engine-line">
+        <span class="status-dot" id="engine-dot"></span>
+        <span id="engine-text">motor…</span>
+      </div>
+      <div class="engine-sub" id="engine-sub"></div>
+    </div>
+  </aside>
+
+  <!-- ── painel principal ──────────────────────────────────────────── -->
+  <main class="main">
+    <header class="topbar">
+      <!-- v0.7.11-web21: botão único — oculta/mostra as sessões (colapsa no
+           desktop, gaveta no responsivo). O cabeçalho do wrapper já mostra
+           UFVAI, versão e "agente ativo": aqui não se repete. -->
+      <button class="icon-btn menu-btn" id="menu-btn" title="Ocultar/mostrar as sessões" aria-label="Ocultar ou mostrar a lista de sessões" data-i18n-title="top.sessions">☰</button>
+
+      <div class="top-title">
+        <div class="title-row">
+          <h1 id="session-title" title="Duplo clique renomeia a sessão">UFVAI</h1>
+          <!-- v0.7.11-web29: espiral global — mostra que o agente está
+               trabalhando (e que terminou, com o "concluído" verde) -->
+          <span class="agent-busy" id="agent-busy" hidden>
+            <span class="spin" aria-hidden="true"></span>
+            <span class="busy-check" aria-hidden="true">✓</span>
+            <span class="busy-text"></span>
+          </span>
+        </div>
+        <div class="top-sub">
+          <button class="pill model-pill" id="model-pill" title="Trocar modelo" data-i18n-title="top.model">
+            <span id="model-label">modelo…</span>
+          </button>
+          <button class="pill agent-pill" id="agent-pill" title="Agente (somente UFVAI)" data-i18n-title="top.agent">
+            <span id="agent-label">UFVAI</span>
+          </button>
+          <button class="pill variant-pill" id="variant-chip" title="Variante do modelo" data-i18n-title="top.variant" hidden></button>
+          <span class="pill soft" id="usage-pill" title="Uso da sessão" data-i18n-title="top.usage" hidden></span>
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <!-- v0.7.11-web23: "expandir tudo" — os interruptores de raciocínio e
+             ferramentas valem para o que vem a seguir; este botão age sobre a
+             conversa inteira, já renderizada. v0.7.11-web24: ícone com
+             RÓTULO (o ⇕ sozinho era difícil de identificar). -->
+        <button class="icon-btn labelled" id="expand-all-btn" title="Expandir/recolher tudo" aria-label="Expandir ou recolher raciocínio e ferramentas" data-i18n-title="tool.expandAll">
+          <span class="lb-icon">⇕</span><span class="lb-text" data-i18n="tool.expandAll">expandir tudo</span>
+        </button>
+        <!-- v0.7.11-web26: mini navegador de arquivos da pasta do agente -->
+        <button class="icon-btn" id="explorer-btn" title="Explorador de arquivos" aria-label="Abrir o explorador de arquivos" data-i18n-title="explorer.title">📁</button>
+        <button class="icon-btn" id="session-menu-btn" title="Ações da sessão" aria-label="Ações da sessão" data-i18n-title="top.actions">⋯</button>
+        <button class="icon-btn" id="settings-btn" title="Ajustes" aria-label="Ajustes" data-i18n-title="top.settings">⚙</button>
+        <button class="icon-btn" id="refresh-btn" title="Atualizar" aria-label="Atualizar" data-i18n-title="top.refresh">↻</button>
+        <!-- v0.7.11-web23: o botão claro/escuro foi REMOVIDO — ele vive no
+             cabeçalho do wrapper, que propaga o tema por postMessage. -->
+      </div>
+    </header>
+
+    <!-- v0.7.11-web26: aviso de gateway antigo (fora do proxy do Colab) -->
+    <div class="engine-dead" id="gateway-old" hidden>
+      <div class="dead-icon">⚠️</div>
+      <div class="dead-text">
+        <strong data-i18n="warn.gatewayOld">Esta página está servida por uma versão antiga</strong>
+        <p data-i18n="warn.gatewayOldBody"></p>
+        <p><a id="gateway-old-link" href="#" target="_blank" rel="noopener"></a></p>
+      </div>
+    </div>
+
+    <!-- v0.7.11-web23: aviso de ambiente encerrado (Colab morto) -->
+    <div class="engine-dead" id="engine-dead" hidden>
+      <div class="dead-icon">⚠️</div>
+      <div class="dead-text">
+        <strong data-i18n="warn.dead">O ambiente do Colab foi encerrado</strong>
+        <p data-i18n="warn.deadBody"></p>
+      </div>
+      <!-- v0.7.11-web28: o botão abre o notebook no Colab (para reexecutar) -->
+      <a class="dead-action" id="dead-action" target="_blank" rel="noopener"
+         href="https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb"
+         data-i18n="warn.deadAction">Voltar ao Colab e reexecutar</a>
+    </div>
+
+    <div class="thread" id="thread">
+      <!-- v0.7.11-web39: busca dentro da conversa (Ctrl+F) -->
+      <div class="find-bar" id="find-bar" hidden>
+        <input id="find-input" type="search" placeholder="Buscar na conversa…" autocomplete="off" data-i18n-placeholder="find.placeholder">
+        <span class="find-count" id="find-count"></span>
+        <button class="mini-btn" id="find-prev" title="Anterior" aria-label="Ocorrência anterior">↑</button>
+        <button class="mini-btn" id="find-next" title="Próxima" aria-label="Próxima ocorrência">↓</button>
+        <button class="mini-btn" id="find-close" title="Fechar" aria-label="Fechar busca">✕</button>
+      </div>
+      <div id="messages"></div>
+      <div class="empty" id="empty-state">
+        <div class="empty-logo">
+          <img src="assets/logo.svg" alt="UFVAI" width="320" height="133">
+        </div>
+        <h2 data-i18n="app.tagline">UFVAI - A inteligência que acelera a ciência.</h2>
+        <p data-i18n="app.description"></p>
+        <p class="empty-hint" data-i18n="empty.hint"></p>
+      </div>
+      <!-- v0.7.11-web25: rolagem automática; este botão volta ao fim -->
+      <button class="jump-btn" id="jump-btn" hidden title="Ir para o fim" aria-label="Ir para o fim da conversa">↓</button>
+    </div>
+
+    <!-- ── compositor ─────────────────────────────────────────────── -->
+    <div class="composer">
+      <!-- v0.7.11-web27: servidor sobrecarregado — o retry está em curso -->
+      <div class="retry-banner" id="retry-banner" hidden>
+        <span class="rb-icon">⚠️</span>
+        <div class="rb-text">
+          <strong id="retry-title"></strong>
+          <span id="retry-detail"></span>
+        </div>
+        <span class="rb-count" id="retry-count"></span>
+      </div>
+
+      <!-- v0.7.11-web39: aviso de contexto (80%+) com compactação rápida -->
+      <div class="context-warning" id="context-warning" hidden>
+        <span id="context-warning-text"></span>
+        <button class="mini-btn" id="context-compact" data-i18n="ctx.compact">Compactar</button>
+        <button class="mini-btn" id="context-dismiss" aria-label="Fechar" title="Fechar">✕</button>
+      </div>
+
+      <!-- v0.7.11-web27: erros comuns (vermelhos), distintos da sobrecarga -->
+      <div class="errors" id="errors" hidden></div>
+
+      <!-- v0.7.11-web24: pedidos de permissão do motor (as "decisões" que
+           não apareciam na versão web) -->
+      <div class="permissions" id="permissions" hidden></div>
+
+      <!-- v0.7.11-web38: formulários da ferramenta "question" do agente -->
+      <div class="forms" id="forms" hidden></div>
+
+      <!-- paleta de comandos (/) e de habilidades/arquivos (@) -->
+      <div class="palette" id="palette" hidden>
+        <div class="palette-head" id="palette-head"></div>
+        <div class="palette-list" id="palette-list"></div>
+        <div class="palette-foot" data-i18n="palette.hint"></div>
+      </div>
+
+      <div class="attachments" id="attachments" hidden></div>
+
+      <!-- v0.7.11-web40: prompts favoritos -->
+      <div class="fav-menu" id="fav-menu" hidden></div>
+
+      <div class="composer-inner">
+        <textarea id="input" rows="1" placeholder="Pergunte ao UFVAI… (/ para comandos, @ para habilidades e arquivos)" autocomplete="off" data-i18n-placeholder="composer.placeholder"></textarea>
+        <button class="icon-btn fav-btn" id="fav-btn" title="Prompts favoritos" aria-label="Prompts favoritos" data-i18n-title="fav.title">★</button>
+        <button class="icon-btn attach-btn" id="attach-btn" title="Anexar arquivos" aria-label="Anexar arquivos" data-i18n-title="composer.attach">📎</button>
+        <input id="file-input" type="file" multiple hidden>
+        <button class="send" id="send-btn" title="Enviar (Enter)" aria-label="Enviar" data-i18n-title="composer.send">➤</button>
+        <!-- v0.7.11-web30: o botão de PARAR é sempre visível. Antes ele
+             só aparecia enquanto o SSE dizia que o modelo estava
+             trabalhando — quando esse evento se perdia, não havia
+             comando nenhum para interromper. -->
+        <button class="stop" id="stop-btn" title="Interromper (Esc)" aria-label="Interromper" data-i18n-title="composer.stop">■</button>
+      </div>
+      <div class="status-line" id="status" hidden><span class="spinner"></span><span id="status-text" role="status" aria-live="polite">Trabalhando…</span></div>
+    </div>
+  </main>
+
+  <div class="scrim" id="scrim" hidden></div>
+
+  <!-- ── explorador de arquivos (v0.7.11-web26) ────────────────────── -->
+  <aside class="explorer" id="explorer" hidden>
+    <!-- v0.7.11-web28: arrastar para redimensionar a área do explorador -->
+    <div class="exp-resizer" id="exp-resizer" role="separator" aria-orientation="vertical"
+         tabindex="0" title="Arrastar para redimensionar" data-i18n-title="explorer.resize"></div>
+    <div class="exp-head">
+      <div class="exp-titles">
+        <span class="exp-title" data-i18n="explorer.title">Explorador</span>
+        <span class="exp-path" id="exp-path">/</span>
+      </div>
+      <div class="exp-actions">
+        <button class="icon-btn" id="exp-up" title="Pasta acima" aria-label="Pasta acima" data-i18n-title="explorer.up">↑</button>
+        <button class="icon-btn" id="exp-refresh" title="Atualizar" aria-label="Atualizar" data-i18n-title="explorer.refresh">↻</button>
+        <button class="icon-btn" id="exp-close" title="Fechar" aria-label="Fechar" data-i18n-title="modal.close">✕</button>
+      </div>
+    </div>
+    <!-- v0.7.11-web28: filtro de busca (arquivos e pastas) -->
+    <div class="exp-search-wrap">
+      <span class="exp-search-icon" aria-hidden="true">⌕</span>
+      <input id="exp-search" type="search" autocomplete="off" spellcheck="false"
+             placeholder="Filtrar arquivos e pastas…"
+             aria-label="Filtrar arquivos e pastas" data-i18n-placeholder="explorer.search">
+      <button class="exp-search-clear" id="exp-search-clear" type="button" hidden
+              title="Limpar o filtro" aria-label="Limpar o filtro" data-i18n-title="explorer.clearSearch">✕</button>
+    </div>
+    <div class="exp-body">
+      <div class="exp-list" id="exp-list"></div>
+      <!-- v0.7.11-web28: arrastar para redimensionar o VISUALIZADOR -->
+      <div class="exp-vresizer" id="exp-vresizer" role="separator" aria-orientation="horizontal"
+           tabindex="0" title="Arrastar para redimensionar a visualização"
+           data-i18n-title="explorer.resizePreview"></div>
+      <div class="exp-preview" id="exp-preview" hidden></div>
+    </div>
+  </aside>
+</div>
+
+<!-- ── seletor de modelo ────────────────────────────────────────────── -->
+<div class="modal" id="model-modal" role="dialog" aria-modal="true" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2 data-i18n="modal.model">Modelo</h2>
+      <button class="icon-btn" id="model-close" aria-label="Fechar" data-i18n-title="modal.close">✕</button>
+    </div>
+    <input id="model-search" type="search" placeholder="Buscar modelo…" autocomplete="off" data-i18n-placeholder="modal.searchModel">
+    <div class="model-list" id="model-list"></div>
+    <div class="modal-foot" id="model-foot"></div>
+  </div>
+</div>
+
+<!-- ── ajustes ──────────────────────────────────────────────────────── -->
+<div class="modal" id="settings-modal" role="dialog" aria-modal="true" hidden>
+  <div class="modal-card settings-card">
+    <div class="modal-head">
+      <h2 data-i18n="modal.settings">Ajustes</h2>
+      <button class="icon-btn" id="settings-close" aria-label="Fechar" data-i18n-title="modal.close">✕</button>
+    </div>
+    <div class="settings-body">
+      <nav class="settings-tabs" id="settings-tabs">
+        <button class="tab active" data-tab="geral" data-i18n="settings.tab.general">Geral</button>
+        <button class="tab" data-tab="modelo" data-i18n="settings.tab.model">Modelo</button>
+        <button class="tab" data-tab="agente" data-i18n="settings.tab.agent">Agente</button>
+        <button class="tab" data-tab="comandos" data-i18n="settings.tab.commands">Comandos</button>
+        <button class="tab" data-tab="habilidades" data-i18n="settings.tab.skills">Habilidades</button>
+        <button class="tab" data-tab="sessao" data-i18n="settings.tab.session">Sessão</button>
+        <button class="tab" data-tab="autosave" data-i18n="settings.tab.autosave">Autosave</button>
+        <button class="tab" data-tab="atalhos" data-i18n="settings.tab.shortcuts">Atalhos</button>
+        <button class="tab" data-tab="sobre" data-i18n="settings.tab.about">Sobre</button>
+      </nav>
+      <div class="settings-pane" id="settings-pane"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── menu da sessão / variante ────────────────────────────────────── -->
+<div class="modal" id="session-modal" role="dialog" aria-modal="true" hidden>
+  <div class="modal-card modal-sm">
+    <div class="modal-head">
+      <h2 id="session-modal-title" data-i18n="modal.session">Sessão</h2>
+      <button class="icon-btn" id="session-close" aria-label="Fechar" data-i18n-title="modal.close">✕</button>
+    </div>
+    <div class="model-list" id="session-actions"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+
+<!-- ── confirmação genérica (web40: regenerar, fila, etc.) ─────────────── -->
+<div class="modal" id="ask-modal" role="dialog" aria-modal="true" aria-labelledby="ask-title" hidden>
+  <div class="modal-card modal-sm">
+    <div class="modal-head">
+      <h2 id="ask-title">—</h2>
+      <button class="icon-btn" id="ask-close" aria-label="Fechar" data-i18n-title="modal.close">✕</button>
+    </div>
+    <div class="prompt-body"><p id="ask-message"></p></div>
+    <div class="modal-foot">
+      <button class="btn" id="ask-cancel" data-i18n="key.cancel">Cancelar</button>
+      <button class="btn primary" id="ask-ok" data-i18n="key.ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── entrada de texto (substitui prompt(): bloqueado em iframe) ───── -->
+<div class="modal" id="prompt-modal" role="dialog" aria-modal="true" aria-labelledby="prompt-title" hidden>
+  <div class="modal-card modal-sm">
+    <div class="modal-head">
+      <h2 id="prompt-title">—</h2>
+      <button class="icon-btn" id="prompt-close" aria-label="Fechar" data-i18n-title="modal.close">✕</button>
+    </div>
+    <div class="prompt-body">
+      <p id="prompt-hint"></p>
+      <input id="prompt-input" type="text" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="prompt-cancel" data-i18n="key.cancel">Cancelar</button>
+      <button class="btn primary" id="prompt-ok" data-i18n="session.rename">Renomear</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── confirmação (finalizar sessão) ────────────────────────────────── -->
+<div class="modal" id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" hidden>
+  <div class="modal-card modal-sm">
+    <div class="modal-head">
+      <h2 id="confirm-title">—</h2>
+      <button class="icon-btn" id="confirm-close" aria-label="Fechar" data-i18n-title="modal.close">✕</button>
+    </div>
+    <div class="prompt-body">
+      <p id="confirm-message"></p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="confirm-cancel" data-i18n="key.cancel">Cancelar</button>
+      <button class="btn" id="confirm-archive" data-i18n="session.finalizeArchive">Finalizar e arquivar</button>
+      <button class="btn danger" id="confirm-delete" data-i18n="session.finalizeDelete">Excluir do histórico</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<!-- web34: melhorias aditivas de produtividade (chips, densidade, dicas) -->
+<script src="enhance34.js" defer></script>
+</body>
+</html>

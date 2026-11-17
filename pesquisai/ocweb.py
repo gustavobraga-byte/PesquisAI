@@ -421,9 +421,12 @@ _BOOT_JS = r"""(function(){
         if(!d||!d.ready)return;          // sem modelos no servidor (ex.: sem chave)
         if(modelsOk(Number(d.models)||0))return;
         try{
-          var last=Number(sessionStorage.getItem("ufvai.modelreload")||0);
+          // Chave versionada: tentativas feitas por web13/web14 não podem
+          // impedir a primeira recuperação depois da atualização.
+          var reloadKey="ufvai.modelreload.v15."+location.pathname;
+          var last=Number(sessionStorage.getItem(reloadKey)||0);
           if(Date.now()-last<600000)return;
-          sessionStorage.setItem("ufvai.modelreload",String(Date.now()));
+          sessionStorage.setItem(reloadKey,String(Date.now()));
         }catch(e){}
         if(canNav()){try{location.reload()}catch(e){}}
       });
@@ -534,6 +537,276 @@ def _catalog_json(path: str, timeout: float = 12.0, wait: float = 6.0):
         if time.time() >= deadline:
             return last
         time.sleep(0.2)
+
+
+# ── v0.7.11-web16: reparo de sessão ──────────────────────────────────────────
+# Dois defeitos apareciam em conversas já carregadas:
+#
+# 1. a sessão ficava apontando para um modelo que ESTE ambiente não oferece
+#    (provedor desconectado, modelo renomeado/retirado). A SPA mostrava
+#    "modelo (unavailable)" e o envio morria em ``provider.no-route``;
+# 2. a execução morria no meio (cota/erro do provedor) deixando
+#    ``time.busy > time.idle``. A SPA continuava em "Trabalhando" e as
+#    mensagens novas entravam na fila sem nunca serem entregues.
+#
+# O proxy corrige os dois sem tocar no binário do motor: repara o modelo na
+# leitura da sessão e interrompe execuções que o próprio motor já não lista
+# como ativas em ``/api/session/active``.
+_SESSION_GET_RE = re.compile(r"^/api/session/(ses_[A-Za-z0-9]+)$")
+_MODEL_KEYS_CACHE: dict = {"at": 0.0, "keys": frozenset()}
+_MODEL_KEYS_LOCK = threading.Lock()
+_MODEL_REPAIR_TRIED: dict[str, float] = {}
+_MODEL_REPAIR_LOCK = threading.Lock()
+_MODEL_REPAIR_TTL_S = 300.0
+_MODEL_KEYS_TTL_S = 120.0
+_SEEN_SESSIONS: dict[str, float] = {}
+_SESSION_DIR: dict[str, str] = {}
+_SEEN_LOCK = threading.Lock()
+_RUNS_STOP = threading.Event()
+_RUNS_LAST: dict[str, float] = {}
+_RUNS_LOCK = threading.Lock()
+_STUCK_RUN_S = 90.0
+_STUCK_RUN_TTL_S = 120.0
+
+
+def _model_keys() -> set[str]:
+    """``{"provedor/modelo", ...}`` do catálogo atual (cache de 2 min)."""
+    now = time.time()
+    with _MODEL_KEYS_LOCK:
+        if _MODEL_KEYS_CACHE["keys"] and now - float(_MODEL_KEYS_CACHE["at"]) < _MODEL_KEYS_TTL_S:
+            return set(_MODEL_KEYS_CACHE["keys"])
+    payload = _catalog_json("/api/model", timeout=8.0, wait=2.0)
+    rows = payload.get("data") if isinstance(payload, dict) else None
+    keys = {
+        f"{row.get('providerID')}/{row.get('id')}"
+        for row in (rows or [])
+        if isinstance(row, dict) and row.get("providerID") and row.get("id")
+    }
+    if keys:
+        with _MODEL_KEYS_LOCK:
+            _MODEL_KEYS_CACHE["keys"] = frozenset(keys)
+            _MODEL_KEYS_CACHE["at"] = now
+    return keys
+
+
+def _config_model_ref() -> dict | None:
+    """Modelo padrão do ``/api/config`` como ``{providerID, id}``."""
+    cfg = _api_json("/api/config", timeout=5.0)
+    data = cfg.get("data") if isinstance(cfg, dict) else None
+    model = str((data or {}).get("model") or "").strip()
+    if "/" not in model:
+        return None
+    provider, _, model_id = model.partition("/")
+    provider, model_id = provider.strip(), model_id.split("#")[0].strip()
+    if not provider or not model_id:
+        return None
+    return {"providerID": provider, "id": model_id}
+
+
+def _replacement_ref(provider_id: str, keys: set[str]) -> dict | None:
+    """Melhor modelo substituto: mesmo provedor → padrão da config → 1º livre."""
+    same = sorted(key for key in keys if key.startswith(f"{provider_id}/"))
+    if same:
+        return {"providerID": provider_id, "id": same[0].split("/", 1)[1]}
+    default = _config_model_ref()
+    if default and f"{default['providerID']}/{default['id']}" in keys:
+        return default
+    for key in sorted(keys):
+        provider, _, model_id = key.partition("/")
+        if provider and model_id:
+            return {"providerID": provider, "id": model_id}
+    return None
+
+
+def _post_session_model(session_id: str, ref: dict) -> bool:
+    """``POST /api/session/<id>/model`` no motor (``True`` se aceitou)."""
+    host, port, password = service_info()
+    if not port or not session_id or not ref:
+        return False
+    conn = http.client.HTTPConnection(host, port, timeout=6.0)
+    try:
+        body = json.dumps({"model": ref}).encode("utf-8")
+        conn.request(
+            "POST",
+            f"/api/session/{session_id}/model{_location_query(session_id)}",
+            body=body,
+            headers={
+                "Authorization": _basic(password),
+                "Content-Type": "application/json",
+            },
+        )
+        resp = conn.getresponse()
+        resp.read()
+        return 200 <= resp.status < 300
+    except OSError:
+        return False
+    finally:
+        conn.close()
+
+
+def repair_session_model(data: bytes) -> bytes:
+    """Troca o modelo da sessão quando ele não existe neste ambiente.
+
+    Sessão com ``model: null`` fica como está: a SPA resolve o padrão da
+    configuração (comportamento do motor). Só corrige o que está quebrado.
+    """
+    try:
+        payload = json.loads(data.decode("utf-8", "replace"))
+    except ValueError:
+        return data
+    row = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(row, dict):
+        return data
+    model = row.get("model") if isinstance(row.get("model"), dict) else {}
+    provider = str(model.get("providerID") or "").strip()
+    model_id = str(model.get("id") or "").strip()
+    if not provider or not model_id:
+        return data
+    keys = _model_keys()
+    if not keys or f"{provider}/{model_id}" in keys:
+        return data
+    session_id = str(row.get("id") or "").strip()
+    location = row.get("location") if isinstance(row.get("location"), dict) else {}
+    remember_session_dir(session_id, str(location.get("directory") or ""))
+    now = time.time()
+    with _MODEL_REPAIR_LOCK:
+        if now - _MODEL_REPAIR_TRIED.get(session_id, 0.0) < _MODEL_REPAIR_TTL_S:
+            return data
+        _MODEL_REPAIR_TRIED[session_id] = now
+        if len(_MODEL_REPAIR_TRIED) > 200:
+            for key in sorted(_MODEL_REPAIR_TRIED, key=_MODEL_REPAIR_TRIED.get)[:100]:
+                _MODEL_REPAIR_TRIED.pop(key, None)
+    ref = _replacement_ref(provider, keys)
+    if not ref or not _post_session_model(session_id, ref):
+        return data
+    row["model"] = dict(model)
+    row["model"]["providerID"] = ref["providerID"]
+    row["model"]["id"] = ref["id"]
+    row["model"].pop("variant", None)
+    try:
+        return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    except (TypeError, ValueError):
+        return data
+
+
+def remember_seen_session(session_id: str) -> None:
+    """Guarda as sessões que o navegador abriu (vigia de execução travada)."""
+    sid = str(session_id or "").strip()
+    if not sid.startswith("ses_"):
+        return
+    with _SEEN_LOCK:
+        _SEEN_SESSIONS[sid] = time.time()
+        if len(_SEEN_SESSIONS) > 60:
+            for key in sorted(_SEEN_SESSIONS, key=_SEEN_SESSIONS.get)[:30]:
+                _SEEN_SESSIONS.pop(key, None)
+                _SESSION_DIR.pop(key, None)
+
+
+def remember_session_dir(session_id: str, directory: str) -> None:
+    """Diretório de trabalho da sessão (o motor exige ``location`` fora do cwd)."""
+    sid = str(session_id or "").strip()
+    directory = str(directory or "").strip()
+    if not sid.startswith("ses_") or not directory:
+        return
+    with _SEEN_LOCK:
+        _SESSION_DIR[sid] = directory
+
+
+def _location_query(session_id: str) -> str:
+    """``?location[directory]=…`` quando a sessão está fora do cwd do motor."""
+    with _SEEN_LOCK:
+        directory = _SESSION_DIR.get(str(session_id or ""))
+    if not directory:
+        return ""
+    return "?location%5Bdirectory%5D=" + quote(directory, safe="")
+
+
+def _active_session_ids() -> set[str]:
+    active = _api_json("/api/session/active", timeout=6.0)
+    rows = active.get("data") if isinstance(active, dict) else None
+    if not isinstance(rows, dict):
+        return set()
+    return {str(key) for key in rows}
+
+
+def _session_info(session_id: str) -> dict:
+    info = _api_json(f"/api/session/{session_id}{_location_query(session_id)}", timeout=6.0)
+    row = info.get("data") if isinstance(info, dict) else None
+    return row if isinstance(row, dict) else {}
+
+
+def _interrupt_session(session_id: str) -> bool:
+    host, port, password = service_info()
+    if not port:
+        return False
+    conn = http.client.HTTPConnection(host, port, timeout=6.0)
+    try:
+        conn.request(
+            "POST",
+            f"/api/session/{session_id}/interrupt{_location_query(session_id)}",
+            body=b"{}",
+            headers={
+                "Authorization": _basic(password),
+                "Content-Type": "application/json",
+            },
+        )
+        resp = conn.getresponse()
+        resp.read()
+        return 200 <= resp.status < 300
+    except OSError:
+        return False
+    finally:
+        conn.close()
+
+
+def unstick_sessions(now_ms: int | None = None) -> int:
+    """Interrompe execuções que o motor não reconhece mais como ativas.
+
+    ``busy > idle`` + ausente de ``/api/session/active`` = execução morta: a
+    SPA fica em "Trabalhando" para sempre e as mensagens novas nunca saem da
+    fila. Só age nesse caso (nunca numa execução real) e no máximo 1×/2 min
+    por sessão.
+    """
+    now_ms = int(now_ms if now_ms is not None else time.time() * 1000)
+    active = _active_session_ids()
+    with _SEEN_LOCK:
+        # Só conversas abertas nos últimos 30 min e, no máximo, 10 por ciclo.
+        recentes = [
+            sid
+            for sid, visto in sorted(_SEEN_SESSIONS.items(), key=lambda kv: -kv[1])
+            if now_ms / 1000.0 - visto < 1800.0
+        ][:10]
+    fixed = 0
+    for session_id in recentes:
+        if session_id in active:
+            continue
+        row = _session_info(session_id)
+        if not row:
+            continue
+        times = row.get("time") if isinstance(row.get("time"), dict) else {}
+        busy = int(times.get("busy") or 0)
+        idle = int(times.get("idle") or 0)
+        if not busy or busy <= idle:
+            continue
+        if now_ms - busy < _STUCK_RUN_S * 1000:
+            continue
+        with _RUNS_LOCK:
+            if now_ms / 1000.0 - _RUNS_LAST.get(session_id, 0.0) < _STUCK_RUN_TTL_S:
+                continue
+            _RUNS_LAST[session_id] = now_ms / 1000.0
+        if _interrupt_session(session_id):
+            fixed += 1
+    return fixed
+
+
+def _watch_stuck_runs() -> None:
+    """Vigia contínuo (15 s) das execuções mortas — ver ``unstick_sessions``."""
+    while not _RUNS_STOP.is_set():
+        try:
+            unstick_sessions()
+        except Exception:  # noqa: BLE001 — o vigia nunca derruba o proxy
+            pass
+        _RUNS_STOP.wait(15.0)
 
 
 # v0.8.0 (web14b): atrasa a 1ª conexão SSE de cada documento HTML (~1,2 s)
@@ -2189,6 +2462,7 @@ class _Handler(BaseHTTPRequestHandler):
                 ctype.startswith("text/html")
                 or rota_api in ("/api/model", "/api/provider")
                 or aggregate
+                or bool(_SESSION_GET_RE.match(rota_api))
                 or (method == "POST" and rota_api == "/api/session")
             )
             passthrough = ""
@@ -2218,6 +2492,16 @@ class _Handler(BaseHTTPRequestHandler):
                 data = aggregate_message_pages(self.path, data, extra_headers=extra)
             created_sid = ""
             status_out = resp.status
+            if (
+                method in ("GET", "HEAD")
+                and resp.status == 200
+                and _SESSION_GET_RE.match(rota_api)
+            ):
+                # v0.7.11-web16: conversa presa a modelo que este ambiente não
+                # oferece → troca pelo substituto válido antes de a SPA pintar.
+                sid_visto = _SESSION_GET_RE.match(rota_api).group(1)  # type: ignore[union-attr]
+                remember_seen_session(sid_visto)
+                data = repair_session_model(data)
             if method in ("GET", "HEAD") and rota_api in ("/api/model", "/api/provider"):
                 data, status_out = _catalog_response(
                     rota_api.rsplit("/", 1)[-1], data, resp.status
@@ -2231,6 +2515,8 @@ class _Handler(BaseHTTPRequestHandler):
                 _cache_put(cache_key, port, data)
             if method == "POST" and rota_api == "/api/session" and resp.status == 200:
                 data, created_sid = _brand_new_session(data)
+                if created_sid:
+                    remember_seen_session(created_sid)
             if ctype.startswith("text/html") and resp.status == 200:
                 _rearm_close_once()
                 sid = current_session()
@@ -2343,6 +2629,10 @@ def _start(port: int = 8002) -> bool:
             threading.Thread(
                 target=_watch_focus, name="ufvai-focus", daemon=True
             ).start()
+            _RUNS_STOP.clear()
+            threading.Thread(
+                target=_watch_stuck_runs, name="ufvai-runs", daemon=True
+            ).start()
             return True
         except OSError:
             return False
@@ -2354,6 +2644,7 @@ def stop() -> None:
         server, _SERVER = _SERVER, None
         _THREAD = None
     _FOCUS_STOP.set()
+    _RUNS_STOP.set()
     if server is not None:
         try:
             server.shutdown()

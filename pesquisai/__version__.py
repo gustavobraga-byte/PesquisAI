@@ -550,8 +550,8 @@ __brand__: str = "UFVAI"
 __brand_tagline__: str = "Pesquisa científica com integridade."
 
 # ── Metadados do release ───────────────────────────────────────
-__release_date__: str = "2026-11-06"
-__codename__: str = "VPN da UFV no Colab: OpenVPN em namespace isolado + tela de vínculo"
+__release_date__: str = "2026-11-17"
+__codename__: str = "Interface web42: formulários da question com busca periódica (robustez)"
 
 # ── Identidade do projeto ──────────────────────────────────────
 __author__: str = "Gustavo Bastos Braga"
