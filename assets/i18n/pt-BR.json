@@ -1,0 +1,1353 @@
+{
+  "name": "Português (Brasil)",
+  "language_picker": {
+    "question": "Escolha o idioma da interface do OpenCode",
+    "option_descriptions": {
+      "en": "Alternar para interface em inglês",
+      "zh-Hans": "Alternar para interface em chinês simplificado",
+      "zh-Hant": "Alternar para interface em chinês tradicional",
+      "pt-BR": "Alternar para interface em português (Brasil)"
+    }
+  },
+  "commands": {
+    "agent.cycle": {
+      "titles": {
+        "Agent cycle": "Ciclo de agentes",
+        "Next agent": "Próximo agente"
+      },
+      "description": "Alternar para o próximo agente"
+    },
+    "agent.cycle.reverse": {
+      "titles": {
+        "Agent cycle reverse": "Ciclo de agentes (inverso)",
+        "Previous agent": "Agente anterior"
+      },
+      "description": "Alternar para o agente anterior"
+    },
+    "agent.list": {
+      "titles": {
+        "Switch agent": "Trocar agente",
+        "List agents": "Listar agentes"
+      },
+      "description": "Trocar de agente"
+    },
+    "app.clear": {
+      "titles": {
+        "Clear the screen in mini": "Limpar a tela na minimapa",
+        "Clear screen": "Limpar tela"
+      },
+      "description": "Limpar a tela"
+    },
+    "app.console": {
+      "titles": {
+        "Toggle console": "Alternar console"
+      },
+      "description": "Alternar console"
+    },
+    "app.debug": {
+      "titles": {
+        "Toggle debug panel": "Alternar painel de depuração"
+      },
+      "description": "Alternar painel de depuração"
+    },
+    "app.exit": {
+      "titles": {
+        "Exit the app": "Sair do aplicativo",
+        "Exit the application": "Encerrar o aplicativo",
+        "Close diff viewer": "Fechar visualizador de diff",
+        "Dismiss form": "Descartar formulário",
+        "Cancel permission rejection": "Cancelar rejeição de permissão",
+        "Reject permission": "Rejeitar permissão"
+      },
+      "description": "Sair do aplicativo"
+    },
+    "app.scrap": {
+      "titles": {
+        "Open scrap screen": "Abrir tela de rascunhos"
+      },
+      "description": "Abrir tela de rascunhos"
+    },
+    "app.storybook": {
+      "titles": {
+        "Open storybook": "Abrir storybook"
+      },
+      "description": "Abrir storybook"
+    },
+    "app.toggle.animations": {
+      "titles": {
+        "Disable animations": "Desativar animações",
+        "Toggle animations": "Alternar animações",
+        "Enable animations": "Ativar animações"
+      },
+      "description": "Alternar animações"
+    },
+    "app.toggle.diffwrap": {
+      "titles": {
+        "Disable diff wrapping": "Desativar quebra de linha no diff",
+        "Toggle diff wrapping": "Alternar quebra de linha no diff",
+        "Enable diff wrapping": "Ativar quebra de linha no diff"
+      },
+      "description": "Alternar quebra de linha no diff"
+    },
+    "app.toggle.file_context": {
+      "titles": {
+        "Disable file context": "Desativar contexto de arquivo",
+        "Toggle file context": "Alternar contexto de arquivo",
+        "Enable file context": "Ativar contexto de arquivo"
+      },
+      "description": "Alternar contexto de arquivo"
+    },
+    "app.toggle.paste_summary": {
+      "titles": {
+        "Enable paste summary": "Ativar resumo de colagem",
+        "Toggle paste summary": "Alternar resumo de colagem",
+        "Disable paste summary": "Desativar resumo de colagem"
+      },
+      "description": "Alternar resumo de colagem"
+    },
+    "command.palette.show": {
+      "titles": {
+        "Show command palette": "Mostrar paleta de comandos",
+        "List available commands": "Listar comandos disponíveis",
+        "Open command palette": "Abrir paleta de comandos"
+      },
+      "description": "Abrir paleta de comandos"
+    },
+    "composer.shell.down": {
+      "titles": {
+        "Next shell": "Próximo shell"
+      },
+      "description": "Próximo shell"
+    },
+    "composer.shell.kill": {
+      "titles": {
+        "Kill shell command": "Encerrar comando de shell"
+      },
+      "description": "Encerrar comando de shell"
+    },
+    "composer.shell.select": {
+      "titles": {
+        "View shell output": "Ver saída do shell"
+      },
+      "description": "Ver saída do shell"
+    },
+    "composer.shell.up": {
+      "titles": {
+        "Previous shell": "Shell anterior"
+      },
+      "description": "Shell anterior"
+    },
+    "composer.subagent.down": {
+      "titles": {
+        "Next subagent": "Próximo subagente"
+      },
+      "description": "Próximo subagente"
+    },
+    "composer.subagent.interrupt": {
+      "titles": {
+        "Interrupt subagent": "Interromper subagente"
+      },
+      "description": "Interromper subagente"
+    },
+    "composer.subagent.select": {
+      "titles": {
+        "Navigate to subagent": "Ir para o subagente"
+      },
+      "description": "Ir para o subagente"
+    },
+    "composer.subagent.toggle-activity": {
+      "titles": {
+        "Toggle active subagents": "Alternar subagentes ativos"
+      },
+      "description": "Alternar subagentes ativos"
+    },
+    "composer.subagent.up": {
+      "titles": {
+        "Previous subagent": "Subagente anterior"
+      },
+      "description": "Subagente anterior"
+    },
+    "composer.terminal.down": {
+      "titles": {
+        "Next terminal": "Próximo terminal"
+      },
+      "description": "Próximo terminal"
+    },
+    "composer.terminal.select": {
+      "titles": {
+        "Select terminal": "Selecionar terminal"
+      },
+      "description": "Selecionar terminal"
+    },
+    "composer.terminal.up": {
+      "titles": {
+        "Previous terminal": "Terminal anterior"
+      },
+      "description": "Terminal anterior"
+    },
+    "diff.close": {
+      "titles": {
+        "Close diff viewer": "Fechar visualizador de diff"
+      },
+      "description": "Fechar visualizador de diff"
+    },
+    "diff.collapse": {
+      "titles": {
+        "Collapse diff viewer item": "Recolher item do visualizador de diff",
+        "Deprecated: file tree is mouse-controlled": "Obsoleto: a árvore de arquivos é controlada pelo mouse"
+      },
+      "description": "Recolher item do visualizador de diff"
+    },
+    "diff.down": {
+      "titles": {
+        "Move diff viewer down": "Mover visualizador de diff para baixo"
+      },
+      "description": "Mover visualizador de diff para baixo"
+    },
+    "diff.expand": {
+      "titles": {
+        "Expand diff viewer item": "Expandir item do visualizador de diff",
+        "Deprecated: file tree is mouse-controlled": "Obsoleto: a árvore de arquivos é controlada pelo mouse"
+      },
+      "description": "Expandir item do visualizador de diff"
+    },
+    "diff.expand_all": {
+      "titles": {
+        "Expand all diff viewer folders": "Expandir todas as pastas do visualizador de diff",
+        "Deprecated: file tree is mouse-controlled": "Obsoleto: a árvore de arquivos é controlada pelo mouse"
+      },
+      "description": "Expandir todas as pastas do visualizador de diff"
+    },
+    "diff.first": {
+      "titles": {
+        "Go to the start of the diff": "Ir para o início do diff"
+      },
+      "description": "Ir para o início do diff"
+    },
+    "diff.half_page.down": {
+      "titles": {
+        "Scroll diff viewer down half a page": "Rolar diff meia página abaixo",
+        "Scroll down half a page": "Rolar meia página abaixo"
+      },
+      "description": "Rolar diff meia página abaixo"
+    },
+    "diff.half_page.up": {
+      "titles": {
+        "Scroll diff viewer up half a page": "Rolar diff meia página acima",
+        "Scroll up half a page": "Rolar meia página acima"
+      },
+      "description": "Rolar diff meia página acima"
+    },
+    "diff.help": {
+      "titles": {
+        "Show more diff viewer shortcuts": "Mostrar mais atalhos do visualizador de diff"
+      },
+      "description": "Mostrar mais atalhos do diff"
+    },
+    "diff.last": {
+      "titles": {
+        "Go to the end of the diff": "Ir para o fim do diff"
+      },
+      "description": "Ir para o fim do diff"
+    },
+    "diff.mark_reviewed": {
+      "titles": {
+        "Toggle selected diff file reviewed": "Alternar revisão do arquivo de diff selecionado"
+      },
+      "description": "Marcar arquivo do diff como revisado"
+    },
+    "diff.next_file": {
+      "titles": {
+        "Jump to next diff file": "Ir para o próximo arquivo do diff"
+      },
+      "description": "Ir para o próximo arquivo do diff"
+    },
+    "diff.next_hunk": {
+      "titles": {
+        "Jump to next diff hunk": "Ir para o próximo bloco do diff"
+      },
+      "description": "Ir para o próximo bloco do diff"
+    },
+    "diff.open": {
+      "titles": {
+        "Open diff viewer": "Abrir visualizador de diff"
+      },
+      "description": "Abrir visualizador de diff"
+    },
+    "diff.page.down": {
+      "titles": {
+        "Page diff viewer down": "Página do diff para baixo"
+      },
+      "description": "Página do diff para baixo"
+    },
+    "diff.page.up": {
+      "titles": {
+        "Page diff viewer up": "Página do diff para cima"
+      },
+      "description": "Página do diff para cima"
+    },
+    "diff.previous_file": {
+      "titles": {
+        "Jump to previous diff file": "Ir para o arquivo anterior do diff"
+      },
+      "description": "Ir para o arquivo anterior do diff"
+    },
+    "diff.previous_hunk": {
+      "titles": {
+        "Jump to previous diff hunk": "Ir para o bloco anterior do diff"
+      },
+      "description": "Ir para o bloco anterior do diff"
+    },
+    "diff.single_patch": {
+      "titles": {
+        "Toggle single patch view": "Alternar visão de patch único"
+      },
+      "description": "Alternar visão de patch único"
+    },
+    "diff.switch_focus": {
+      "titles": {
+        "Switch diff viewer focus": "Alternar foco do visualizador de diff",
+        "Deprecated: keyboard navigation always controls the diff": "Obsoleto: o teclado sempre controla o diff"
+      },
+      "description": "Alternar foco do visualizador de diff"
+    },
+    "diff.switch_source": {
+      "titles": {
+        "Switch diff viewer source": "Alternar origem do diff"
+      },
+      "description": "Alternar origem do diff"
+    },
+    "diff.toggle": {
+      "titles": {
+        "Toggle diff viewer item": "Alternar item do visualizador de diff",
+        "Deprecated: file tree is mouse-controlled": "Obsoleto: a árvore de arquivos é controlada pelo mouse"
+      },
+      "description": "Alternar item do visualizador de diff"
+    },
+    "diff.toggle_file_tree": {
+      "titles": {
+        "Toggle diff viewer file tree": "Alternar árvore de arquivos do diff"
+      },
+      "description": "Alternar árvore de arquivos do diff"
+    },
+    "diff.toggle_view": {
+      "titles": {
+        "Toggle diff viewer split or unified view": "Alternar visão dividida ou unificada do diff"
+      },
+      "description": "Alternar visão dividida ou unificada do diff"
+    },
+    "diff.up": {
+      "titles": {
+        "Move diff viewer up": "Mover visualizador de diff para cima"
+      },
+      "description": "Mover visualizador de diff para cima"
+    },
+    "docs.open": {
+      "titles": {
+        "Open docs": "Abrir docs",
+        "Open documentation": "Abrir documentação"
+      },
+      "description": "Abrir documentação"
+    },
+    "help.show": {
+      "titles": {
+        "Help": "Ajuda",
+        "Open help dialog": "Abrir diálogo de ajuda"
+      },
+      "description": "Abrir diálogo de ajuda"
+    },
+    "location.reload": {
+      "titles": {
+        "Reload configuration": "Recarregar configuração",
+        "Reload locations": "Recarregar localizações"
+      },
+      "description": "Recarregar configuração"
+    },
+    "mcp.list": {
+      "titles": {
+        "MCP servers": "Servidores MCP",
+        "List MCP servers": "Listar servidores MCP"
+      },
+      "description": "Listar servidores MCP"
+    },
+    "messages.copy": {
+      "titles": {
+        "Copy last assistant message": "Copiar última mensagem do assistente",
+        "Copy message": "Copiar mensagem"
+      },
+      "description": "Copiar mensagens"
+    },
+    "model.cycle_favorite": {
+      "titles": {
+        "Favorite cycle": "Ciclo de favoritos",
+        "Next favorite model": "Próximo modelo favorito"
+      },
+      "description": "Próximo modelo favorito"
+    },
+    "model.cycle_favorite_reverse": {
+      "titles": {
+        "Favorite cycle reverse": "Ciclo de favoritos (inverso)",
+        "Previous favorite model": "Modelo favorito anterior"
+      },
+      "description": "Modelo favorito anterior"
+    },
+    "model.cycle_recent": {
+      "titles": {
+        "Model cycle": "Ciclo de modelos",
+        "Next recently used model": "Próximo modelo usado recentemente"
+      },
+      "description": "Próximo modelo usado recentemente"
+    },
+    "model.cycle_recent_reverse": {
+      "titles": {
+        "Model cycle reverse": "Ciclo de modelos (inverso)",
+        "Previous recently used model": "Modelo usado recentemente anterior"
+      },
+      "description": "Modelo usado recentemente anterior"
+    },
+    "model.dialog.favorite": {
+      "titles": {
+        "Toggle model favorite status": "Alternar status de favorito do modelo",
+        "Favorite": "Favoritar"
+      },
+      "description": "Alternar status de favorito do modelo"
+    },
+    "model.dialog.provider": {
+      "titles": {
+        "Open provider list from model dialog": "Abrir lista de provedores no diálogo de modelos",
+        "View all integrations": "Ver todas as integrações",
+        "Connect an integration": "Conectar uma integração"
+      },
+      "description": "Abrir lista de provedores"
+    },
+    "model.list": {
+      "titles": {
+        "Switch model": "Trocar modelo",
+        "List available models": "Listar modelos disponíveis"
+      },
+      "description": "Trocar de modelo"
+    },
+    "open.menu": {
+      "titles": {
+        "Open session or project": "Abrir sessão ou projeto",
+        "Open recent sessions and projects": "Abrir sessões e projetos recentes"
+      },
+      "description": "Abrir sessão ou projeto"
+    },
+    "opencode.debug": {
+      "titles": {
+        "View debug info": "Ver informações de depuração"
+      },
+      "description": "Ver informações de depuração"
+    },
+    "opencode.settings": {
+      "titles": {
+        "Open settings": "Abrir configurações"
+      },
+      "description": "Abrir configurações"
+    },
+    "opencode.status": {
+      "titles": {
+        "View status": "Ver status"
+      },
+      "description": "Ver status"
+    },
+    "opencode.update": {
+      "titles": {
+        "Update OpenCode": "Atualizar o OpenCode"
+      },
+      "description": "Atualizar o OpenCode"
+    },
+    "pane.focus.left": {
+      "titles": {
+        "Focus session pane": "Focar painel da sessão"
+      },
+      "description": "Focar painel da sessão"
+    },
+    "pane.focus.right": {
+      "titles": {
+        "Focus terminal pane": "Focar painel de terminal",
+        "Focus right pane": "Focar painel direito"
+      },
+      "description": "Focar painel direito"
+    },
+    "permission.mode": {
+      "titles": {
+        "Enable auto-approve permissions": "Ativar aprovação automática de permissões",
+        "Disable auto-approve permissions": "Desativar aprovação automática de permissões",
+        "Toggle auto-approve permissions": "Alternar aprovação automática de permissões"
+      },
+      "description": "Alternar aprovação automática de permissões da sessão"
+    },
+    "plugins.install": {
+      "titles": {
+        "Install plugin": "Instalar plugin"
+      },
+      "description": "Instalar plugin"
+    },
+    "plugins.list": {
+      "titles": {
+        "Plugins": "Plugins",
+        "Open plugin manager dialog": "Abrir gerenciador de plugins"
+      },
+      "description": "Abrir gerenciador de plugins"
+    },
+    "plugins.toggle": {
+      "titles": {
+        "Toggle plugin": "Alternar plugin",
+        "disable": "desativar",
+        "enable": "ativar"
+      },
+      "description": "Ativar/desativar plugin"
+    },
+    "prompt.autocomplete.complete": {
+      "titles": {
+        "Complete autocomplete item": "Completar item de autocompletar"
+      },
+      "description": "Completar item de autocompletar"
+    },
+    "prompt.autocomplete.destructive": {
+      "titles": {
+        "Confirm autocomplete action": "Confirmar ação de autocompletar"
+      },
+      "description": "Confirmar ação de autocompletar"
+    },
+    "prompt.autocomplete.hide": {
+      "titles": {
+        "Hide autocomplete": "Ocultar autocompletar"
+      },
+      "description": "Ocultar autocompletar"
+    },
+    "prompt.autocomplete.next": {
+      "titles": {
+        "Next autocomplete item": "Próximo item de autocompletar",
+        "Move to next autocomplete item": "Ir ao próximo item de autocompletar"
+      },
+      "description": "Próximo item de autocompletar"
+    },
+    "prompt.autocomplete.prev": {
+      "titles": {
+        "Previous autocomplete item": "Item anterior de autocompletar",
+        "Move to previous autocomplete item": "Ir ao item anterior de autocompletar"
+      },
+      "description": "Item anterior de autocompletar"
+    },
+    "prompt.autocomplete.select": {
+      "titles": {
+        "Select autocomplete item": "Selecionar item de autocompletar"
+      },
+      "description": "Selecionar item de autocompletar"
+    },
+    "prompt.clear": {
+      "titles": {
+        "Clear prompt": "Limpar prompt",
+        "Clear input field": "Limpar campo de entrada",
+        "Dismiss autocomplete": "Descartar autocompletar",
+        "Clear prompt or exit": "Limpar prompt ou sair",
+        "Clear answer edit": "Limpar edição de resposta"
+      },
+      "description": "Limpar prompt"
+    },
+    "prompt.editor": {
+      "titles": {
+        "Open editor": "Abrir editor",
+        "Open external editor": "Abrir editor externo"
+      },
+      "description": "Abrir editor externo"
+    },
+    "prompt.editor_context.clear": {
+      "titles": {
+        "Clear editor context": "Limpar contexto do editor",
+        "Remove editor context": "Remover contexto do editor"
+      },
+      "description": "Limpar contexto do editor"
+    },
+    "prompt.history.next": {
+      "titles": {
+        "Next prompt history": "Próximo histórico de prompts",
+        "Next history item": "Próximo item do histórico"
+      },
+      "description": "Próximo item do histórico de prompts"
+    },
+    "prompt.history.previous": {
+      "titles": {
+        "Previous prompt history": "Histórico de prompts anterior",
+        "Previous history item": "Item anterior do histórico"
+      },
+      "description": "Item anterior do histórico de prompts"
+    },
+    "prompt.images.view": {
+      "titles": {
+        "View image attachments": "Ver anexos de imagem"
+      },
+      "description": "Ver anexos de imagem"
+    },
+    "prompt.paste": {
+      "titles": {
+        "Paste": "Colar",
+        "Paste from clipboard": "Colar da área de transferência"
+      },
+      "description": "Colar da área de transferência"
+    },
+    "prompt.queue": {
+      "titles": {
+        "Queue prompt": "Enfileirar prompt"
+      },
+      "description": "Enfileirar prompt"
+    },
+    "prompt.skills": {
+      "titles": {
+        "Skills": "Skills",
+        "Open skill selector": "Abrir seletor de skills"
+      },
+      "description": "Abrir seletor de skills"
+    },
+    "prompt.stash": {
+      "titles": {
+        "Stash prompt": "Guardar prompt no stash"
+      },
+      "description": "Guardar prompt no stash"
+    },
+    "prompt.stash.list": {
+      "titles": {
+        "List stashed prompts": "Listar prompts no stash",
+        "Stash list": "Lista do stash"
+      },
+      "description": "Listar prompts no stash"
+    },
+    "prompt.stash.pop": {
+      "titles": {
+        "Pop stashed prompt": "Restaurar prompt do stash",
+        "Stash pop": "Restaurar do stash"
+      },
+      "description": "Restaurar prompt do stash"
+    },
+    "prompt.submit": {
+      "titles": {
+        "Submit prompt": "Enviar prompt"
+      },
+      "description": "Enviar prompt"
+    },
+    "provider.connect": {
+      "titles": {
+        "Connect an integration": "Conectar uma integração",
+        "Connect integration": "Conectar integração"
+      },
+      "description": "Conectar integração"
+    },
+    "queued_prompt.delete": {
+      "titles": {
+        "Delete queued prompt": "Excluir prompt na fila",
+        "Delete pending prompt": "Excluir prompt pendente"
+      },
+      "description": "Excluir prompt na fila"
+    },
+    "server.pair": {
+      "titles": {
+        "Pair device": "Emparelhar dispositivo"
+      },
+      "description": "Emparelhar dispositivo"
+    },
+    "service.restart": {
+      "titles": {
+        "Restart service": "Reiniciar serviço"
+      },
+      "description": "Reiniciar serviço"
+    },
+    "session.aside": {
+      "titles": {
+        "Ask a side question": "Fazer pergunta avulsa"
+      },
+      "description": "Pergunta avulsa baseada no contexto da sessão (não fica no histórico)"
+    },
+    "session.background": {
+      "titles": {
+        "Background blocking tools": "Ferramentas bloqueantes em 2º plano",
+        "Background blocking session tools": "Ferramentas de sessão em 2º plano (bloqueantes)",
+        "Background subagents": "Subagentes em 2º plano"
+      },
+      "description": "Subagentes e ferramentas em segundo plano"
+    },
+    "session.cd": {
+      "titles": {
+        "Change working directory": "Alterar diretório de trabalho"
+      },
+      "description": "Alterar diretório de trabalho"
+    },
+    "session.child.first": {
+      "titles": {
+        "Toggle subagent picker": "Alternar seletor de subagentes",
+        "View subagents": "Ver subagentes"
+      },
+      "description": "Alternar seletor de subagentes"
+    },
+    "session.child.next": {
+      "titles": {
+        "Go to next child session": "Ir para a próxima sessão filha"
+      },
+      "description": "Ir para a próxima sessão filha"
+    },
+    "session.child.previous": {
+      "titles": {
+        "Go to previous child session": "Ir para a sessão filha anterior"
+      },
+      "description": "Ir para a sessão filha anterior"
+    },
+    "session.compact": {
+      "titles": {
+        "Compact session": "Compactar sessão",
+        "Compact the session": "Compactar a sessão"
+      },
+      "description": "Compactar a sessão"
+    },
+    "session.copy": {
+      "titles": {
+        "Copy session transcript": "Copiar transcrição da sessão"
+      },
+      "description": "Copiar transcrição da sessão"
+    },
+    "session.copy.id": {
+      "titles": {
+        "Copy session ID": "Copiar ID da sessão"
+      },
+      "description": "Copiar ID da sessão"
+    },
+    "session.delete": {
+      "titles": {
+        "delete": "excluir",
+        "Delete session": "Excluir sessão"
+      },
+      "description": "Excluir sessão"
+    },
+    "session.export": {
+      "titles": {
+        "Export session transcript": "Exportar transcrição da sessão",
+        "Export session to editor": "Exportar sessão para o editor"
+      },
+      "description": "Exportar transcrição da sessão"
+    },
+    "session.first": {
+      "titles": {
+        "First message": "Primeira mensagem",
+        "Navigate to first message": "Ir para a primeira mensagem"
+      },
+      "description": "Ir para a primeira mensagem"
+    },
+    "session.fork": {
+      "titles": {
+        "Fork session": "Bifurcar sessão",
+        "Fork session from message": "Bifurcar sessão a partir da mensagem"
+      },
+      "description": "Bifurcar sessão"
+    },
+    "session.half.page.down": {
+      "titles": {
+        "Half page down": "Meia página abaixo",
+        "Scroll messages down by half page": "Rolar mensagens meia página abaixo"
+      },
+      "description": "Rolar mensagens meia página abaixo"
+    },
+    "session.half.page.up": {
+      "titles": {
+        "Half page up": "Meia página acima",
+        "Scroll messages up by half page": "Rolar mensagens meia página acima"
+      },
+      "description": "Rolar mensagens meia página acima"
+    },
+    "session.interrupt": {
+      "titles": {
+        "Interrupt session": "Interromper sessão",
+        "Interrupt current session": "Interromper sessão atual"
+      },
+      "description": "Interromper sessão"
+    },
+    "session.last": {
+      "titles": {
+        "Last message": "Última mensagem",
+        "Navigate to last message": "Ir para a última mensagem"
+      },
+      "description": "Ir para a última mensagem"
+    },
+    "session.line.down": {
+      "titles": {
+        "Line down": "Uma linha abaixo",
+        "Scroll messages down by one line": "Rolar mensagens uma linha abaixo"
+      },
+      "description": "Rolar mensagens uma linha abaixo"
+    },
+    "session.line.up": {
+      "titles": {
+        "Line up": "Uma linha acima",
+        "Scroll messages up by one line": "Rolar mensagens uma linha acima"
+      },
+      "description": "Rolar mensagens uma linha acima"
+    },
+    "session.list": {
+      "titles": {
+        "Switch session": "Trocar de sessão",
+        "List all sessions": "Listar todas as sessões"
+      },
+      "description": "Trocar de sessão"
+    },
+    "session.message.next": {
+      "titles": {
+        "Next message": "Próxima mensagem",
+        "Navigate to next message": "Ir para a próxima mensagem"
+      },
+      "description": "Ir para a próxima mensagem"
+    },
+    "session.message.previous": {
+      "titles": {
+        "Previous message": "Mensagem anterior",
+        "Navigate to previous message": "Ir para a mensagem anterior"
+      },
+      "description": "Ir para a mensagem anterior"
+    },
+    "session.message.user.next": {
+      "titles": {
+        "Next user message": "Próxima mensagem do usuário",
+        "Navigate to next user message": "Ir para a próxima mensagem do usuário"
+      },
+      "description": "Ir para a próxima mensagem do usuário"
+    },
+    "session.message.user.previous": {
+      "titles": {
+        "Previous user message": "Mensagem anterior do usuário",
+        "Navigate to previous user message": "Ir para a mensagem anterior do usuário"
+      },
+      "description": "Ir para a mensagem anterior do usuário"
+    },
+    "session.messages_last_user": {
+      "titles": {
+        "Jump to last user message": "Ir para a última mensagem do usuário",
+        "Navigate to last user message": "Ir para a última mensagem do usuário"
+      },
+      "description": "Ir para a última mensagem do usuário"
+    },
+    "session.move": {
+      "titles": {
+        "Move session": "Mover sessão",
+        "Manage workspaces": "Gerenciar workspaces"
+      },
+      "description": "Gerenciar workspaces"
+    },
+    "session.new": {
+      "titles": {
+        "New session": "Nova sessão",
+        "Create a new session": "Criar uma nova sessão"
+      },
+      "description": "Nova sessão"
+    },
+    "session.page.down": {
+      "titles": {
+        "Page down": "Página abaixo",
+        "Scroll messages down by one page": "Rolar mensagens uma página abaixo"
+      },
+      "description": "Rolar mensagens uma página abaixo"
+    },
+    "session.page.up": {
+      "titles": {
+        "Page up": "Página acima",
+        "Scroll messages up by one page": "Rolar mensagens uma página acima"
+      },
+      "description": "Rolar mensagens uma página acima"
+    },
+    "session.parent": {
+      "titles": {
+        "Go to parent session": "Ir para a sessão pai"
+      },
+      "description": "Ir para a sessão pai"
+    },
+    "session.pin.toggle": {
+      "titles": {
+        "Pin or unpin session in the session list": "Fixar/desafixar sessão na lista"
+      },
+      "description": "Fixar/desafixar sessão na lista"
+    },
+    "session.queued_prompts": {
+      "titles": {
+        "Manage queued prompts": "Gerenciar prompts na fila",
+        "View queued prompts": "Ver prompts na fila",
+        "View pending prompts": "Ver prompts pendentes"
+      },
+      "description": "Gerenciar prompts na fila"
+    },
+    "session.quick_switch.1": {
+      "titles": {
+        "Switch to session in quick slot 1": "Ir para a sessão no slot rápido 1"
+      },
+      "description": "Ir para a sessão no slot rápido 1"
+    },
+    "session.quick_switch.2": {
+      "titles": {
+        "Switch to session in quick slot 2": "Ir para a sessão no slot rápido 2"
+      },
+      "description": "Ir para a sessão no slot rápido 2"
+    },
+    "session.quick_switch.3": {
+      "titles": {
+        "Switch to session in quick slot 3": "Ir para a sessão no slot rápido 3"
+      },
+      "description": "Ir para a sessão no slot rápido 3"
+    },
+    "session.quick_switch.4": {
+      "titles": {
+        "Switch to session in quick slot 4": "Ir para a sessão no slot rápido 4"
+      },
+      "description": "Ir para a sessão no slot rápido 4"
+    },
+    "session.quick_switch.5": {
+      "titles": {
+        "Switch to session in quick slot 5": "Ir para a sessão no slot rápido 5"
+      },
+      "description": "Ir para a sessão no slot rápido 5"
+    },
+    "session.quick_switch.6": {
+      "titles": {
+        "Switch to session in quick slot 6": "Ir para a sessão no slot rápido 6"
+      },
+      "description": "Ir para a sessão no slot rápido 6"
+    },
+    "session.quick_switch.7": {
+      "titles": {
+        "Switch to session in quick slot 7": "Ir para a sessão no slot rápido 7"
+      },
+      "description": "Ir para a sessão no slot rápido 7"
+    },
+    "session.quick_switch.8": {
+      "titles": {
+        "Switch to session in quick slot 8": "Ir para a sessão no slot rápido 8"
+      },
+      "description": "Ir para a sessão no slot rápido 8"
+    },
+    "session.quick_switch.9": {
+      "titles": {
+        "Switch to session in quick slot 9": "Ir para a sessão no slot rápido 9"
+      },
+      "description": "Ir para a sessão no slot rápido 9"
+    },
+    "session.redo": {
+      "titles": {
+        "Redo": "Refazer",
+        "Redo message": "Refazer mensagem"
+      },
+      "description": "Refazer mensagem"
+    },
+    "session.rename": {
+      "titles": {
+        "Rename session": "Renomear sessão",
+        "rename": "renomear"
+      },
+      "description": "Renomear sessão"
+    },
+    "session.share": {
+      "titles": {
+        "Share session": "Compartilhar sessão",
+        "Share current session": "Compartilhar sessão atual"
+      },
+      "description": "Compartilhar sessão"
+    },
+    "session.sidebar.toggle": {
+      "titles": {
+        "Hide sidebar": "Ocultar barra lateral",
+        "Show sidebar": "Mostrar barra lateral",
+        "Toggle sidebar": "Alternar barra lateral"
+      },
+      "description": "Alternar barra lateral"
+    },
+    "session.tab.close": {
+      "titles": {
+        "Close tab": "Fechar aba",
+        "Close current session tab": "Fechar aba de sessão atual"
+      },
+      "description": "Fechar aba atual"
+    },
+    "session.tab.history.back": {
+      "titles": {
+        "Go back in session tab history": "Voltar no histórico de abas de sessão"
+      },
+      "description": "Voltar no histórico de abas"
+    },
+    "session.tab.history.forward": {
+      "titles": {
+        "Go forward in session tab history": "Avançar no histórico de abas de sessão"
+      },
+      "description": "Avançar no histórico de abas"
+    },
+    "session.tab.next": {
+      "titles": {
+        "Next tab": "Próxima aba",
+        "Switch to next open session tab": "Ir à próxima aba de sessão aberta"
+      },
+      "description": "Próxima aba aberta"
+    },
+    "session.tab.next_unread": {
+      "titles": {
+        "Next unread tab": "Próxima aba não lida",
+        "Switch to next unread session tab": "Ir à próxima aba de sessão não lida"
+      },
+      "description": "Próxima aba não lida"
+    },
+    "session.tab.previous": {
+      "titles": {
+        "Previous tab": "Aba anterior",
+        "Switch to previous open session tab": "Ir à aba de sessão aberta anterior"
+      },
+      "description": "Aba aberta anterior"
+    },
+    "session.tab.previous_unread": {
+      "titles": {
+        "Previous unread tab": "Aba não lida anterior",
+        "Switch to previous unread session tab": "Ir à aba de sessão não lida anterior"
+      },
+      "description": "Aba não lida anterior"
+    },
+    "session.tab.reopen": {
+      "titles": {
+        "Reopen closed tab": "Reabrir aba fechada",
+        "Reopen last closed session tab": "Reabrir última aba de sessão fechada"
+      },
+      "description": "Reabrir aba fechada"
+    },
+    "session.tab.select.1": {
+      "titles": {
+        "Switch to tab 1": "Ir para a aba 1",
+        "Switch to session tab 1": "Ir para a aba de sessão 1"
+      },
+      "description": "Ir para a aba de sessão 1"
+    },
+    "session.tab.select.10": {
+      "titles": {
+        "Switch to tab 10": "Ir para a aba 10",
+        "Switch to session tab 10": "Ir para a aba de sessão 10"
+      },
+      "description": "Ir para a aba de sessão 10"
+    },
+    "session.tab.select.2": {
+      "titles": {
+        "Switch to tab 2": "Ir para a aba 2",
+        "Switch to session tab 2": "Ir para a aba de sessão 2"
+      },
+      "description": "Ir para a aba de sessão 2"
+    },
+    "session.tab.select.3": {
+      "titles": {
+        "Switch to tab 3": "Ir para a aba 3",
+        "Switch to session tab 3": "Ir para a aba de sessão 3"
+      },
+      "description": "Ir para a aba de sessão 3"
+    },
+    "session.tab.select.4": {
+      "titles": {
+        "Switch to tab 4": "Ir para a aba 4",
+        "Switch to session tab 4": "Ir para a aba de sessão 4"
+      },
+      "description": "Ir para a aba de sessão 4"
+    },
+    "session.tab.select.5": {
+      "titles": {
+        "Switch to tab 5": "Ir para a aba 5",
+        "Switch to session tab 5": "Ir para a aba de sessão 5"
+      },
+      "description": "Ir para a aba de sessão 5"
+    },
+    "session.tab.select.6": {
+      "titles": {
+        "Switch to tab 6": "Ir para a aba 6",
+        "Switch to session tab 6": "Ir para a aba de sessão 6"
+      },
+      "description": "Ir para a aba de sessão 6"
+    },
+    "session.tab.select.7": {
+      "titles": {
+        "Switch to tab 7": "Ir para a aba 7",
+        "Switch to session tab 7": "Ir para a aba de sessão 7"
+      },
+      "description": "Ir para a aba de sessão 7"
+    },
+    "session.tab.select.8": {
+      "titles": {
+        "Switch to tab 8": "Ir para a aba 8",
+        "Switch to session tab 8": "Ir para a aba de sessão 8"
+      },
+      "description": "Ir para a aba de sessão 8"
+    },
+    "session.tab.select.9": {
+      "titles": {
+        "Switch to tab 9": "Ir para a aba 9",
+        "Switch to session tab 9": "Ir para a aba de sessão 9"
+      },
+      "description": "Ir para a aba de sessão 9"
+    },
+    "session.terminal": {
+      "titles": {
+        "New terminal": "Novo terminal"
+      },
+      "description": "Novo terminal"
+    },
+    "session.timeline": {
+      "titles": {
+        "Jump to message": "Ir para a mensagem",
+        "Show session timeline": "Mostrar linha do tempo da sessão"
+      },
+      "description": "Mostrar linha do tempo da sessão"
+    },
+    "session.toggle.exploration_grouping": {
+      "titles": {
+        "Show tool calls individually": "Mostrar chamadas de ferramentas individualmente",
+        "Toggle related tool call grouping": "Alternar agrupamento de chamadas de ferramentas",
+        "Group related tool calls": "Agrupar chamadas de ferramentas relacionadas"
+      },
+      "description": "Alternar agrupamento de chamadas de ferramentas"
+    },
+    "session.toggle.scrollbar": {
+      "titles": {
+        "Toggle session scrollbar": "Alternar barra de rolagem da sessão"
+      },
+      "description": "Alternar barra de rolagem da sessão"
+    },
+    "session.toggle.thinking": {
+      "titles": {
+        "Expand thinking": "Expandir raciocínio",
+        "Toggle thinking blocks visibility": "Alternar visibilidade do raciocínio"
+      },
+      "description": "Alternar visibilidade do raciocínio"
+    },
+    "session.undo": {
+      "titles": {
+        "Undo previous message": "Desfazer mensagem anterior",
+        "Undo message": "Desfazer mensagem"
+      },
+      "description": "Desfazer mensagem anterior"
+    },
+    "session.unshare": {
+      "titles": {
+        "Unshare current session": "Cancelar compartilhamento da sessão",
+        "Unshare session": "Cancelar compartilhamento"
+      },
+      "description": "Cancelar compartilhamento da sessão"
+    },
+    "stash.delete": {
+      "titles": {
+        "Delete stash entry": "Excluir item do stash"
+      },
+      "description": "Excluir item do stash"
+    },
+    "stats.open": {
+      "titles": {
+        "Usage statistics": "Estatísticas de uso"
+      },
+      "description": "Estatísticas de uso"
+    },
+    "terminal.close": {
+      "titles": {
+        "Close terminal pane": "Fechar painel de terminal"
+      },
+      "description": "Fechar painel de terminal"
+    },
+    "terminal.select": {
+      "titles": {
+        "Select terminal": "Selecionar terminal"
+      },
+      "description": "Selecionar terminal"
+    },
+    "terminal.suspend": {
+      "titles": {
+        "Suspend terminal": "Suspender terminal"
+      },
+      "description": "Suspender terminal"
+    },
+    "terminal.title.toggle": {
+      "titles": {
+        "Disable terminal title": "Desativar título do terminal",
+        "Toggle terminal title": "Alternar título do terminal",
+        "Enable terminal title": "Ativar título do terminal"
+      },
+      "description": "Alternar título do terminal"
+    },
+    "terminal.toggle": {
+      "titles": {
+        "Toggle terminal pane": "Alternar painel de terminal",
+        "Hide terminal pane": "Ocultar painel de terminal",
+        "Show terminal pane": "Mostrar painel de terminal"
+      },
+      "description": "Alternar painel de terminal"
+    },
+    "theme.mode.lock": {
+      "titles": {
+        "Lock theme mode": "Bloquear modo de tema",
+        "Lock or unlock theme mode": "Bloquear ou desbloquear modo de tema",
+        "Unlock theme mode": "Desbloquear modo de tema"
+      },
+      "description": "Bloquear/desbloquear modo de tema"
+    },
+    "theme.switch": {
+      "titles": {
+        "Switch theme": "Trocar tema",
+        "List available themes": "Listar temas disponíveis"
+      },
+      "description": "Trocar tema"
+    },
+    "theme.switch_mode": {
+      "titles": {
+        "Switch to light mode": "Alternar para modo claro",
+        "Switch between light and dark theme mode": "Alternar entre modo claro e escuro",
+        "Switch to dark mode": "Alternar para modo escuro"
+      },
+      "description": "Alternar entre modo claro e escuro"
+    },
+    "variant.cycle": {
+      "titles": {
+        "Variant cycle": "Ciclo de variantes",
+        "Cycle model variants": "Alternar entre variantes do modelo",
+        "Cycle model variant": "Alternar variante do modelo"
+      },
+      "description": "Alternar variantes do modelo"
+    },
+    "variant.list": {
+      "titles": {
+        "Switch model variant": "Trocar variante do modelo",
+        "List model variants": "Listar variantes de modelo"
+      },
+      "description": "Trocar variante do modelo"
+    },
+    "which-key.end": {
+      "titles": {
+        "Jump to last which-key binding": "Ir ao último atalho (which-key)"
+      },
+      "description": "Ir ao último atalho (which-key)"
+    },
+    "which-key.group.next": {
+      "titles": {
+        "Next which-key group": "Próximo grupo (which-key)"
+      },
+      "description": "Próximo grupo (which-key)"
+    },
+    "which-key.group.previous": {
+      "titles": {
+        "Previous which-key group": "Grupo anterior (which-key)"
+      },
+      "description": "Grupo anterior (which-key)"
+    },
+    "which-key.home": {
+      "titles": {
+        "Jump to first which-key binding": "Ir ao primeiro atalho (which-key)"
+      },
+      "description": "Ir ao primeiro atalho (which-key)"
+    },
+    "which-key.layout.toggle": {
+      "titles": {
+        "Switch which-key layout": "Alternar layout do which-key"
+      },
+      "description": "Alternar layout do which-key"
+    },
+    "which-key.page.down": {
+      "titles": {
+        "Page which-key down": "Página which-key abaixo"
+      },
+      "description": "Página which-key abaixo"
+    },
+    "which-key.page.up": {
+      "titles": {
+        "Page which-key up": "Página which-key acima"
+      },
+      "description": "Página which-key acima"
+    },
+    "which-key.pending.toggle": {
+      "titles": {
+        "Toggle which-key pending preview": "Alternar prévia pendente do which-key"
+      },
+      "description": "Alternar prévia pendente do which-key"
+    },
+    "which-key.scroll.down": {
+      "titles": {
+        "Scroll which-key down": "Rolar which-key abaixo"
+      },
+      "description": "Rolar which-key abaixo"
+    },
+    "which-key.scroll.up": {
+      "titles": {
+        "Scroll which-key up": "Rolar which-key acima"
+      },
+      "description": "Rolar which-key acima"
+    },
+    "which-key.toggle": {
+      "titles": {
+        "Toggle which-key panel": "Alternar painel which-key"
+      },
+      "description": "Alternar painel which-key"
+    }
+  },
+  "groups": {
+    "Agent": "Agentes",
+    "Autocomplete": "Autocompletar",
+    "Composer": "Composição",
+    "Dialog": "Diálogos",
+    "Execute": "Execução",
+    "Integration": "Integrações",
+    "Prompt": "Prompts",
+    "Session": "Sessões",
+    "System": "Sistema",
+    "VCS": "Controle de versão",
+    "Suggested": "Sugestões",
+    "Workspace": "Workspaces",
+    "Model": "Modelos",
+    "Provider": "Provedores",
+    "Providers": "Provedores",
+    "Permission": "Permissões",
+    "Question": "Perguntas",
+    "Form": "Formulários",
+    "Debug": "Depuração"
+  },
+  "slash_commands": {
+    "/agents": "Trocar agente",
+    "/btw": "Pergunta avulsa (responde uma vez com base no contexto, sem gravar no histórico)",
+    "/cd": "Alterar diretório de trabalho",
+    "/clear": "Nova sessão",
+    "/compact": "Compactar o contexto da sessão",
+    "/connect": "Conectar provedor de modelos",
+    "/continue": "Trocar de sessão",
+    "/copy": "Copiar a sessão completa",
+    "/debug": "Ver informações de depuração",
+    "/diff": "Abrir visualizador de diff",
+    "/editor": "Abrir editor externo",
+    "/effort": "Alternar variante do modelo (intensidade de raciocínio)",
+    "/exit": "Sair do aplicativo (apelidos: /quit, /q)",
+    "/export": "Exportar a sessão completa",
+    "/fork": "Bifurcar sessão",
+    "/help": "Mostrar ajuda",
+    "/mcps": "Alternar MCP",
+    "/models": "Listar modelos disponíveis",
+    "/new": "Nova sessão (apelido: /clear)",
+    "/open": "Abrir sessão ou projeto",
+    "/pair": "Emparelhar dispositivo",
+    "/plugins": "Plugins",
+    "/project": "Abrir sessão ou projeto",
+    "/projects": "Abrir sessão ou projeto",
+    "/q": "Sair do aplicativo",
+    "/quit": "Sair do aplicativo",
+    "/redo": "Refazer",
+    "/reload": "Recarregar configuração",
+    "/rename": "Renomear sessão",
+    "/restart": "Reiniciar serviço",
+    "/resume": "Trocar de sessão",
+    "/sessions": "Trocar de sessão (apelidos: /resume, /continue)",
+    "/settings": "Abrir configurações",
+    "/share": "Compartilhar sessão",
+    "/skills": "Selecionar skill",
+    "/stats": "Ver estatísticas de uso",
+    "/status": "Ver status",
+    "/terminal": "Novo terminal",
+    "/themes": "Trocar tema",
+    "/thinking": "Alternar variante do modelo (intensidade de raciocínio)",
+    "/timeline": "Ir para a mensagem",
+    "/toggle-thinking": "Alternar visibilidade do raciocínio",
+    "/undo": "Desfazer mensagem anterior",
+    "/unshare": "Cancelar compartilhamento",
+    "/update": "Atualizar o OpenCode",
+    "/upgrade": "Atualizar o OpenCode",
+    "/variants": "Alternar variante do modelo",
+    "/web": "Emparelhar dispositivo",
+    "/worktrees": "Gerenciar workspaces"
+  }
+}

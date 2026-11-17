@@ -1,0 +1,11 @@
+{
+  "name": "ufvai-retry",
+  "version": "0.7.10",
+  "private": true,
+  "type": "module",
+  "description": "UFVAI: repete automaticamente requisições barradas por cota/limite de taxa (429/503), esperando a janela do provedor.",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": ["index.js", "README.md"]
+}

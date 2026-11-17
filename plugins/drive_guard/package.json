@@ -1,0 +1,15 @@
+{
+  "name": "ufvai-drive-guard",
+  "version": "0.7.7",
+  "private": true,
+  "type": "module",
+  "description": "UFVAI: bloqueia o acesso do agente a \"My Drive\" fora da pasta PesquisAI (inclusive com --auto).",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "policy.js",
+    "README.md"
+  ]
+}
