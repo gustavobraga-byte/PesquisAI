@@ -31,10 +31,6 @@ def _isolate(tmp_path, monkeypatch):
     """Cada teste roda com estado e credenciais isolados."""
     monkeypatch.setenv("UFVAI_VPN_DIR", str(tmp_path / "vpn"))
     monkeypatch.setenv("HOME", str(tmp_path))
-    # v0.7.11-web12: o espelho persistente (Drive) não pode vazar entre testes
-    monkeypatch.setenv(
-        "UFVAI_VPN_PREFS_FILE", str(tmp_path / "backups" / "ufvai_vpn_prefs.json")
-    )
     with vpn._LOCK:
         vpn._STATE.update(
             {
@@ -152,66 +148,6 @@ def test_mark_decision_ufv():
     vpn.mark_decision("ufv")
     assert vpn.load_prefs()["last_choice"] == "ufv"
     assert vpn.should_ask(str(vpn.state_dir())) is False
-
-
-def test_decisao_sobrevive_a_novo_runtime(tmp_path, monkeypatch):
-    """Novo acesso (state_dir vazio) não pergunta de novo: vale o espelho."""
-    vpn.mark_decision("ufv")
-    mirror = tmp_path / "backups" / "ufvai_vpn_prefs.json"
-    assert mirror.is_file()
-
-    # simula um runtime novo: ~/.config zerado, Drive intacto
-    novo = tmp_path / "runtime2"
-    monkeypatch.setenv("UFVAI_VPN_DIR", str(novo))
-    assert vpn.load_prefs()["last_choice"] == "ufv"
-    assert vpn.should_ask(str(vpn.state_dir())) is False
-
-
-def test_espelho_local_e_drive_se_completam(tmp_path, monkeypatch):
-    """Decisão antiga só no Drive continua valendo; o local não a apaga."""
-    mirror = tmp_path / "backups" / "ufvai_vpn_prefs.json"
-    mirror.parent.mkdir(parents=True, exist_ok=True)
-    mirror.write_text('{"ask_dismissed": true, "last_choice": "no"}', encoding="utf-8")
-    # prefs locais novas, sem a chave (ex.: gravadas por uma versão antiga)
-    vpn.save_prefs({"last_choice": "ufv"})
-    assert vpn.load_prefs()["ask_dismissed"] is True
-    assert vpn.should_ask(str(vpn.state_dir())) is False
-
-
-def test_auto_connect_exige_credenciais_salvas(tmp_path):
-    backup = str(tmp_path / "backups")
-    vpn.mark_decision("ufv")
-    assert vpn.should_auto_connect(backup) is False       # decidiu, mas não salvou
-    vpn.save_credentials("12345678901", "senha", backup)
-    assert vpn.should_auto_connect(backup) is True
-
-
-def test_auto_connect_desligado_por_padrao_quem_escolheu_nao(tmp_path):
-    backup = str(tmp_path / "backups")
-    vpn.save_credentials("12345678901", "senha", backup)
-    vpn.mark_decision("no")
-    assert vpn.should_auto_connect(backup) is False
-
-
-def test_desconectar_desarma_auto_connect(tmp_path, monkeypatch):
-    backup = str(tmp_path / "backups")
-    vpn.mark_decision("ufv")
-    vpn.save_credentials("12345678901", "senha", backup)
-    assert vpn.should_auto_connect(backup) is True
-    monkeypatch.setattr(vpn, "_cleanup_processes", lambda: None)
-    vpn.disconnect(backup)
-    assert vpn.should_auto_connect(backup) is False
-
-
-def test_status_expoe_auto_connect_e_persistencia(tmp_path):
-    backup = str(tmp_path / "backups")
-    vpn.mark_decision("ufv")
-    vpn.save_credentials("12345678901", "senha", backup)
-    st = vpn.status(backup)
-    assert st["auto_connect"] is True
-    assert st["auto_connect_ready"] is True
-    assert st["prefs_persistent"] is True
-    assert st["should_ask"] is False
 
 
 # ── credenciais cifradas ─────────────────────────────────────

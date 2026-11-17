@@ -24,7 +24,9 @@ from pesquisai.drive_guard import (  # noqa: E402
     install_plugin,
     status,
 )
-from pesquisai.opencode_config import (  # noqa: E402
+from pesquisai.opencode_config import (
+    always_allowed_permissions,
+    # noqa: E402
     DRIVE_GUARD_ALLOWED,
     DRIVE_GUARD_MOUNT,
     drive_guard_permissions,
@@ -92,7 +94,15 @@ class TestMergeConfig:
         assert merged["permissions"][-1] == drive_guard_permissions()[-1]
         # a regra do usuário fica ANTES do allow de PesquisAI (que vence)
         assert merged["permissions"].index(user_rule) < len(merged["permissions"]) - 10
-        assert len(merged["permissions"]) == 1 + len(drive_guard_permissions())
+        # v0.7.11-web24: as regras de internet (websearch/webfetch) entram
+        # ANTES das do guard (que precisam ficar por último para vencerem).
+        assert len(merged["permissions"]) == (
+            1 + len(always_allowed_permissions()) + len(drive_guard_permissions())
+        )
+        assert merged["permissions"][-1] == drive_guard_permissions()[-1]
+        web_rules = [r for r in merged["permissions"] if r["action"] in ("websearch", "webfetch")]
+        assert web_rules == always_allowed_permissions()
+        assert all(r["effect"] == "allow" for r in web_rules)
 
     def test_permissions_em_formato_inesperado_nao_e_sobrescrito(self):
         cfg = {"permissions": {"read": "allow"}}

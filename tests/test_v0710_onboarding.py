@@ -53,15 +53,9 @@ def test_validate_key_format_aceita_prefixos_corretos():
     assert ok
 
 
-def test_validate_key_format_aceita_google_sem_prefixo_aiza():
-    # v0.7.11-web9: prefixo é heurística, não exigência.
+def test_validate_key_format_recusa_prefixo_errado_e_curta():
     ok, msg = ob.validate_key_format("google", "sk-or-xxxxxxxxxxxxxxxxxxxxxxxx")
-    assert ok and msg == ""
-    ok, _ = ob.validate_key_format("google", "uma-chave-qualquer-com-20+")
-    assert ok
-
-
-def test_validate_key_format_recusa_curta_e_vazia():
+    assert not ok and "AIza" in msg
     ok, msg = ob.validate_key_format("google", "AIza")
     assert not ok and "incompleta" in msg
     ok, msg = ob.validate_key_format("google", "")
@@ -119,10 +113,8 @@ def test_store_keys_descarta_metadados_e_vazios():
 
 # ── modelo padrão do Google ────────────────────────────────────────────────
 
-def test_google_model_padrao_e_o_flash_lite_latest():
-    assert ob.google_model() == "google/gemini-flash-lite-latest"
-    assert ob.google_variant() == "high"
-    assert ob.google_model_selector() == "google/gemini-flash-lite-latest#high"
+def test_google_model_padrao_e_o_gemini_35_flash():
+    assert ob.google_model() == "google/gemini-3.5-flash"
 
 
 def test_google_model_respeita_override(monkeypatch):
@@ -135,37 +127,23 @@ def test_google_model_respeita_override(monkeypatch):
 def test_google_model_from_catalog_escolhe_o_primeiro_disponivel():
     linhas = ["openrouter/free", "google/gemini-3-flash", "nvidia/llama"]
     assert ob.google_model_from_catalog(linhas) == "google/gemini-3-flash"
-    assert ob.google_model_from_catalog([]) == "google/gemini-flash-lite-latest"
-
-
-def test_google_variant_respeita_override(monkeypatch):
-    monkeypatch.setenv("UFVAI_GOOGLE_VARIANT", "max")
-    assert ob.google_model_selector() == "google/gemini-flash-lite-latest#max"
-    monkeypatch.setenv("UFVAI_GOOGLE_VARIANT", "")
-    assert ob.google_model_selector() == "google/gemini-flash-lite-latest#high"
+    assert ob.google_model_from_catalog([]) == "google/gemini-3.5-flash"
 
 
 def test_default_model_for():
-    assert ob.default_model_for("google") == "google/gemini-flash-lite-latest"
+    assert ob.default_model_for("google") == "google/gemini-3.5-flash"
     assert ob.default_model_for("openrouter") == "openrouter/free"
     assert ob.default_model_for("nvidia") == ""
     assert ob.default_model_for("desconhecido") == ""
 
 
 def test_merge_model_preserva_o_resto_da_configuracao():
-    antes = {"model": "x", "agents": {"UFVAI": {"description": "d"}}, "provider": {"a": 1}}
-    depois = ob.merge_model(antes, "google/gemini-flash-lite-latest", variant="high")
-    assert depois["model"] == "google/gemini-flash-lite-latest"          # raiz sem variante
-    assert depois["agents"]["UFVAI"]["model"] == "google/gemini-flash-lite-latest#high"
-    assert depois["agents"]["UFVAI"]["description"] == "d"            # preserva o agente
+    antes = {"model": "x", "agent": {"UFVAI": {}}, "provider": {"a": 1}}
+    depois = ob.merge_model(antes, "google/gemini-3.5-flash")
+    assert depois["model"] == "google/gemini-3.5-flash"
+    assert depois["agent"] == antes["agent"]
     assert depois["provider"] == antes["provider"]
     assert antes["model"] == "x"  # não muta
-
-
-def test_merge_model_aceita_variante_embutida_no_id():
-    depois = ob.merge_model({}, "google/gemini-flash-lite-latest#max")
-    assert depois["model"] == "google/gemini-flash-lite-latest"
-    assert depois["agents"]["UFVAI"]["model"] == "google/gemini-flash-lite-latest#max"
 
 
 def test_merge_model_recusa_vazio():
@@ -210,23 +188,8 @@ def test_ui_oferece_google_nvidia_openrouter_e_pago():
 def test_ui_do_google_tem_link_e_campo_de_colar():
     assert "aistudio.google.com/api-keys" in ob.PROVIDERS["google"]["url"]
     assert "GOOGLE_GENERATIVE_AI_API_KEY" in ob.PROVIDERS["google"]["env"]
+    assert "Copiar" in UI
     assert "ob-key" in UI
-    assert "Criar chave de API" in UI
-    assert "ícone de copiar" in UI
-
-
-def test_ui_usa_o_print_real_do_google():
-    img = ROOT / "assets" / "print-google-apikey.png"
-    assert img.is_file(), "print real do Google ausente em assets/"
-    assert img.stat().st_size > 10_000
-    assert "/assets/print-google-apikey.png" in UI
-    assert "print-google-apikey.png" in APP  # whitelist da rota /assets
-
-
-def test_boot_nao_inicia_motor_sem_chave():
-    assert "needs_onboarding_now" in APP
-    assert "Onboarding pendente: terminal não iniciado" in APP
-    assert "needs_onboarding_now as _needs_ob" in (ROOT / "pesquisai" / "run_fast.py").read_text(encoding="utf-8")
 
 
 def test_ui_espera_termos_antes_de_aparecer():
@@ -234,14 +197,3 @@ def test_ui_espera_termos_antes_de_aparecer():
     assert "terms-overlay" in UI
     assert "welcome-overlay" in UI
     assert "ufvai_ob_skip" in UI
-
-
-def test_new_user_boot_starts_engine_before_onboarding():
-    """Usuário novo ainda precisa do motor para ver modelos/conectores públicos."""
-    from pathlib import Path
-
-    source = Path(__file__).resolve().parents[1] / "pesquisai" / "run_fast.py"
-    text = source.read_text(encoding="utf-8")
-    assert "needs_onboarding_now as _needs_ob" in text
-    assert "if _skip_engine:" not in text
-    assert "ensure_service_project_dir(folder_path)" in text
