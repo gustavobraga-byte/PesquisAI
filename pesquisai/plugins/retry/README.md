@@ -1,12 +1,9 @@
 # UFVAI Retry
 
-Plugin do servidor (OpenCode V2) que intercepta o hook `retry` e, **somente
-quando a mensagem é de cota** (`quota`, `RESOURCE_EXHAUSTED`,
-`free_tier`, `per minute`, `rate limit`), troca a espera curta por **~62 s** —
-a janela de 1 minuto da cota gratuita do Google.
-- **“high demand” / “overloaded” / “temporarily”** (503): espera **curta**
-  (5 s padrão; `demandDelayMs`/`UFVAI_RETRY_DEMAND_MS`, teto 30 s).
-- Outros 429/503 (ex.: “Too many requests”) seguem o retry padrão do motor.
+Plugin do servidor (OpenCode V2) que intercepta o hook `retry` e, para falhas
+de **cota/limite de taxa** (HTTP 429 e 503, ou mensagens com `quota`,
+`rate limit`, `RESOURCE_EXHAUSTED`), troca a espera curta por uma espera de
+**~62 s** — a janela de 1 minuto da cota gratuita do Google.
 
 - Lê `retryDelay`/`retry in 23s` da própria mensagem, quando existir.
 - Teto de 3 min por tentativa; desiste após `maxAttempts` (padrão 8).
