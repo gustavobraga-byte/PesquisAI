@@ -267,6 +267,20 @@ def mask_key(key: str) -> str:
     return f"{k[:6]}…{k[-4:]}"
 
 
+#: v0.7.11-web46: flag persistente "usuário optou por não adicionar chave".
+#: Usa prefixo ``_env_`` para NÃO ser contado como chave de provedor por
+#: :func:`store_keys` / :func:`has_any_key` (metadados são ignorados).
+SKIP_KEY_META = "_env_skip_key"
+
+
+def skip_key_selected(store: Mapping[str, Any] | None) -> bool:
+    """True se o usuário escolheu "não adicionar chave" (decisão persistida)."""
+    try:
+        return str((store or {}).get(SKIP_KEY_META, "") or "").strip() in ("1", "true", "yes")
+    except Exception:  # pragma: no cover
+        return False
+
+
 def store_keys(store: Mapping[str, Any] | None) -> dict[str, str]:
     """Remove metadados ``_env_*`` e entradas vazias do store."""
     out: dict[str, str] = {}
@@ -307,6 +321,11 @@ def needs_onboarding(
     guia em vez de cair num terminal sem provedor.
     """
     if str(os.environ.get("UFVAI_SKIP_ONBOARDING", "") or "").strip() in ("1", "true", "yes"):
+        return False
+    # v0.7.11-web46: quem escolheu "não adicionar chave" não volta a ver a tela
+    # a cada boot; a decisão fica persistida no store (e pode ser revertida
+    # depois em 🔌 Provedores, quando o usuário adicionar uma chave).
+    if skip_key_selected(store):
         return False
     return not has_any_key(store, env)
 
@@ -425,6 +444,29 @@ def providers_public() -> list[dict[str, Any]]:
     return out
 
 
+def free_models_available() -> dict[str, Any]:
+    """Conta modelos **gratuitos e disponíveis** no catálogo do motor (web46).
+
+    Nunca inventa números: se o catálogo não puder ser lido, devolve
+    ``known=False`` e a interface mostra apenas uma mensagem genérica.
+    """
+    try:
+        from .webapi import catalog  # type: ignore
+
+        data = catalog() or {}
+        models = data.get("models") or []
+        free = [m for m in models if (m.get("cost") or {}).get("free")]
+        ready = [m for m in free if m.get("available")]
+        return {
+            "known": True,
+            "count": len(ready),
+            "total_free": len(free),
+            "providers": sorted({m.get("providerID", "") for m in ready}),
+        }
+    except Exception:  # pragma: no cover — motor fora do ar
+        return {"known": False, "count": 0, "total_free": 0, "providers": []}
+
+
 def onboarding_state(
     store: Mapping[str, Any] | None,
     env: Mapping[str, str] | None = None,
@@ -433,6 +475,8 @@ def onboarding_state(
     return {
         "needs": needs_onboarding(store, env),
         "has_key": has_any_key(store, env),
+        "skip_key": skip_key_selected(store),
+        "free_models": free_models_available(),
         "google_model": google_model(),
         "providers": providers_public(),
         "docs": CHAVES_DOC_URL,

@@ -556,3 +556,91 @@ body.w34-compact .w34-hints { display: none; }
     backdrop-filter: none !important;
   }
 }
+
+/* ── v0.7.11-web43 — quick wins ──────────────────────────────────────── */
+/* Seletor de tema sistema/claro/escuro nos Ajustes → Geral */
+.theme-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.theme-opt {
+  padding: 5px 10px; min-height: 30px; font-size: 11.5px;
+  border: 1px solid var(--line, #33414d); border-radius: 7px;
+  background: var(--panel-2, transparent); color: var(--ink, #e8edf2);
+  cursor: pointer; transition: background 120ms ease, color 120ms ease;
+}
+.theme-opt:hover { background: var(--accent-dim, #6b54201f); }
+.theme-opt.on {
+  background: var(--accent, #b29149); color: #14181d;
+  border-color: var(--accent, #b29149); font-weight: 600;
+}
+.theme-opt:focus-visible { outline: 2px solid var(--accent, #b29149); outline-offset: 2px; }
+
+/* Ações rápidas por item do explorador (✎ renomear · ⬇ baixar) */
+.exp-row-actions { flex: none; display: flex; gap: 2px; opacity: .35; transition: opacity 120ms ease; }
+.exp-item:hover .exp-row-actions,
+.exp-item:focus-within .exp-row-actions { opacity: 1; }
+.exp-act {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0; border: none; border-radius: 6px;
+  background: transparent; color: var(--ink-muted, #9aa7b3);
+  font-size: 13px; line-height: 1; text-decoration: none; cursor: pointer;
+}
+.exp-act:hover { background: var(--accent-dim, #6b54201f); color: var(--accent, #b29149); }
+.exp-act:focus-visible { outline: 2px solid var(--accent, #b29149); outline-offset: 1px; }
+@media (hover: none) { .exp-row-actions { opacity: 1; } }  /* toque: sempre visível */
+
+/* ── v0.7.11-web44: chat, explorador e seletor de modelos ───────────── */
+
+/* botão "jump to last" com contador de mensagens novas */
+.jump-btn.has-new {
+  border-color: var(--danger, #e07070);
+  color: var(--danger, #e07070);
+  font-weight: 700;
+}
+
+/* filtros do catálogo de modelos */
+.model-filters {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 0 0 10px;
+}
+.mf-chip {
+  font: inherit; font-size: 12px; line-height: 1;
+  padding: 6px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line-strong, #ffffff1f);
+  background: transparent; color: var(--ink-muted, #9aa7b3);
+  transition: background 120ms ease, color 120ms ease;
+}
+.mf-chip:hover { background: var(--accent-dim, #6b54201f); color: var(--accent, #b29149); }
+.mf-chip.on {
+  background: var(--accent, #b29149); color: #14181d;
+  border-color: var(--accent, #b29149); font-weight: 600;
+}
+.mf-chip:focus-visible, #model-provider:focus-visible { outline: 2px solid var(--accent, #b29149); outline-offset: 2px; }
+#model-provider {
+  font: inherit; font-size: 12px; padding: 6px 8px; border-radius: 8px;
+  border: 1px solid var(--line-strong, #ffffff1f);
+  background: var(--panel, #14181d); color: var(--ink, #e8e6e0);
+  margin-left: auto; max-width: 190px;
+}
+
+/* modelo com janela de contexto abaixo do mínimo do UFVAI */
+.badge.incompatible {
+  background: rgba(224, 112, 112, .14);
+  border: 1px solid rgba(224, 112, 112, .5);
+  color: #e07070;
+  font-weight: 600;
+}
+.model-item.incompatible { position: relative; }
+.model-item.incompatible .m-name { opacity: .72; }
+
+/* ordenação do explorador */
+.exp-sort-wrap {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; font-size: 11px; color: var(--ink-muted, #9aa7b3);
+  border-bottom: 1px solid var(--line-strong, #ffffff12);
+}
+.exp-sort-wrap select {
+  font: inherit; font-size: 11px; padding: 4px 6px; border-radius: 6px;
+  border: 1px solid var(--line-strong, #ffffff1f);
+  background: var(--panel, #14181d); color: var(--ink, #e8e6e0);
+  flex: 1; min-width: 0;
+}
+.exp-act.exp-del:hover { background: rgba(224, 112, 112, .14); color: #e07070; }

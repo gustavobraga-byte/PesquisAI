@@ -37,6 +37,8 @@ __all__ = [
     "search",
     "resolve",
     "preview",
+    "rename",
+    "delete",
     "read_bytes",
     "drive_link",
     "DRIVE_HOME",
@@ -161,8 +163,15 @@ def drive_link(name: str) -> str:
     return f"{DRIVE_SEARCH}?q={quote(str(name or ''), safe='')}"
 
 
-def listing(relative: str = "") -> dict[str, Any]:
-    """Conteúdo de uma pasta do agente."""
+def listing(relative: str = "", sort: str = "name") -> dict[str, Any]:
+    """Conteúdo de uma pasta do agente.
+
+    v0.7.11-web44: ``sort`` aceita ``name`` (padrão, A→Z com pastas primeiro),
+    ``name-desc`` (Z→A), ``mtime`` (modificado mais recente primeiro) e
+    ``mtime-asc`` (mais antigo primeiro). A ordenação é feita **depois** de
+    coletar o ``stat`` de cada entrada — assim funciona tanto na listagem
+    normal quanto em qualquer raiz (Drive FUSE inclusive).
+    """
     roots = allowed_roots()
     target = safe_path(relative, roots)
     if target is None:
@@ -173,7 +182,7 @@ def listing(relative: str = "") -> dict[str, Any]:
         return {"error": "não é uma pasta", "path": relative, "items": []}
     items: list[dict] = []
     try:
-        entries = sorted(os.scandir(target), key=lambda e: (not e.is_dir(), e.name.lower()))
+        entries = list(os.scandir(target))
     except OSError as exc:
         return {"error": f"não foi possível ler a pasta: {exc}", "path": relative, "items": []}
     parent = ""
@@ -202,13 +211,33 @@ def listing(relative: str = "") -> dict[str, Any]:
                 "mime": "" if is_dir else _mime_of(path),
                 "kind": _kind_of(path),
                 "driveUrl": drive_link(entry.name),
+                # v0.7.11-web43: download direto já na listagem (o botão ⬇
+                # de cada linha do explorador aponta para cá, sem precisar
+                # abrir a prévia antes). Só faz sentido para arquivos.
+                "downloadUrl": (
+                    f"api/ufvai/explorer/download?path={quote(str(item_rel), safe='')}"
+                    if not is_dir else ""
+                ),
             }
         )
+    # v0.7.11-web44: ordenação escolhida pelo usuário no explorador.
+    ordem = str(sort or "name").strip().lower()
+    if ordem == "mtime":
+        items.sort(key=lambda i: (-int(i.get("modified") or 0), i["name"].lower()))
+    elif ordem == "mtime-asc":
+        items.sort(key=lambda i: (int(i.get("modified") or 0), i["name"].lower()))
+    elif ordem == "name-desc":
+        items.sort(key=lambda i: (not i["type"] == "directory", i["name"].lower()), reverse=True)
+        # pastas primeiro mesmo em ordem decrescente
+        items.sort(key=lambda i: i["type"] != "directory")
+    else:  # name — padrão histórico: pastas primeiro, depois A→Z
+        items.sort(key=lambda i: (i["type"] != "directory", i["name"].lower()))
     return {
         "path": rel,
         "parent": parent,
         "root": str(target),
         "items": items,
+        "sort": ordem,
         "driveHome": DRIVE_HOME,
         "error": "",
     }
@@ -926,6 +955,70 @@ def _relative(path: Path, roots: list[Path] | None = None) -> str:
         except (ValueError, OSError):
             continue
     return path.name
+
+
+def rename(relative: str, new_name: str) -> dict[str, Any]:
+    """Renomeia um arquivo/pasta **dentro** de uma raiz permitida (web43).
+
+    A segurança herda de :func:`safe_path`: nada fora da pasta do projeto é
+    tocado. O nome novo é validado para não conter separadores (impedindo
+    mover o arquivo para outra pasta) e não sobrescreve um destino existente.
+    """
+    target = safe_path(relative)
+    if target is None:
+        return {"ok": False, "error": "caminho fora da pasta do agente"}
+    name = str(new_name or "").strip()
+    if not name or name in (".", "..") or "/" in name or "\\" in name or "\x00" in name:
+        return {"ok": False, "error": "nome inválido"}
+    if not target.exists():
+        return {"ok": False, "error": "arquivo não encontrado"}
+    dest = target.with_name(name)
+    if dest.exists():
+        return {"ok": False, "error": "já existe um arquivo com esse nome"}
+    try:
+        target.rename(dest)
+    except OSError as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"não foi possível renomear: {exc}"}
+    new_rel = _relative(dest)
+    return {
+        "ok": True,
+        "name": name,
+        "path": new_rel,
+        "driveUrl": drive_link(name),
+    }
+
+
+def delete(relative: str) -> dict[str, Any]:
+    """Exclui um arquivo (ou pasta) **dentro** de uma raiz permitida (web44).
+
+    Segurança: herda :func:`safe_path` (nada fora da pasta do projeto), exige
+    um caminho relativo não vazio e **nunca** remove a própria raiz. Pastas
+    são removidas com ``shutil.rmtree``; a confirmação é feita no navegador.
+    """
+    raw = str(relative or "")
+    if os.path.isabs(raw):
+        return {"ok": False, "error": "use um caminho relativo à pasta do agente"}
+    rel = raw.strip().lstrip("/")
+    if not rel:
+        return {"ok": False, "error": "caminho vazio — a raiz não pode ser excluída"}
+    target = safe_path(rel)
+    if target is None:
+        return {"ok": False, "error": "caminho fora da pasta do agente"}
+    roots = [r.resolve() for r in allowed_roots()]
+    if target.resolve() in roots:
+        return {"ok": False, "error": "a pasta raiz não pode ser excluída"}
+    if not target.exists():
+        return {"ok": False, "error": "arquivo não encontrado"}
+    name = target.name
+    try:
+        if target.is_dir():
+            import shutil
+            shutil.rmtree(target)
+        else:
+            target.unlink()
+    except OSError as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"não foi possível excluir: {exc}"}
+    return {"ok": True, "name": name, "path": rel, "deleted": True}
 
 
 def preview(relative: str) -> dict[str, Any]:

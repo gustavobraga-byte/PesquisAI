@@ -96,6 +96,7 @@
     explorerPath: '',         // pasta atual do explorador de arquivos
     explorerQuery: '',        // filtro de busca do explorador (web28)
     explorerWidth: 360,       // largura do explorador (arrastável — web28)
+    explorerSort: 'name',     // web44: name | name-desc | mtime | mtime-asc
     previewHeight: 320,       // altura do visualizador (arrastável — web28)
     pendingUsers: [],         // mensagens do usuário ainda provisórias (web28)
     usage: null,           // {used, limit, percent} — janela de contexto
@@ -112,6 +113,9 @@
     forms: [],             // formulários pendentes (v0.7.11-web42)
     formsSig: '',          // assinatura para não re-renderizar à toa
     newSinceScroll: 0,     // mensagens novas fora da rolagem
+    // v0.7.11-web44: filtros do seletor de modelos
+    modelFilters: { free: false, available: false, provider: '' },
+    minContext: 50000,     // abaixo disso o modelo é incompatível (UFVAI)
     ctxDismissed: new Set(), // sessões em que o aviso de contexto foi fechado
     prefs: {
       expandReasoning: false,
@@ -553,13 +557,49 @@
   /* ── tema ─────────────────────────────────────────────────────────── */
 
   const THEME_KEY = 'pesquisai_theme';
+  // v0.7.11-web43: "tema sistema" — a escolha do usuário (auto/claro/escuro)
+  // fica em THEME_CHOICE_KEY; THEME_KEY e o cookie seguem guardando o valor
+  // RESOLVIDO, para compatibilidade com o wrapper e a interface do terminal.
+  const THEME_CHOICE_KEY = 'pesquisai_theme_choice';
+  const THEME_MODES = ['auto', 'pesquisai', 'pesquisai-light'];
+
+  function themeQuery() {
+    try { return window.matchMedia('(prefers-color-scheme: light)'); }
+    catch (e) { return null; }
+  }
+
+  function resolveTheme(choice) {
+    if (choice === 'auto') {
+      const q = themeQuery();
+      return (q && q.matches) ? 'pesquisai-light' : 'pesquisai';
+    }
+    return choice === 'pesquisai-light' ? 'pesquisai-light' : 'pesquisai';
+  }
+
+  function getThemeChoice() {
+    let stored = '';
+    try { stored = localStorage.getItem(THEME_CHOICE_KEY) || ''; } catch (e) { /* ignora */ }
+    if (THEME_MODES.indexOf(stored) >= 0) return stored;
+    // migração de quem vinha da web42 (só o valor resolvido estava gravado):
+    // preserva a preferência explícita; sem nada, passa a seguir o sistema.
+    const legacy = currentTheme();
+    return THEME_MODES.indexOf(legacy) >= 0 ? legacy : 'auto';
+  }
+
+  function setThemeChoice(choice) {
+    try { localStorage.setItem(THEME_CHOICE_KEY, choice); } catch (e) { /* ignora */ }
+  }
 
   function applyTheme(theme) {
-    // aceita o valor canônico do UFVAI ("pesquisai"/"pesquisai-light") e as
-    // formas abreviadas ("light"/"dark") que a interface principal usava
-    const light = theme === 'pesquisai-light' || theme === 'light';
-    const value = light ? 'pesquisai-light' : 'pesquisai';
+    // "auto"/"system" = seguir o sistema; "light"/"dark" = atalhos legados.
+    let choice;
+    if (theme === 'auto' || theme === 'system') choice = 'auto';
+    else if (theme === 'light' || theme === 'pesquisai-light') choice = 'pesquisai-light';
+    else choice = 'pesquisai';
+    setThemeChoice(choice);
+    const value = resolveTheme(choice);
     document.documentElement.setAttribute('data-theme', value);
+    document.documentElement.setAttribute('data-theme-choice', choice);
     document.documentElement.style.colorScheme = value === 'pesquisai-light' ? 'light' : 'dark';
     try { localStorage.setItem(THEME_KEY, value); } catch (e) { /* modo restrito */ }
     // O cookie é compartilhado com a interface principal (mesmo domínio,
@@ -577,19 +617,36 @@
       const meta = document.querySelector('meta[name="theme-color"]');
       if (meta) meta.setAttribute('content', value === 'pesquisai-light' ? '#f5f6f7' : '#141c24');
     } catch (e) { /* ignora */ }
+    return value;
   }
 
   function currentTheme() {
+    // Devolve o valor RESOLVIDO (usado pelo botão de alternar e pela
+    // compatibilidade). O padrão, a partir da web43, é seguir o sistema.
     try {
       const cookie = document.cookie.match(/(?:^| )pesquisai_theme=([^;]+)/);
-      if (cookie) return decodeURIComponent(cookie[1]);
+      if (cookie) {
+        const c = decodeURIComponent(cookie[1]);
+        if (c === 'pesquisai' || c === 'pesquisai-light') return c;
+      }
     } catch (e) { /* ignora */ }
     try {
       const stored = localStorage.getItem(THEME_KEY);
-      if (stored) return stored;
+      if (stored === 'pesquisai' || stored === 'pesquisai-light') return stored;
     } catch (e) { /* ignora */ }
-    return 'pesquisai';
+    return resolveTheme('auto');
   }
+
+  // v0.7.11-web43: acompanha mudanças do tema do SO quando a escolha é auto.
+  (function watchSystemTheme() {
+    const q = themeQuery();
+    if (!q) return;
+    const onChange = () => { if (getThemeChoice() === 'auto') applyTheme('auto'); };
+    try {
+      if (q.addEventListener) q.addEventListener('change', onChange);
+      else if (q.addListener) q.addListener(onChange);
+    } catch (e) { /* ignora */ }
+  })();
 
   window.addEventListener('message', (event) => {
     const data = event.data || {};
@@ -1058,6 +1115,59 @@
     $('#explorer').hidden = true;
   }
 
+  // v0.7.11-web43: renomear direto na lista do explorador (o modal de texto
+  // já existente é reaproveitado). O backend valida raiz/nome e non-overwrite.
+  async function renameExplorerItem(item) {
+    const current = item.name || '';
+    const name = await askText(
+      t('explorer.rename'),
+      current,
+      t('explorer.renamePrompt'),
+      t('explorer.renameAction') || t('session.rename'),
+    );
+    if (!name || !name.trim() || name.trim() === current) return;
+    try {
+      const res = await apiPost('/explorer/rename', {
+        path: item.path,
+        name: name.trim(),
+      });
+      if (!res.ok) {
+        toast(String(res.error || t('explorer.renameFail')), 'err');
+        return;
+      }
+      toast(t('explorer.done'));
+      const box = $('#exp-preview');
+      if (box && !box.hidden) closePreview();
+      loadExplorer(state.explorerPath, state.explorerQuery);
+    } catch (e) {
+      toast(String(e.message || e), 'err');
+    }
+  }
+
+  // v0.7.11-web44: excluir arquivo/pasta direto na lista do explorador.
+  // O backend valida a raiz e nunca apaga a pasta do projeto em si.
+  async function deleteExplorerItem(item) {
+    const nome = item.name || item.path || '';
+    const pergunta = item.type === 'directory'
+      ? t('explorer.deleteDirConfirm', { name: nome })
+      : t('explorer.deleteConfirm', { name: nome });
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function'
+      && !window.confirm(pergunta)) return;
+    try {
+      const res = await apiPost('/explorer/delete', { path: item.path });
+      if (!res.ok) {
+        toast(String(res.error || t('explorer.deleteFail')), 'err');
+        return;
+      }
+      toast(t('explorer.deleted', { name: res.name || nome }));
+      const box = $('#exp-preview');
+      if (box && !box.hidden) closePreview();
+      loadExplorer(state.explorerPath, state.explorerQuery);
+    } catch (e) {
+      toast(String(e.message || e), 'err');
+    }
+  }
+
   /**
    * Carrega a lista do explorador.
    *
@@ -1075,9 +1185,12 @@
     list.innerHTML = '';
     list.appendChild(el('div', 'exp-empty', t('explorer.loading')));
     try {
+      // v0.7.11-web44: ordenação escolhida (name | name-desc | mtime | mtime-asc).
+      const ordem = state.explorerSort || 'name';
+      const sufixo = `&sort=${encodeURIComponent(ordem)}`;
       const url = needle
-        ? `/explorer?path=${encodeURIComponent(path || '')}&q=${encodeURIComponent(needle)}`
-        : `/explorer?path=${encodeURIComponent(path || '')}`;
+        ? `/explorer?path=${encodeURIComponent(path || '')}&q=${encodeURIComponent(needle)}${sufixo}`
+        : `/explorer?path=${encodeURIComponent(path || '')}${sufixo}`;
       const data = await apiGet(url);
       list.innerHTML = '';
       if (data.error) {
@@ -1096,8 +1209,11 @@
           t('explorer.results', { n: items.length })));
       }
       items.forEach((item) => {
-        const row = el('button', 'exp-item');
-        row.type = 'button';
+        // v0.7.11-web43: div+role=button (em vez de <button>) para poder
+        // conter os botões de ação sem aninhar elementos interativos.
+        const row = el('div', 'exp-item');
+        row.setAttribute('role', 'button');
+        row.setAttribute('tabindex', '0');
         row.appendChild(el('span', 'exp-icon', explorerIcon(item)));
         const nameBox = el('span', 'exp-name');
         nameBox.appendChild(el('span', null, item.name));
@@ -1110,13 +1226,55 @@
         if (item.type !== 'directory') {
           row.appendChild(el('span', 'exp-size', humanSize(item.size)));
         }
-        row.addEventListener('click', () => {
+        // v0.7.11-web43: ações rápidas por item — renomear (✎) e baixar (⬇).
+        // Os botões param a propagação para não disparar a abertura da linha.
+        const acts = el('span', 'exp-row-actions');
+        const ren = el('button', 'exp-act', '✎');
+        ren.type = 'button';
+        ren.title = t('explorer.rename') || 'Renomear';
+        ren.setAttribute('aria-label', ren.title);
+        ren.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          renameExplorerItem(item);
+        });
+        acts.appendChild(ren);
+        // v0.7.11-web44: excluir (🗑) — confirmação no navegador, raiz protegida
+        const del = el('button', 'exp-act exp-del', '🗑');
+        del.type = 'button';
+        del.title = t('explorer.delete') || 'Excluir';
+        del.setAttribute('aria-label', del.title);
+        del.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          deleteExplorerItem(item);
+        });
+        acts.appendChild(del);
+        if (item.type !== 'directory' && item.downloadUrl) {
+          const dl = el('a', 'exp-act', '⬇');
+          dl.href = BASE + item.downloadUrl;
+          dl.setAttribute('download', item.name || '');
+          dl.title = t('explorer.download') || 'Baixar';
+          dl.setAttribute('aria-label', dl.title);
+          dl.addEventListener('click', (event) => event.stopPropagation());
+          acts.appendChild(dl);
+        }
+        row.appendChild(acts);
+        const openItem = () => {
           if (item.type === 'directory') {
             loadExplorer(item.path, '');
           } else {
             document.querySelectorAll('#exp-list .exp-item').forEach((n) => n.classList.remove('on'));
             row.classList.add('on');
             previewExplorerFile(item);
+          }
+        };
+        row.addEventListener('click', openItem);
+        row.addEventListener('keydown', (event) => {
+          if (event.target !== row) return;   // não sequestra as teclas dos botões de ação
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openItem();
           }
         });
         list.appendChild(row);
@@ -1738,19 +1896,49 @@
     return state.sessions.find((s) => s.id === state.sessionId) || null;
   }
 
+  // v0.7.11-web43: constrói UM item de sessão. A reconciliação por chave em
+  // renderSessions reaproveita esse nó quando a assinatura não mudou.
+  function buildSessionItem(row, cls, inBulk, selected, pinned) {
+    const item = el('button', cls);
+    item.type = 'button';
+    if (inBulk) item.appendChild(el('span', 's-check', selected ? '☑' : '☐'));
+    if (state.active[row.id]) item.appendChild(el('span', 's-dot'));
+    item.appendChild(el('span', 's-title', sessionTitle(row)));
+    item.appendChild(el('span', 's-time', relativeTime(row.updated || row.created)));
+    if (!inBulk) {
+      const pin = el('span', 's-pin', pinned ? '📌' : '📍');
+      pin.title = pinned ? t('sessions.unpin') : t('sessions.pin');
+      pin.setAttribute('role', 'button');
+      pin.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        togglePin(row.id);
+      });
+      item.appendChild(pin);
+    }
+    item.addEventListener('click', () => {
+      if (state.bulk.active) { toggleBulk(row.id); return; }
+      openSession(row.id, { focus: true });
+    });
+    // v0.7.11-web20: duplo clique no nome renomeia a sessão
+    if (!inBulk) {
+      item.addEventListener('dblclick', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        renameSession(row.id);
+      });
+    }
+    return item;
+  }
+
   function renderSessions() {
     const list = $('#sessions');
     const filter = ($('#session-search').value || '').trim().toLowerCase();
-    list.innerHTML = '';
     const rows = state.sessions.filter((row) => {
       if (!row || !row.id) return false;   // v0.7.11-web39: nunca quebra com item inválido
       if (!filter) return true;
       return (row.title || '').toLowerCase().includes(filter) || row.id.toLowerCase().includes(filter);
     });
-    if (!rows.length) {
-      list.appendChild(el('div', 'model-group', 'sem sessões'));
-      return;
-    }
     // v0.7.11-web41: fixadas primeiro, depois por atualização
     rows.sort((a, b) => {
       const pa = state.pinned.has(a.id) ? 1 : 0;
@@ -1758,13 +1946,18 @@
       if (pa !== pb) return pb - pa;
       return Number(b.updated || b.created || 0) - Number(a.updated || a.created || 0);
     });
+    // v0.7.11-web43: reconcilia por CHAVE (id da sessão). Nós cuja assinatura
+    // não mudou são reaproveitados — sem "innerHTML = ''" — o que preserva
+    // rolagem/foco e elimina o "piscar" a cada refreshSessions().
+    const wanted = [];
+    const inBulk = state.bulk.active;
     let lastGroup = '';
     rows.forEach((row) => {
-      const inBulk = state.bulk.active;
       if (!inBulk) {
         const g = sessionGroup(row.updated || row.created);
         if (g !== lastGroup) {
-          list.appendChild(el('div', 'session-group', t(`sessions.${g}`)));
+          const label = t(`sessions.${g}`);
+          wanted.push({ key: 'g:' + g, sig: 'g:' + g + '|' + label, label });
           lastGroup = g;
         }
       }
@@ -1774,37 +1967,50 @@
       if (inBulk) cls += ' bulk-mode';
       if (selected) cls += ' bulk-on';
       if (pinned) cls += ' pinned';
-      const item = el('button', cls);
-      item.type = 'button';
-      if (inBulk) item.appendChild(el('span', 's-check', selected ? '☑' : '☐'));
-      if (state.active[row.id]) item.appendChild(el('span', 's-dot'));
-      item.appendChild(el('span', 's-title', sessionTitle(row)));
-      item.appendChild(el('span', 's-time', relativeTime(row.updated || row.created)));
-      if (!inBulk) {
-        const pin = el('span', 's-pin', pinned ? '📌' : '📍');
-        pin.title = pinned ? t('sessions.unpin') : t('sessions.pin');
-        pin.setAttribute('role', 'button');
-        pin.addEventListener('click', (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          togglePin(row.id);
-        });
-        item.appendChild(pin);
-      }
-      item.addEventListener('click', () => {
-        if (state.bulk.active) { toggleBulk(row.id); return; }
-        openSession(row.id, { focus: true });
+      wanted.push({
+        key: 's:' + row.id,
+        sig: [row.id, sessionTitle(row), relativeTime(row.updated || row.created),
+          cls, state.active[row.id] ? 1 : 0, selected ? 1 : 0, pinned ? 1 : 0].join('\u0001'),
+        row, cls, inBulk, selected, pinned,
       });
-      // v0.7.11-web20: duplo clique no nome renomeia a sessão
-      if (!inBulk) {
-        item.addEventListener('dblclick', (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          renameSession(row.id);
-        });
-      }
-      list.appendChild(item);
     });
+
+    if (!wanted.length) {
+      list.dataset.sig = '';
+      list.innerHTML = '';
+      list.appendChild(el('div', 'model-group', 'sem sessões'));
+      updateBulkBar();
+      return;
+    }
+    const fingerprint = (inBulk ? 'B' : 'N') + '|' + state.sessionId + '|'
+      + wanted.map((w) => w.key + '\u0002' + w.sig).join('\u0003');
+    if (list.dataset.sig === fingerprint && list.childElementCount) {
+      updateBulkBar();
+      return;   // nada mudou: não reconstrói nada
+    }
+    list.dataset.sig = fingerprint;
+
+    const old = new Map();
+    Array.prototype.slice.call(list.children).forEach((node) => {
+      if (node.dataset && node.dataset.key) old.set(node.dataset.key, node);
+    });
+    const frag = document.createDocumentFragment();
+    wanted.forEach((w) => {
+      let node = old.get(w.key);
+      if (!node || node.dataset.sig !== w.sig) {
+        node = (w.label !== undefined)
+          ? el('div', 'session-group', w.label)
+          : buildSessionItem(w.row, w.cls, w.inBulk, w.selected, w.pinned);
+        node.dataset.key = w.key;
+        node.dataset.sig = w.sig;
+      }
+      frag.appendChild(node);   // move o nó: preserva identidade/ouvintes
+    });
+    // Tudo que ficou em `list` não foi movido para o fragmento: é órfão
+    // (saiu da lista/filtro) ou a versão antiga de um nó recriado. Remover
+    // TODOS evita duplicatas quando a assinatura de uma chave muda.
+    Array.prototype.slice.call(list.children).forEach((node) => list.removeChild(node));
+    list.appendChild(frag);
     updateBulkBar();
   }
 
@@ -2438,10 +2644,29 @@
     }
   }
 
+  /**
+   * v0.7.11-web45: estado "expandir tudo" é **persistente**.
+   *
+   * Antes, `setAllExpanded()` só mudava os blocos que já estavam no DOM e os
+   * blocos criados depois (streaming ou mensagens sincronizadas) nasciam com
+   * `!!state.prefs.expand*`, ignorando o botão. Agora toda criação de bloco
+   * passa por aqui: com "expandir tudo" ligado, o bloco nasce aberto.
+   */
+  function shouldExpandBlock(kind) {
+    return state.allExpanded ? true : !!state.prefs[kind];
+  }
+
   /** Abre/fecha TODOS os blocos (raciocínio e ferramentas) da conversa. */
   function setAllExpanded(open) {
     document.querySelectorAll('#messages details.block').forEach((block) => {
       block.open = open;
+    });
+    // v0.7.11-web45: cobre também os nós VIVOS do streaming (podem não estar
+    // no DOM ainda, e precisam acompanhar o botão imediatamente).
+    Object.values(state.stream || {}).forEach((slot) => {
+      if (!slot) return;
+      if (slot.reasoningBlock) slot.reasoningBlock.open = open;
+      Object.values(slot.tools || {}).forEach((block) => { block.open = open; });
     });
     const btn = $('#expand-all-btn');
     if (btn) {
@@ -2468,14 +2693,17 @@
     const answer = el('div', 'answer');
     answer.innerHTML = md(message.text || '');
     decorateRich(answer, true);
-    wrap.appendChild(answer);
-    wrap.appendChild(messageMeta(message));
 
+    // v0.7.11-web44: o raciocínio VEM ANTES da resposta — é o que acontece
+    // cronologicamente. Antes o bloco era anexado depois do `answer` e a
+    // leitura ficava invertida ("resposta primeiro, pensamento no fim").
     if (message.reasoning) {
       const block = textBlock(t('tool.reasoning'), message.reasoning, 'reasoning');
-      block.open = !!state.prefs.expandReasoning;
+      block.open = shouldExpandBlock('expandReasoning');
       wrap.appendChild(block);
     }
+    wrap.appendChild(answer);
+    wrap.appendChild(messageMeta(message));
     const tools = message.tools || [];
     if (tools.length) {
       const summary = toolSummary(tools);
@@ -2495,7 +2723,7 @@
         );
         setBlockStatus(block, tool.status === 'error' ? 'error'
           : (tool.status === 'completed' ? 'done' : 'running'));
-        block.open = !!state.prefs.expandTools;
+        block.open = shouldExpandBlock('expandTools');
         wrap.appendChild(block);
       });
     }
@@ -2574,9 +2802,15 @@
     const btn = $('#jump-btn');
     if (!btn) return;
     btn.hidden = !visible;
-    btn.textContent = (visible && state.newSinceScroll > 0)
-      ? `↓ ${state.newSinceScroll}`
-      : '↓';
+    const n = visible ? (state.newSinceScroll || 0) : 0;
+    btn.textContent = n > 0 ? `↓ ${n}` : '↓';
+    btn.classList.toggle('has-new', n > 0);
+    // v0.7.11-web44: contador também leído por leitores de tela.
+    const label = n > 0
+      ? `${t('jump.toLast')} · ${t('jump.newMessages', { n })}`
+      : t('jump.toLast');
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('title', label);
   }
 
   /* ── busca na conversa (v0.7.11-web39) ─────────────────────────────── */
@@ -2772,6 +3006,51 @@
     });
   }
 
+  /**
+   * v0.7.11-web44: fallback do indicador de raciocínio.
+   *
+   * O status só virava ``done`` no evento ``reasoning.ended`` — se esse
+   * evento se perdia no SSE (proxy/reconexão) ou o turno era interrompido, a
+   * espiral amarela ficava girando para sempre mesmo com a resposta pronta.
+   * Ao fim do turno, todo bloco ainda ``status-busy`` é concluído aqui.
+   */
+  function finishReasoningBlocks() {
+    document.querySelectorAll('#messages details.block.reasoning').forEach((block) => {
+      const status = block.__statusWrap || block.__status;
+      if (status && status.classList.contains('status-busy')) {
+        setBlockStatus(block, 'done');
+      }
+    });
+    Object.values(state.stream || {}).forEach((slot) => {
+      if (slot && slot.reasoningBlock) setBlockStatus(slot.reasoningBlock, 'done');
+    });
+  }
+
+  /**
+   * v0.7.11-web44: remove slots de streaming **vazios**.
+   *
+   * ``step.started`` / ``text.started`` / ``reasoning.started`` criam o nó vivo
+   * cedo para não perder eventos. Se o turno termina sem nenhum texto (erro de
+   * ferramenta, evento perdido, interrupção), sobrava uma bolha do assistente
+   * em branco. Aqui o slot sem texto, raciocínio e ferramentas é removido —
+   * desde que o histórico não tenha uma mensagem real com o mesmo id.
+   */
+  function pruneEmptyStreamSlots() {
+    Object.keys(state.stream || {}).forEach((mid) => {
+      const slot = state.stream[mid];
+      if (!slot || !slot.wrap) return;
+      if ((slot.text && slot.text.trim())
+        || (slot.reasoning && slot.reasoning.trim())
+        || Object.keys(slot.tools || {}).length) return;
+      const persisted = (state.messages || []).some(
+        (m) => m.id === mid && (m.text || m.reasoning || (m.tools || []).length),
+      );
+      if (persisted) return;
+      if (slot.wrap.parentNode) slot.wrap.parentNode.removeChild(slot.wrap);
+      delete state.stream[mid];
+    });
+  }
+
   function handleEvent(ev) {
     if (!ev || !ev.type) return;
     if (ev.sid && state.sessionId && ev.sid !== state.sessionId) return;
@@ -2785,6 +3064,9 @@
       case 'run.failed':
         state.runClosed = true;
         setRunning(false);
+        // v0.7.11-web44: garante que nenhum raciocínio fique "carregando"
+        // se o evento reasoning.ended não chegou.
+        finishReasoningBlocks();
         refreshSessions();
         refreshUsage();
         // v0.7.11-web24: completa o texto que possa ter ficado faltando
@@ -2825,8 +3107,9 @@
           // v0.7.11-web28: o raciocínio mostra a espiral amarela enquanto
           // está em curso.
           slot.reasoningBlock = textBlock(t('tool.reasoning'), '', 'reasoning', 'running');
-          slot.reasoningBlock.open = !!state.prefs.expandReasoning;
-          slot.wrap.appendChild(slot.reasoningBlock);
+          slot.reasoningBlock.open = shouldExpandBlock('expandReasoning');
+          // v0.7.11-web44: antes do answer (ordem cronológica do pensamento).
+          slot.wrap.insertBefore(slot.reasoningBlock, slot.answer);
         } else {
           setBlockStatus(slot.reasoningBlock, 'running');
         }
@@ -2838,8 +3121,9 @@
         if (ev.text) slot.reasoning = ev.text;
         if (!slot.reasoningBlock) {
           slot.reasoningBlock = textBlock(t('tool.reasoning'), slot.reasoning, 'reasoning', 'done');
-          slot.reasoningBlock.open = !!state.prefs.expandReasoning;
-          slot.wrap.appendChild(slot.reasoningBlock);
+          slot.reasoningBlock.open = shouldExpandBlock('expandReasoning');
+          // v0.7.11-web44: mesma ordem do streaming — pensamento antes da resposta.
+          slot.wrap.insertBefore(slot.reasoningBlock, slot.answer);
         }
         // v0.7.11-web28: terminou — a espiral some e o rótulo fica verde.
         setBlockStatus(slot.reasoningBlock, 'done');
@@ -2881,11 +3165,22 @@
       }
       case 'inbox.enqueued':
         if (ev.text) {
+          // v0.7.11-web44: a bolha local "na fila" já foi desenhada por
+          // queueMessage — removê-la evita mostrar a mesma mensagem duas vezes.
+          clearQueuedBubble(ev.text);
           const wrap = el('div', 'msg msg-user');
           wrap.appendChild(el('div', 'bubble', ev.text));
           wrap.style.opacity = '0.65';
           $('#messages').appendChild(wrap);
           scrollToEnd(false);
+        }
+        break;
+      case 'inbox.delivered':
+        // v0.7.11-web44: o motor pegou o item da inbox → a bolha provisória
+        // (se o evento enqueued se perdeu) não deve ficar órfã na tela.
+        {
+          const residual = document.querySelector('#messages .msg-user.queued');
+          if (residual && residual.parentNode) residual.parentNode.removeChild(residual);
         }
         break;
       case 'retry.scheduled':
@@ -2958,6 +3253,14 @@
     atualizaTextoAtividade();
     setAgentBusy(state.running, estavaRodando);
     if (state.running) { watchRun(); startElapsed(); } else { stopElapsed(); }
+    // v0.7.11-web44: qualquer caminho de fim de turno conclui os blocos de
+    // raciocínio (o SSE pode perder reasoning.ended).
+    if (!state.running) {
+      finishReasoningBlocks();
+      // v0.7.11-web44: dá tempo ao syncMessages trazer o texto oficial
+      // antes de remover os slots que nunca receberam conteúdo.
+      setTimeout(pruneEmptyStreamSlots, 400);
+    }
     // v0.7.11-web40: turno terminou → envia a próxima mensagem da fila
     if (!state.running && !state.stopping) setTimeout(flushQueue, 0);
   }
@@ -3306,7 +3609,7 @@
       block.__body.appendChild(toolContent(tool.name, tool.input, tool.output, tool.diff));
       setBlockStatus(block, tool.status === 'error' ? 'error'
         : (tool.status === 'completed' ? 'done' : 'running'));
-      block.open = !!state.prefs.expandTools;
+      block.open = shouldExpandBlock('expandTools');   // web45: respeita "expandir tudo"
       slot.wrap.appendChild(block);
     });
   }
@@ -3594,6 +3897,44 @@
 
   /* ── fila de mensagens (v0.7.11-web40) ────────────────────────────── */
 
+  function rebadgeQueue() {
+    state.queue.forEach((item, idx) => {
+      const badge = item.node && item.node.querySelector('.q-badge');
+      if (badge) badge.textContent = `${t('queue.badge')} ${idx + 1}`;
+    });
+  }
+
+  /**
+   * v0.7.11-web44: entrega a mensagem ao motor **na hora** em que ela é
+   * enfileirada. O opencode aceita prompts durante um turno e os guarda na
+   * inbox da sessão (evento ``session.inbox.enqueued``), entregando-os assim
+   * que a execução atual libera — não é preciso esperar ``run.finished``.
+   *
+   * Devolve ``true`` se o motor aceitou. Em caso de falha o item permanece
+   * na fila local e o ``flushQueue`` tradicional assume como fallback.
+   */
+  async function postQueuedItem(item) {
+    if (!state.sessionId) return false;
+    const files = (item.attachments || [])
+      .filter((a) => a.uri)
+      .map((a) => ({ uri: a.uri, source: { type: 'inline' }, name: a.name }));
+    const uploads = (item.attachments || [])
+      .filter((a) => a.path)
+      .map((a) => ({ name: a.name, path: a.path, size: a.size }));
+    try {
+      await ensureEvents();
+      await apiPost(`/sessions/${encodeURIComponent(state.sessionId)}/message`, {
+        text: item.text || '',
+        files,
+        skills: (item.skills || []).length ? item.skills : undefined,
+        uploads: uploads.length ? uploads : undefined,
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   function queueMessage(text) {
     const files = state.attachments.slice();
     const skills = state.pendingSkills.slice();
@@ -3602,7 +3943,8 @@
     node.appendChild(el('div', 'bubble', text || `(${t('composer.attached')})`));
     node.appendChild(el('span', 'q-badge', `${t('queue.badge')} ${state.queue.length + 1}`));
     $('#messages').appendChild(node);
-    state.queue.push({ text, attachments: files, skills, node });
+    const item = { text, attachments: files, skills, node };
+    state.queue.push(item);
     state.attachments = [];
     state.pendingSkills = [];
     renderAttachments();
@@ -3611,6 +3953,24 @@
     input.style.height = 'auto';
     toast(t('queue.added'));
     scrollToEnd(true);
+    // web44: publica no motor AGORA; a fila local fica só como fallback.
+    postQueuedItem(item).then((accepted) => {
+      if (!accepted) return;
+      const idx = state.queue.indexOf(item);
+      if (idx !== -1) { state.queue.splice(idx, 1); rebadgeQueue(); }
+    });
+  }
+
+  /** Remove a bolha provisória da fila quando o motor confirma o enqueue. */
+  function clearQueuedBubble(text) {
+    const alvo = String(text || '').trim();
+    const nodes = document.querySelectorAll('#messages .msg-user.queued');
+    for (const node of nodes) {
+      const bubble = node.querySelector('.bubble');
+      if (!bubble || String(bubble.textContent || '').trim() !== alvo) continue;
+      if (node.parentNode) node.parentNode.removeChild(node);
+      return;
+    }
   }
 
   async function flushQueue() {
@@ -4042,22 +4402,51 @@
     return model.context ? `${Math.round(model.context / 1000)}k` : '';
   }
 
+  function modelContext(model) {
+    return Number((model && model.context) || 0);
+  }
+
+  /** Preenche o filtro de provedor com os providers do catálogo do motor. */
+  function renderProviderFilter() {
+    const select = $('#model-provider');
+    if (!select) return;
+    const atual = (state.modelFilters && state.modelFilters.provider) || '';
+    const known = new Map((state.providers || []).map((p) => [p.id, p.name || p.id]));
+    state.models.forEach((m) => { if (!known.has(m.providerID)) known.set(m.providerID, m.providerID); });
+    select.innerHTML = '';
+    const todos = el('option', null, t('model.allProviders') || 'Todos os provedores');
+    todos.value = '';
+    select.appendChild(todos);
+    [...known.entries()].sort((a, b) => a[1].localeCompare(b[1])).forEach(([id, name]) => {
+      const opt = el('option', null, name);
+      opt.value = id;
+      select.appendChild(opt);
+    });
+    select.value = atual;
+  }
+
   function renderModelList(filter) {
     const list = $('#model-list');
     list.innerHTML = '';
     const needle = (filter || '').trim().toLowerCase();
+    const filtros = state.modelFilters || { free: false, available: false, provider: '' };
     const groups = new Map();
     state.models.forEach((model) => {
       if (needle) {
         const hay = `${model.name} ${model.id} ${model.providerID}`.toLowerCase();
         if (!hay.includes(needle)) return;
       }
+      // v0.7.11-web44: filtros por custo/disponibilidade/provedor
+      if (filtros.free && !(model.cost && model.cost.free)) return;
+      if (filtros.available && !model.available) return;
+      if (filtros.provider && model.providerID !== filtros.provider) return;
       if (!groups.has(model.providerID)) groups.set(model.providerID, []);
       groups.get(model.providerID).push(model);
     });
 
     const providerMeta = new Map((state.providers || []).map((p) => [p.id, p]));
     let shown = 0;
+    let incompativeis = 0;
     groups.forEach((models, providerID) => {
       const meta = providerMeta.get(providerID) || {};
       const head = el('div', 'model-group');
@@ -4077,23 +4466,45 @@
         if (model.cost && model.cost.free) item.appendChild(el('span', 'badge free', 'grátis'));
         if (!model.available) item.appendChild(el('span', 'badge nokey', 'sem chave'));
         item.appendChild(el('span', 'm-meta', modelMeta(model)));
+        // v0.7.11-web44: janelas < 50k são incompatíveis com o UFVAI
+        // (a memória, as skills e o histórico da conversa não cabem).
+        const ctx = modelContext(model);
+        if (ctx > 0 && ctx < (state.minContext || 50000)) {
+          incompativeis++;
+          item.classList.add('incompatible');
+          item.appendChild(el('span', 'badge incompatible', t('model.incompatible')));
+          item.title = t('model.incompatibleTip', { k: modelMeta(model), min: Math.round(state.minContext / 1000) });
+        }
         item.addEventListener('click', () => pickModel(model));
         list.appendChild(item);
         shown++;
       });
     });
 
-    if (!shown) list.appendChild(el('div', 'model-group', 'nenhum modelo encontrado'));
-    $('#model-foot').textContent = state.models.length
+    if (!shown) list.appendChild(el('div', 'model-group', t('model.none')));
+    let foot = state.models.length
       ? `${state.models.length} modelos · ${state.models.filter((m) => m.available).length} com provedor configurado`
       : 'catálogo vazio — o motor ainda está subindo';
+    if (incompativeis) foot += ` · ${incompativeis} incompatíveis (< 50k)`;
+    $('#model-foot').textContent = foot;
   }
 
   function openModels() {
     $('#model-modal').hidden = false;
     $('#model-search').value = '';
+    renderProviderFilter();     // web44
+    syncFilterChips();          // web44
     renderModelList('');
     $('#model-search').focus();
+  }
+
+  /** v0.7.11-web44: reflete os filtros ativos nos chips. */
+  function syncFilterChips() {
+    const f = state.modelFilters || {};
+    const free = $('#mf-free');
+    const avail = $('#mf-available');
+    if (free) free.classList.toggle('on', !!f.free);
+    if (avail) avail.classList.toggle('on', !!f.available);
   }
 
   async function pickModel(model) {
@@ -4200,7 +4611,29 @@
 
     if (tab === 'geral') {
       pane.appendChild(el('h3', null, t('settings.appearance')));
-      pane.appendChild(row(t('settings.theme'), currentTheme() === 'pesquisai-light' ? 'claro' : 'escuro'));
+      // v0.7.11-web43: três modos — seguir o sistema, claro, escuro.
+      const themeRow = el('div', 'setting-row');
+      themeRow.appendChild(el('span', 'setting-label', t('settings.theme')));
+      const themePicker = el('div', 'theme-picker');
+      themePicker.setAttribute('role', 'group');
+      themePicker.setAttribute('aria-label', t('settings.theme'));
+      const choice = getThemeChoice();
+      [
+        ['auto', t('settings.themeSystem') || 'Sistema'],
+        ['pesquisai-light', t('settings.themeLight') || 'Claro'],
+        ['pesquisai', t('settings.themeDark') || 'Escuro'],
+      ].forEach(([mode, label]) => {
+        const b = el('button', 'btn theme-opt' + (mode === choice ? ' on' : ''), label);
+        b.type = 'button';
+        b.setAttribute('aria-pressed', mode === choice ? 'true' : 'false');
+        b.addEventListener('click', () => {
+          applyTheme(mode);
+          renderSettings();
+        });
+        themePicker.appendChild(b);
+      });
+      themeRow.appendChild(themePicker);
+      pane.appendChild(themeRow);
       pane.appendChild(el('p', null, t('settings.themeNote')));
       pane.appendChild(row(t('settings.language'), (state.locale || 'pt-BR').toUpperCase()));
       pane.appendChild(el('p', null, t('settings.languageNote')));
@@ -4741,7 +5174,9 @@
 
   async function boot() {
     loadPrefs();
-    applyTheme(currentTheme());
+    // v0.7.11-web43: aplica a ESCOLHA (auto/claro/escuro), não o valor
+    // resolvido — senão um visitante com "auto" perderia a preferência no boot.
+    applyTheme(getThemeChoice());
     // v0.7.11-web26: se o gateway desta origem for antigo, vai para a
     // porta que serve a versão completa.
     if (!(await gatewayIsCurrent())) {
@@ -5043,6 +5478,24 @@
     $('#model-pill').addEventListener('click', openModels);
     $('#model-close').addEventListener('click', () => { $('#model-modal').hidden = true; });
     $('#model-search').addEventListener('input', debounce((e) => renderModelList(e.target.value), 150));
+    // v0.7.11-web44: filtros de modelos (grátis / com chave / provedor)
+    const mfFree = $('#mf-free');
+    if (mfFree) mfFree.addEventListener('click', () => {
+      state.modelFilters.free = !state.modelFilters.free;
+      syncFilterChips();
+      renderModelList($('#model-search').value || '');
+    });
+    const mfAvail = $('#mf-available');
+    if (mfAvail) mfAvail.addEventListener('click', () => {
+      state.modelFilters.available = !state.modelFilters.available;
+      syncFilterChips();
+      renderModelList($('#model-search').value || '');
+    });
+    const mfProv = $('#model-provider');
+    if (mfProv) mfProv.addEventListener('change', () => {
+      state.modelFilters.provider = mfProv.value || '';
+      renderModelList($('#model-search').value || '');
+    });
 
     $('#agent-pill').addEventListener('click', openAgents);
     $('#variant-chip').addEventListener('click', openVariants);
@@ -5057,12 +5510,10 @@
     $('#session-menu-btn').addEventListener('click', openSessionMenu);
     $('#session-close').addEventListener('click', () => { $('#session-modal').hidden = true; });
 
-    // v0.7.11-web23: "expandir tudo" — abre/fecha todos os blocos já
-    // renderizados (raciocínio e ferramentas).
+    // v0.7.11-web45: "expandir tudo" — alterna o estado PERSISTENTE. Novos
+    // blocos (streaming ou sincronizados) nascem abertos enquanto estiver on.
     $('#expand-all-btn').addEventListener('click', () => {
-      const anyClosed = [...document.querySelectorAll('#messages details.block')]
-        .some((b) => !b.open);
-      setAllExpanded(anyClosed);
+      setAllExpanded(!state.allExpanded);
     });
 
     // v0.7.11-web23: o botão claro/escuro foi removido da web (o do
@@ -5147,6 +5598,15 @@
       });
     }
     $('#exp-search-clear').addEventListener('click', clearExplorerSearch);
+    // v0.7.11-web44: ordenação do explorador
+    const expSort = $('#exp-sort');
+    if (expSort) {
+      expSort.value = state.explorerSort || 'name';
+      expSort.addEventListener('change', () => {
+        state.explorerSort = expSort.value || 'name';
+        loadExplorer(state.explorerPath, state.explorerQuery);
+      });
+    }
     bindExplorerResizer();
     bindPreviewResizer();
     loadExplorerWidth();
@@ -5154,6 +5614,7 @@
     $('#jump-btn').addEventListener('click', () => {
       state.autoScroll = true;
       state.newSinceScroll = 0;
+      showJump(false);   // v0.7.11-web44: some na hora do clique
       const thread = $('#thread');
       if (thread && thread.scrollTo) {
         thread.scrollTo({ top: thread.scrollHeight, behavior: 'smooth' });
@@ -5256,13 +5717,11 @@
         event.preventDefault();
         backgroundSession();
       }
-      // v0.7.11-web23: expandir/recolher tudo
+      // v0.7.11-web45: expandir/recolher tudo — alterna o estado persistente
       if ((event.ctrlKey || event.metaKey) && event.shiftKey
           && (event.key === 'A' || event.key === 'a')) {
         event.preventDefault();
-        const anyClosed = [...document.querySelectorAll('#messages details.block')]
-          .some((b) => !b.open);
-        setAllExpanded(anyClosed);
+        setAllExpanded(!state.allExpanded);
       }
       // v0.7.11-web23: ocultar/mostrar as sessões
       if ((event.ctrlKey || event.metaKey) && event.key === '\\') {
@@ -5360,6 +5819,29 @@
     renderFavMenu,
     loadFavorites,
     loadForms,   // v0.7.11-web42: diagnóstico/recarga manual de formulários
+    // v0.7.11-web43: quick wins (tema sistema, rename do explorador)
+    applyTheme,
+    getThemeChoice,
+    currentTheme,
+    resolveTheme,
+    renameExplorerItem,
+    // v0.7.11-web44: fila inbox, reasoning, mensagens vazias, jump,
+    // explorador (excluir/ordenar) e filtros de modelos
+    postQueuedItem,
+    clearQueuedBubble,
+    rebadgeQueue,
+    finishReasoningBlocks,
+    pruneEmptyStreamSlots,
+    showJump,
+    deleteExplorerItem,
+    renderModelList,
+    renderProviderFilter,
+    syncFilterChips,
+    openModels,
+    modelContext,
+    // v0.7.11-web45: expandir tudo persistente (streaming + novas mensagens)
+    setAllExpanded,
+    shouldExpandBlock,
     // v0.7.11-web41: sessões (grupo/fixar) e exportação
     renderSessions,
     togglePin,

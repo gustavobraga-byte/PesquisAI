@@ -5922,6 +5922,8 @@ def create_wrapper_html(
     padding:15px 16px;margin-bottom:10px;cursor:pointer;color:inherit;font-family:inherit;
     transition:border-color .15s,background .15s,transform .15s;}
   #onboard-overlay .ob-choice:hover{border-color:rgba(178,145,73,.65);background:rgba(178,145,73,.09);transform:translateY(-1px)}
+  #onboard-overlay .ob-choice.ob-skip{border-color:rgba(93,186,126,.3);margin-top:2px}
+  #onboard-overlay .ob-choice.ob-skip:hover{border-color:rgba(93,186,126,.65);background:rgba(93,186,126,.09)}
   #onboard-overlay .ob-choice .ob-ico{font-size:20px;width:34px;height:34px;display:flex;
     align-items:center;justify-content:center;background:rgba(178,145,73,.12);border-radius:9px;flex:0 0 auto;}
   #onboard-overlay .ob-choice b{display:block;font-size:13.5px;font-weight:600;margin-bottom:3px}
@@ -6194,7 +6196,14 @@ def create_wrapper_html(
           <small>Ver opções gratuitas (e uma paga) e um passo a passo</small></span>
         <span class="ob-arrow">→</span>
       </button>
-      <p class="ob-note">Você pode trocar de provedor depois em <b>🔌 Provedores</b>.</p>
+      <!-- v0.7.11-web46: opção de seguir sem chave -->
+      <button class="ob-choice ob-skip" id="ob-nokey">
+        <span class="ob-ico">⏭️</span>
+        <span><b>Não adicionar chave agora</b>
+          <small id="ob-nokey-hint">Usar modelos gratuitos, se disponíveis no momento</small></span>
+        <span class="ob-arrow">→</span>
+      </button>
+      <p class="ob-note">Você pode trocar de provedor ou adicionar uma chave depois em <b>🔌 Provedores</b>.</p>
     </div>
 
     <!-- Passo 1 — opções -->
@@ -6219,6 +6228,16 @@ def create_wrapper_html(
       <div id="ob-body"></div>
     </div>
 
+    <!-- v0.7.11-web46: Passo 3 — seguir sem chave -->
+    <div class="ob-step" id="ob-step3">
+      <button class="ob-back" id="ob-back3">← voltar</button>
+      <h2>Continuar sem chave</h2>
+      <p class="ob-sub" id="ob-free-text">Você utilizará alguns modelos gratuitos, se disponíveis no momento.</p>
+      <div class="ob-note" id="ob-free-detail" style="margin:0 0 16px"></div>
+      <button class="ob-open" id="ob-nokey-confirm" style="width:100%;justify-content:center">Continuar com modelos gratuitos</button>
+      <p class="ob-note">Se nenhum modelo gratuito estiver disponível agora, você ainda poderá adicionar uma chave depois em <b>🔌 Provedores</b>. Sua escolha fica salva e esta tela não aparece novamente.</p>
+    </div>
+
     <!-- Sucesso -->
     <div class="ob-done" id="ob-done">
       <div class="big">✅</div>
@@ -6232,7 +6251,7 @@ def create_wrapper_html(
 (function(){
   var OV = document.getElementById("onboard-overlay");
   if (!OV) return;
-  var STEPS = ["ob-step0", "ob-step1", "ob-step2"];
+  var STEPS = ["ob-step0", "ob-step1", "ob-step2", "ob-step3"];
   var DATA = null, CHOSEN = "", BUSY = false;
 
   function $(id){ return document.getElementById(id); }
@@ -6432,6 +6451,64 @@ def create_wrapper_html(
   $("ob-back1").addEventListener("click", function(){ showStep("ob-step0"); });
   $("ob-back2").addEventListener("click", function(){ showStep("ob-step1"); });
   $("ob-close").addEventListener("click", close);
+
+  // ── v0.7.11-web46: "não adicionar chave" ────────────────────
+  function renderFreeInfo(){
+    var f = (DATA && DATA.free_models) || {};
+    var txt = $("ob-free-text"), det = $("ob-free-detail");
+    if (f.known === true && f.count > 0){
+      var provs = (f.providers || []).join(", ");
+      if (txt) txt.textContent = "Você utilizará alguns modelos gratuitos, se disponíveis no momento — "
+        + f.count + " estão disponíveis agora" + (provs ? " (" + provs + ")" : "") + ".";
+      if (det) det.textContent = "A disponibilidade pode mudar. Se um modelo gratuito não responder, "
+        + "adicione uma chave depois em 🔌 Provedores.";
+    } else {
+      // f.known === false (motor fora do ar) ou count === 0: sem número inventado
+      if (txt) txt.textContent = "Você utilizará alguns modelos gratuitos, se disponíveis no momento.";
+      if (det) det.textContent = f.known === true
+        ? "Nenhum modelo gratuito foi detectado neste instante. A disponibilidade pode mudar; "
+          + "você pode adicionar uma chave depois em 🔌 Provedores."
+        : "Não foi possível consultar o catálogo agora. Modelos gratuitos podem estar disponíveis; "
+          + "você pode adicionar uma chave depois em 🔌 Provedores.";
+    }
+    var hint = $("ob-nokey-hint");
+    if (hint && f.known === true && f.count > 0){
+      hint.textContent = "Usar " + f.count + " modelos gratuitos disponíveis agora";
+    }
+  }
+  $("ob-nokey").addEventListener("click", function(){
+    renderFreeInfo();
+    showStep("ob-step3");
+  });
+  $("ob-back3").addEventListener("click", function(){ showStep("ob-step0"); });
+  $("ob-nokey-confirm").addEventListener("click", function(){
+    var btn = $("ob-nokey-confirm");
+    if (BUSY) return;
+    BUSY = true;
+    if (btn){ btn.disabled = true; btn.textContent = "Salvando…"; }
+    fetch("/api/onboarding/skip", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({skip: true})
+    }).then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.ok){
+          var done = $("ob-done"), t = $("ob-done-title"), x = $("ob-done-text");
+          STEPS.forEach(function(id){ var el = $(id); if (el) el.style.display = "none"; });
+          if (done){ done.style.display = "block"; }
+          if (t) t.textContent = "Sem chave — seguindo com modelos gratuitos";
+          if (x) x.textContent = "Você pode adicionar uma chave quando quiser, em 🔌 Provedores.";
+          setTimeout(function(){ close(); location.reload(); }, 1800);
+        } else {
+          throw new Error((d && d.error) || "não foi possível salvar");
+        }
+      })
+      .catch(function(e){
+        BUSY = false;
+        if (btn){ btn.disabled = false; btn.textContent = "Continuar com modelos gratuitos"; }
+        alert("Não foi possível salvar a preferência: " + (e && e.message ? e.message : "tente de novo"));
+      });
+  });
 
   // ── quando abrir ────────────────────────────────────────────
   // Espera Termos e "Bem-vindo de volta" saírem da frente: o onboarding é a

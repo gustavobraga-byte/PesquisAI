@@ -229,6 +229,16 @@
       <button class="exp-search-clear" id="exp-search-clear" type="button" hidden
               title="Limpar o filtro" aria-label="Limpar o filtro" data-i18n-title="explorer.clearSearch">✕</button>
     </div>
+    <!-- v0.7.11-web44: ordenação da listagem -->
+    <div class="exp-sort-wrap">
+      <label for="exp-sort" data-i18n="explorer.sort">Ordenar</label>
+      <select id="exp-sort" aria-label="Ordenar arquivos">
+        <option value="name" data-i18n="explorer.sortName">Nome (A→Z)</option>
+        <option value="name-desc" data-i18n="explorer.sortNameDesc">Nome (Z→A)</option>
+        <option value="mtime" data-i18n="explorer.sortNewest">Mais recentes</option>
+        <option value="mtime-asc" data-i18n="explorer.sortOldest">Mais antigos</option>
+      </select>
+    </div>
     <div class="exp-body">
       <div class="exp-list" id="exp-list"></div>
       <!-- v0.7.11-web28: arrastar para redimensionar o VISUALIZADOR -->
@@ -248,6 +258,12 @@
       <button class="icon-btn" id="model-close" aria-label="Fechar" data-i18n-title="modal.close">✕</button>
     </div>
     <input id="model-search" type="search" placeholder="Buscar modelo…" autocomplete="off" data-i18n-placeholder="modal.searchModel">
+    <!-- v0.7.11-web44: filtros do catálogo de modelos -->
+    <div class="model-filters" id="model-filters">
+      <button type="button" class="mf-chip" id="mf-free" data-i18n="model.freeOnly">Só grátis</button>
+      <button type="button" class="mf-chip" id="mf-available" data-i18n="model.availableOnly">Com chave</button>
+      <select id="model-provider" aria-label="Filtrar por provedor" data-i18n-title="model.byProvider"></select>
+    </div>
     <div class="model-list" id="model-list"></div>
     <div class="modal-foot" id="model-foot"></div>
   </div>

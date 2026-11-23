@@ -201,7 +201,10 @@ def _handle_api(method: str, path: str, query: dict, body: dict) -> tuple[int, A
         needle = str(query.get("q", [""])[0] or "").strip()
         if needle:
             return 200, explorer.search(rel, needle)
-        return 200, explorer.listing(rel)
+        # v0.7.11-web44: ordenação escolhida no explorador
+        # (name | name-desc | mtime | mtime-asc).
+        order = str(query.get("sort", [""])[0] or "name").strip()
+        return 200, explorer.listing(rel, sort=order)
     if resource == "explorer" and method == "GET" and len(parts) == 4 and parts[3] == "preview":
         rel = str(query.get("path", [""])[0] or "")
         return 200, explorer.preview(rel)
@@ -209,6 +212,17 @@ def _handle_api(method: str, path: str, query: dict, body: dict) -> tuple[int, A
         # v0.7.11-web28: resolve a referência de arquivo citada na resposta
         name = str(query.get("name", [""])[0] or "")
         return 200, explorer.resolve(name)
+    if resource == "explorer" and method == "POST" and len(parts) == 4 and parts[3] == "rename":
+        # v0.7.11-web43: renomear arquivo/pasta do explorador (com validação
+        # de raiz e de nome em explorer.rename).
+        return 200, explorer.rename(
+            str(body.get("path") or ""),
+            str(body.get("name") or ""),
+        )
+    if resource == "explorer" and method == "POST" and len(parts) == 4 and parts[3] == "delete":
+        # v0.7.11-web44: excluir arquivo/pasta do explorador (confirmação no
+        # navegador; validação de raiz em explorer.delete).
+        return 200, explorer.delete(str(body.get("path") or ""))
     if resource == "about" and method == "GET":
         return 200, webapi.about()
     if resource == "agent-state" and method == "GET":

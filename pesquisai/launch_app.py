@@ -4922,6 +4922,33 @@ def start_wrapper_server():
                 })
                 return
 
+            if p == "/api/onboarding/skip":
+                # v0.7.11-web46: o usuário optou por NÃO adicionar chave.
+                # Persiste a decisão no store cifrado (metadado _env_*, que
+                # não conta como chave de provedor). Reversível: ao salvar
+                # uma chave depois, a presença dela faz needs_onboarding()
+                # continuar False e a interface remove o aviso.
+                from . import onboarding as _ob
+                try:
+                    _existing = load_encrypted_keys(DRIVE_BACKUP_DIR)
+                except Exception:  # noqa: BLE001
+                    _existing = {}
+                _skip = bool(body.get("skip", True))
+                if _skip:
+                    _existing[_ob.SKIP_KEY_META] = "1"
+                else:
+                    _existing.pop(_ob.SKIP_KEY_META, None)
+                if not save_encrypted_keys(DRIVE_BACKUP_DIR, _existing):
+                    self._json(500, {"ok": False, "error": "Falha ao gravar a preferência no Drive."})
+                    return
+                self._json(200, {
+                    "ok": True,
+                    "skip_key": _skip,
+                    "needs": _ob.needs_onboarding(_existing, _env),
+                    "free_models": _ob.free_models_available(),
+                })
+                return
+
             # ════════════════════════════════════════════════════════
             # v0.7.11 — VPN da UFV (OpenVPN)
             # ════════════════════════════════════════════════════════
