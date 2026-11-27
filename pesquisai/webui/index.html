@@ -188,6 +188,9 @@
 
       <div class="composer-inner">
         <textarea id="input" rows="1" placeholder="Pergunte ao UFVAI… (/ para comandos, @ para habilidades e arquivos)" autocomplete="off" data-i18n-placeholder="composer.placeholder"></textarea>
+        <button class="icon-btn live-btn" id="voice-live-btn" title="Conversa ao vivo por voz" aria-label="Conversa ao vivo por voz">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M9 21h6"/></svg>
+        </button>
         <button class="icon-btn fav-btn" id="fav-btn" title="Prompts favoritos" aria-label="Prompts favoritos" data-i18n-title="fav.title">★</button>
         <button class="icon-btn attach-btn" id="attach-btn" title="Anexar arquivos" aria-label="Anexar arquivos" data-i18n-title="composer.attach">📎</button>
         <input id="file-input" type="file" multiple hidden>
@@ -360,5 +363,6 @@
 <script src="app.js"></script>
 <!-- web34: melhorias aditivas de produtividade (chips, densidade, dicas) -->
 <script src="enhance34.js" defer></script>
+<script src="voice.js" defer></script>
 </body>
 </html>
