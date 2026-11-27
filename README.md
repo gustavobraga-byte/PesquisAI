@@ -14,13 +14,29 @@
 [![Abrir no Colab](https://img.shields.io/badge/▶️_Começar_agora-Google_Colab-brightgreen?style=for-the-badge)](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb)
 [![Apresentação](https://img.shields.io/badge/📊_Slides-ver_apresentação-C9A227?style=for-the-badge)](https://der.ufv.br/ufvai/#apresentacao)
 
-[![Versão](https://img.shields.io/badge/versão-0.7.11-orange.svg)]() [![Licença MIT](https://img.shields.io/badge/licença-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![SisPPG/UFV](https://img.shields.io/badge/SisPPG-10356285004-blue.svg)](http://sisppg.ufv.br) [![LGPD](https://img.shields.io/badge/LGPD-conforme-success.svg)](PRIVACY.md)
+[![Versão](https://img.shields.io/badge/versão-0.7.12-orange.svg)]() [![Licença MIT](https://img.shields.io/badge/licença-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![SisPPG/UFV](https://img.shields.io/badge/SisPPG-10356285004-blue.svg)](http://sisppg.ufv.br) [![LGPD](https://img.shields.io/badge/LGPD-conforme-success.svg)](PRIVACY.md)
 
 > Consulta dados oficiais do Brasil e literatura validada, cita cada fonte e declara honestamente quando não há evidência suficiente.
 
 [🌐 Site](https://der.ufv.br/ufvai/) · [📓 Colab](https://colab.research.google.com/github/gustavobraga-byte/PesquisAI/blob/main/PesquisAI.ipynb) · [📘 Manual](MANUAL.md) · [📜 Termos v3](docs/TERMS_OF_USE.md) · [🔒 Privacidade v1.1](PRIVACY.md) · [📊 Telemetria](TELEMETRY.md) · [📝 Changelog](CHANGELOG.md)
 
 </div>
+
+## 🎙️ Conversa ao vivo com voz (v0.7.12)
+
+O UFVAI oferece conversa por voz pela própria interface web (rota `/voz`),
+sem abrir uma segunda porta:
+
+- **Google Live**: conversa ao vivo em tempo real (requer chave Gemini).
+- **Modelo local**: `LFM3-Omni-2B` (ASR/TTS/chat) baixado sob demanda, com
+  **barra de progresso** e execução em GPU (CUDA) ou CPU.
+- **Grill-me por voz**: entrevista que monta o comando final para o agente
+  de pesquisa, com aprovação por voz.
+
+O servidor de voz (`voice/server.py`, porta 8010) sobe automaticamente no
+primeiro acesso a `/voz/*`. O `.deb` já inclui `voice/`.
+
+---
 
 ---
 

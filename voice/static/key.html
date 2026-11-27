@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UFVAI — Chave Gemini</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ufvai.css">
+<style>
+  main{width:100%;max-width:620px;margin:0 auto;padding:2rem 1rem 3rem}
+  .card{padding:1.8rem}
+  h1{font-size:1.3rem;margin-bottom:.5rem}
+  .lead{color:var(--ink-muted);font-size:.9rem;margin-bottom:1.5rem;line-height:1.6}
+  .step{display:flex;gap:.8rem;margin-bottom:1.2rem;align-items:flex-start}
+  .n{width:26px;height:26px;flex-shrink:0;border-radius:50%;background:var(--grad);color:#1a1206;
+     display:grid;place-items:center;font-weight:700;font-size:.8rem}
+  .step p{font-size:.87rem;color:var(--ink);line-height:1.55}
+  a.link{color:var(--accent);text-decoration:none;font-weight:600}
+  a.link:hover{text-decoration:underline}
+  .keyrow{display:flex;gap:.6rem;margin-top:.5rem;flex-wrap:wrap}
+  .keyrow input{flex:1;min-width:220px;padding:.7rem 1rem;border-radius:var(--radius-sm);
+    border:1px solid var(--line);background:var(--code-bg);color:var(--ink);
+    font-family:var(--font-mono);font-size:.85rem;outline:none}
+  .keyrow input:focus{border-color:var(--accent)}
+  .note{font-size:.76rem;color:var(--ink-dim);margin-top:1.2rem;line-height:1.5}
+  .err{display:none;color:var(--red);font-size:.83rem;margin-top:.7rem}
+  .privacy{display:flex;gap:.5rem;align-items:flex-start;margin-top:1.3rem;
+    padding:.8rem;border-radius:var(--radius-sm);background:var(--amber-dim);font-size:.78rem;line-height:1.5}
+  .privacy svg{width:16px;height:16px;flex-shrink:0;color:var(--amber);margin-top:2px}
+</style>
+</head>
+<body>
+<div id="header"></div>
+<main>
+  <div class="card">
+    <h1>Chave da Gemini API</h1>
+    <p class="lead">Para usar a <b>Conversa ao vivo por voz</b> com o Google Live, você precisa
+    de uma chave gratuita do Google AI Studio. É o mesmo pedido feito no início do UFVAI.</p>
+
+    <div class="step"><span class="n">1</span><p>Acesse
+      <a class="link" href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener">aistudio.google.com/api-keys</a>
+      e entre com sua conta Google.</p></div>
+    <div class="step"><span class="n">2</span><p>Clique em <b>Criar chave de API</b> e copie a chave gerada.</p></div>
+    <div class="step"><span class="n">3</span><p>Cole a chave no campo abaixo e confirme:</p></div>
+
+    <div class="keyrow">
+      <input id="keyInput" type="password" placeholder="Cole sua chave da Gemini API..." autocomplete="off" spellcheck="false">
+      <button class="btn" id="saveBtn">Salvar e conversar</button>
+    </div>
+    <div class="err" id="err"></div>
+    <div class="privacy">
+      <span id="warnIcon"></span>
+      <span>No plano gratuito, o Google pode usar seus dados para treinamento.
+      A chave fica salva apenas neste ambiente e é usada somente para a conversa ao vivo.</span>
+    </div>
+    <p class="note"><a class="link" href="javascript:history.back()">← Voltar</a> para escolher outro motor.</p>
+  </div>
+</main>
+
+<script src="common.js"></script>
+<script>
+document.getElementById('header').innerHTML=ufvaiHeader('Conversa');
+document.getElementById('warnIcon').innerHTML=ufvaiIcon('warn');
+document.getElementById('saveBtn').onclick=async()=>{
+  const key=document.getElementById('keyInput').value.trim();
+  const err=document.getElementById('err');
+  if(!key){
+    err.textContent="Cole uma chave da Gemini API para continuar.";
+    err.style.display='block'; return;
+  }
+  try{
+    const r=await fetch(ufvaiVoiceBase+'/api/gemini/key',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({key})});
+    const d=await r.json();
+    if(d.ok){ location.href=ufvaiVoiceBase+'/live'; }
+    else{ err.textContent=d.error||'Não foi possível salvar a chave.'; err.style.display='block'; }
+  }catch(e){ err.textContent='Erro de conexão com o servidor de voz.'; err.style.display='block'; }
+};
+document.getElementById('keyInput').onkeydown=e=>{if(e.key==='Enter')document.getElementById('saveBtn').click();};
+</script>
+</body>
+</html>

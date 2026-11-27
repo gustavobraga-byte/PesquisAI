@@ -24,6 +24,25 @@ Compatível com o PesquisAI principal (v0.2.1+).
 ═════════════════════════════════════════════════════════════════════════
 Histórico de versões:
 ═══════════════════════════════════════════════════════════════════════
+  v0.7.12 — 27/11/2026: 🎙️ Conversa ao vivo com voz + download do modelo local
+    • PEDIDO DO AUTOR: incluir a conversa ao vivo com voz na versão atual e
+      corrigir o download do modelo local (barra de progresso) e o proxy /voz.
+    • NOVO `voice/` (19 arquivos): FastAPI na porta 8010 com Gemini Live
+      (WebSocket) e LFM3-Omni-2B local (ASR/TTS/chat), páginas de escolha de
+      motor, download/load sob demanda, adaptador LoRA e fine-tuning.
+    • NOVO `pesquisai/voice_autostart.py`: sobe o servidor de voz na primeira
+      rota /voz/* sem exigir comando do usuário.
+    • `webui_server.py`: túnel WebSocket + proxy HTTP /voz/* e correção crítica
+      do POST (corpo lido duas vezes → 422 e travamento do gateway).
+    • `voice/server.py`: `hf download` (fallback `huggingface-cli`/API Python),
+      verificação de `returncode`, erro real em /api/local/status e detecção
+      de pesos também no cache HF.
+    • `voice/static/local.html`: barra com percentual, clique com feedback
+      imediato, polling a 1,2 s e erro com "Tentar novamente".
+    • `build-deb.sh`: `voice/` incluído no pacote .deb.
+    • VALIDAÇÃO: Tesla T4/CUDA 13, torch 2.14.1, hf_hub 1.33.0 — download
+      real de 4,1 GB, loaded=true, POST /voz/api/chat via gateway HTTP 200
+      com texto e áudio. LoRA exige torchao >=0,16 (não fatal).
   v0.7.11 — 06/11/2026: 🛡 VPN da UFV no Colab (OpenVPN em namespace isolado)
     • PEDIDO DO AUTOR: "o servidor do Colab conecte via internet via VPN da UFV"
       e, depois, "vai abrir uma tela logo quando iniciar para escolher se ele é
@@ -545,13 +564,13 @@ Histórico de versões:
 """
 
 # ── Versão semântica (SemVer) ──────────────────────────────────
-__version__: str = "0.7.11"
+__version__: str = "0.7.12"
 __brand__: str = "UFVAI"
 __brand_tagline__: str = "Pesquisa científica com integridade."
 
 # ── Metadados do release ───────────────────────────────────────
-__release_date__: str = "2026-11-21"
-__codename__: str = "Interface web46: onboarding com opção 'não adicionar chave' + modelos gratuitos disponíveis + expandir tudo persistente"
+__release_date__: str = "2026-11-27"
+__codename__: str = "Conversa ao vivo com voz (Gemini Live + LFM3 local) + download do modelo com barra de progresso"
 
 # ── Identidade do projeto ──────────────────────────────────────
 __author__: str = "Gustavo Bastos Braga"
@@ -592,6 +611,10 @@ __components__: dict[str, str] = {
     "web44_models": "0.7.11-web44",       # NOVO web44: filtros + aviso <50k
     "web45_expand_all": "0.7.11-web45",   # NOVO web45: expandir tudo persistente
     "web46_onboarding_nokey": "0.7.11-web46",  # NOVO web46: "não adicionar chave" + gratuitos
+    "voice_live": "0.7.12",              # NOVO: Gemini Live (WebSocket /voz/ws/live)
+    "voice_local": "0.7.12",             # NOVO: LFM3-Omni-2B local (ASR/TTS/chat)
+    "voice_proxy": "0.7.12",             # NOVO: /voz/* no gateway (POST sem dupla leitura)
+    "voice_download_progress": "0.7.12", # NOVO: barra de progresso real no download
 }
 
 # ── Idiomas suportados ─────────────────────────────────────────
@@ -690,6 +713,16 @@ __api_endpoints__: list[str] = [
     "POST /api/vpn/answer",         # NOVO v0.7.11: resposta da tela inicial
     "POST /api/ufvai/explorer/delete",  # NOVO web44: excluir arquivo/pasta
     "POST /api/onboarding/skip",        # NOVO web46: optar por não adicionar chave
+    "GET  /voz/start",                  # NOVO v0.7.12: escolha de motor de voz
+    "GET  /voz/live",                   # NOVO v0.7.12: conversa ao vivo
+    "GET  /voz/local",                  # NOVO v0.7.12: download/load do modelo local
+    "WS   /voz/ws/live",                # NOVO v0.7.12: tunnel WebSocket Gemini Live
+    "GET  /voz/api/local/status",       # NOVO v0.7.12: status + progresso
+    "POST /voz/api/local/download",     # NOVO v0.7.12: download sob demanda
+    "POST /voz/api/local/load",         # NOVO v0.7.12: load na memória
+    "POST /voz/api/chat",               # NOVO v0.7.12: chat/voz (ASR+LLM+TTS)
+    "POST /voz/api/transcribe",         # NOVO v0.7.12: transcrição local
+    "POST /voz/api/tts",                # NOVO v0.7.12: síntese local
 ]
 
 

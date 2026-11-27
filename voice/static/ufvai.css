@@ -1,0 +1,207 @@
+/* ==========================================================================
+   UFVAI Voz — identidade visual (navy + ouro), temas claro e escuro
+   Tokens do theme34.css (v0.7.11-web) + ajustes de harmonia.
+   ========================================================================== */
+:root {
+  --surface: #0f151c;
+  --rail: #151d26;
+  --panel: #141c25;
+  --panel-2: #1d2733;
+  --ink: #eceae4;
+  --ink-muted: #a6a39b;
+  --ink-dim: #7a858d;
+  --line: rgba(255,255,255,.08);
+  --line-strong: rgba(255,255,255,.17);
+  --accent: #c2a057;
+  --accent-rgb: 194,160,87;
+  --accent-dim: rgba(194,160,87,.13);
+  --accent-glow: rgba(194,160,87,.26);
+  --green: #63c586;
+  --green-dim: rgba(99,197,134,.14);
+  --amber: #e0b528;
+  --amber-dim: rgba(224,181,40,.14);
+  --red: #e57e7e;
+  --red-dim: rgba(229,126,126,.13);
+  --radius: 10px;
+  --radius-sm: 7px;
+  --bright: #d9bc7a;
+  --deep: #8f7536;
+  --grad: linear-gradient(135deg,#d9bc7a 0%,#c2a057 48%,#a9883f 100%);
+  --elev-1: 0 1px 2px rgba(0,0,0,.35),0 4px 14px rgba(0,0,0,.25);
+  --elev-2: 0 6px 24px rgba(0,0,0,.45),0 18px 48px rgba(0,0,0,.35);
+  --code-bg: #0c1218;
+  --t: .18s cubic-bezier(.4,0,.2,1);
+  --font: 'Montserrat',system-ui,-apple-system,sans-serif;
+  --font-mono: 'DM Mono',ui-monospace,monospace;
+  --shadow: 0 10px 40px rgba(0,0,0,.28);
+}
+html[data-theme="pesquisai-light"], html[data-theme="light"] {
+  --surface: #f6f5f1; --rail: #fdfdfb; --panel: #fff; --panel-2: #f0efe9;
+  --ink: #20262b; --ink-muted: #4c5a61; --ink-dim: #7d888d;
+  --line: rgba(32,38,43,.10); --line-strong: rgba(32,38,43,.22);
+  --accent: #8a6d33; --accent-rgb: 138,109,51;
+  --accent-dim: rgba(138,109,51,.10); --accent-glow: rgba(138,109,51,.20);
+  --green: #2e7d32; --green-dim: rgba(46,125,50,.10);
+  --amber: #a67c00; --amber-dim: rgba(166,124,0,.10);
+  --red: #c62828; --red-dim: rgba(198,40,40,.10);
+  --bright: #a9883f; --deep: #6d5626;
+  --code-bg: #f4f3ee; --shadow: 0 10px 36px rgba(32,38,43,.10);
+  color-scheme: light;
+}
+
+* { box-sizing:border-box; margin:0; padding:0; }
+html, body { min-height:100%; }
+body {
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font);
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  transition: background .25s, color .25s;
+}
+
+/* ── Cabeçalho: mesmo padrão do wrapper do UFVAI ── */
+header.ufvai-head {
+  width:100%;
+  background: var(--rail);
+  border-bottom: 1px solid var(--line);
+  padding: .85rem 1.6rem;
+  display:flex; align-items:center; gap:.8rem;
+}
+header.ufvai-head .logo-waves {
+  display:grid; place-items:center;
+  color: var(--accent);
+  flex-shrink:0;
+}
+header.ufvai-head .logo-waves svg { width:30px; height:26px; }
+header.ufvai-head .wordmark {
+  font-size:1.15rem; font-weight:700; letter-spacing:-.02em;
+  color: var(--ink);
+  text-transform: lowercase;
+}
+header.ufvai-head .sep { color:var(--ink-dim); margin:0 .15rem; }
+header.ufvai-head .section { color:var(--ink-muted); font-size:1rem; font-weight:600; }
+header.ufvai-head .spacer { flex:1; }
+header.ufvai-head a, header.ufvai-head button.link {
+  color:var(--ink-muted); text-decoration:none; font-size:.82rem;
+  background:none; border:none; cursor:pointer; font-family:var(--font);
+  padding:.35rem .6rem; border-radius:var(--radius-sm); transition:all var(--t);
+}
+header.ufvai-head a:hover, header.ufvai-head button.link:hover {
+  color:var(--accent); background:var(--accent-dim);
+}
+header.ufvai-head .theme-btn { display:grid; place-items:center; width:32px; height:32px; padding:0; }
+
+/* ── Cartões ── */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--elev-1);
+  transition: border-color var(--t), transform var(--t), box-shadow var(--t);
+}
+.card:hover { border-color:var(--line-strong); }
+.card.selectable { cursor:pointer; }
+.card.selectable:hover {
+  border-color:var(--accent);
+  transform:translateY(-3px);
+  box-shadow:var(--elev-2), 0 0 0 1px var(--accent-glow);
+}
+
+/* ── Botões ── */
+.btn {
+  background:var(--grad); color:#1a1206;
+  border:none; font-weight:700; font-family:var(--font);
+  padding:.65rem 1.25rem; border-radius:var(--radius-sm);
+  cursor:pointer; font-size:.9rem;
+  transition:filter var(--t), transform var(--t), box-shadow var(--t);
+}
+.btn:hover { filter:brightness(1.08); box-shadow:var(--accent-glow); }
+.btn:active { transform:scale(.98); }
+.btn:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
+.btn.secondary { background:var(--panel-2); color:var(--ink); border:1px solid var(--line); }
+.btn.secondary:hover { border-color:var(--accent); }
+.btn.confirm { background:var(--green); color:#06210f; }
+.btn.reject { background:var(--panel-2); color:var(--ink); border:1px solid var(--line); }
+
+/* ── Esfera com ondas de áudio (SVG animado) ── */
+.orb {
+  width:140px; height:140px; border-radius:50%;
+  background:var(--grad);
+  display:grid; place-items:center;
+  cursor:pointer; box-shadow:var(--elev-2);
+  transition:transform var(--t), box-shadow var(--t);
+  user-select:none; color:#1a1206;
+  position:relative; overflow:hidden;
+}
+.orb:hover { transform:scale(1.04); }
+.orb.idle { box-shadow:var(--elev-1); }
+.orb.listening { box-shadow:0 0 0 4px var(--green-dim), 0 0 50px rgba(99,197,134,.35); }
+.orb.speaking { box-shadow:0 0 0 4px var(--accent-dim), 0 0 50px var(--accent-glow); }
+.orb .waves { display:flex; align-items:center; gap:4px; height:52px; }
+.orb .waves span {
+  display:block; width:5px; height:12px; border-radius:4px;
+  background:rgba(26,18,6,.75);
+  transform-origin:center;
+}
+.orb.active .waves span { animation:wave 1s ease-in-out infinite; }
+.orb .waves span:nth-child(1){ animation-delay:0s }
+.orb .waves span:nth-child(2){ animation-delay:.12s }
+.orb .waves span:nth-child(3){ animation-delay:.24s }
+.orb .waves span:nth-child(4){ animation-delay:.36s }
+.orb .waves span:nth-child(5){ animation-delay:.48s }
+@keyframes wave {
+  0%,100% { transform:scaleY(.5); }
+  50%     { transform:scaleY(3.2); }
+}
+.orb .mic-icon { width:46px; height:46px; }
+.orb.active .mic-icon { display:none; }
+.orb:not(.active) .waves { display:none; }
+
+/* ── Mensagens ── */
+.turn {
+  padding:.6rem 1rem; border-radius:var(--radius-sm);
+  line-height:1.5; font-size:.92rem; white-space:pre-wrap;
+  animation:fade .2s ease;
+}
+@keyframes fade { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+.turn.user { background:var(--panel-2); align-self:flex-end; max-width:88%; }
+.turn.assistant { background:var(--panel); border:1px solid var(--line); align-self:flex-start; max-width:88%; }
+.turn.sys { background:none; border:none; color:var(--ink-dim); font-size:.78rem; align-self:center; }
+
+/* ── Cartão do comando ── */
+.cmdCard { background:linear-gradient(180deg,var(--green-dim),transparent); border-color:rgba(99,197,134,.4); }
+.cmdCard h2 { color:var(--green); font-size:.95rem; margin-bottom:.6rem; }
+.cmdText {
+  background:var(--code-bg); border:1px solid var(--line);
+  border-radius:var(--radius-sm); padding:1rem;
+  font-family:var(--font-mono); font-size:.84rem;
+  white-space:pre-wrap; max-height:300px; overflow-y:auto; color:var(--ink);
+}
+.cmd-actions { display:flex; gap:.6rem; flex-wrap:wrap; margin-top:.9rem; }
+
+/* ── Utilitários ── */
+.muted { color:var(--ink-dim); }
+.sub { color:var(--ink-muted); font-size:.88rem; }
+.badge {
+  display:inline-block; font-size:.7rem; padding:.25rem .65rem;
+  border-radius:20px; font-weight:600; letter-spacing:.02em;
+}
+.badge.recommended { background:var(--accent); color:#1a1206; }
+.badge.free { background:var(--green-dim); color:var(--green); }
+.badge.local { background:rgba(125,211,252,.13); color:#7dd3fc; }
+.badge.warn { background:var(--amber-dim); color:var(--amber); }
+.spinner {
+  display:inline-block; width:14px; height:14px;
+  border:2px solid var(--line-strong); border-top-color:var(--accent);
+  border-radius:50%; animation:spin .9s linear infinite;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* ── Alternador de tema ── */
+.theme-toggle {
+  display:inline-flex; align-items:center; gap:.45rem;
+  color:var(--ink-muted); font-size:.8rem;
+  background:none; border:none; cursor:pointer; font-family:var(--font);
+}
+.theme-toggle svg { width:16px; height:16px; }

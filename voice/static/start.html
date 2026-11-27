@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UFVAI — Conversa ao vivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ufvai.css">
+<style>
+  main { width:100%; max-width:860px; margin:0 auto; padding:2.6rem 1rem 3rem; }
+  .intro { text-align:center; margin-bottom:2rem; }
+  .intro h1 { font-size:1.6rem; font-weight:700; margin-bottom:.45rem; }
+  .intro h1 b { color:var(--accent); }
+  .intro p { color:var(--ink-muted); font-size:.92rem; max-width:600px; margin:0 auto; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:1.3rem; }
+  .c { padding:1.7rem 1.5rem; display:flex; flex-direction:column; position:relative; }
+  .c .ic { width:52px; height:52px; color:var(--accent); margin-bottom:1rem; }
+  .c.local .ic { color:#7dd3fc; }
+  .c h2 { font-size:1.1rem; margin-bottom:.55rem; }
+  .c p { color:var(--ink-muted); font-size:.87rem; flex:1; }
+  .c .meta { margin-top:1.2rem; display:flex; flex-direction:column; gap:.55rem; }
+  .c .meta .line { display:flex; align-items:flex-start; gap:.5rem; font-size:.8rem; color:var(--ink-muted); }
+  .c .meta .line svg { width:15px; height:15px; flex-shrink:0; margin-top:2px; color:var(--accent); }
+  .c.local .meta .line svg { color:#7dd3fc; }
+  .c .badge { position:absolute; top:1.1rem; right:1.1rem; }
+  .foot { margin-top:1.8rem; text-align:center; color:var(--ink-dim); font-size:.8rem; }
+  .foot svg { width:15px; height:15px; vertical-align:-3px; margin-right:.3rem; color:var(--accent); }
+</style>
+</head>
+<body>
+<div id="header"></div>
+<main>
+  <div class="intro">
+    <h1><b>Conversa ao vivo por voz</b></h1>
+    <p>Escolha como deseja conversar. Em ambos os modos o assistente faz uma
+    <b>entrevista</b> para entender seu trabalho e entrega o comando pronto para o UFVAI.</p>
+  </div>
+
+  <div class="cards">
+    <div class="card selectable c" id="cardGoogle">
+      <span class="badge recommended" id="googleBadge">VERIFICANDO…</span>
+      <div class="ic" id="iconGoogle"></div>
+      <h2>Google Live</h2>
+      <p>Conversa em tempo real, com voz natural e baixa latência. Ideal para
+      entrevistas fluidas e para quem quer praticidade.</p>
+      <div class="meta">
+        <div class="line"><span id="checkIcon"></span><span id="googleStatus">Verificando chave...</span></div>
+        <div class="line"><span id="warnIcon"></span><span>Seus dados podem ser usados pelo Google para treinamento no plano gratuito.</span></div>
+      </div>
+    </div>
+
+    <div class="card selectable c local" id="cardLocal">
+      <div class="ic" id="iconLocal"></div>
+      <h2>LFM3 Local</h2>
+      <p>Modelo ajustado para o UFVAI que roda no seu ambiente. Seus áudios não
+      saem da máquina — maior privacidade, porém exige mais computação.</p>
+      <div class="meta">
+        <div class="line"><span id="privIcon"></span><span>Maior privacidade: processamento 100% local.</span></div>
+        <div class="line"><span id="cpuIcon"></span><span>Requer mais computação e o download do modelo (4,1 GB), feito só se você escolher.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="foot"><span id="footIcon"></span>Não sabe por onde começar? É só falar — a entrevista conduz você.</p>
+</main>
+
+<script src="common.js"></script>
+<script>
+document.getElementById('header').innerHTML = ufvaiHeader('Conversa');
+document.getElementById('iconGoogle').innerHTML = ufvaiIcon('spark');
+document.getElementById('iconLocal').innerHTML = ufvaiIcon('chip');
+document.getElementById('checkIcon').innerHTML = ufvaiIcon('check');
+document.getElementById('warnIcon').innerHTML = ufvaiIcon('warn');
+document.getElementById('privIcon').innerHTML = ufvaiIcon('chip');
+document.getElementById('cpuIcon').innerHTML = ufvaiIcon('chip');
+document.getElementById('footIcon').innerHTML = ufvaiIcon('spark');
+
+let googleReady=false;
+async function checkGoogle(){
+  try{
+    const d = await (await fetch(ufvaiVoiceBase+'/api/status')).json();
+    const b=document.getElementById('googleBadge'), s=document.getElementById('googleStatus');
+    googleReady=!!d.live_key_configured;
+    if(googleReady){
+      b.className='badge free'; b.textContent='RECOMENDADO';
+      s.textContent='Chave já configurada — entra direto na conversa.';
+    } else {
+      b.className='badge recommended'; b.textContent='RECOMENDADO';
+      s.textContent='Sem chave — você será solicitado a informá-la (grátis).';
+    }
+  }catch{ document.getElementById('googleStatus').textContent='Servidor de voz indisponível.'; }
+}
+// Sem chave -> tela de pedido de chave (igual ao início do UFVAI); com chave -> direto.
+document.getElementById('cardGoogle').onclick=()=>location.href=ufvaiVoiceBase+(googleReady?'/live':'/key');
+document.getElementById('cardLocal').onclick=()=>location.href=ufvaiVoiceBase+'/local';
+checkGoogle();
+</script>
+</body>
+</html>

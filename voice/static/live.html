@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UFVAI — Conversa ao vivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ufvai.css">
+<style>
+  main { width:100%; max-width:760px; margin:0 auto; padding:1.6rem 1rem 3rem;
+         display:flex; flex-direction:column; align-items:center; }
+  .sub { color:var(--ink-muted); font-size:.87rem; margin-bottom:1.4rem; text-align:center; max-width:580px; }
+  .orb { width:150px; height:150px; margin-bottom:.6rem; }
+  #state { color:var(--ink-muted); min-height:1.4rem; text-align:center; font-size:.9rem; margin-bottom:.9rem; }
+  .row { display:flex; gap:.7rem; flex-wrap:wrap; justify-content:center; margin-bottom:1.3rem; }
+  #log { width:100%; display:flex; flex-direction:column; gap:.6rem; }
+  #cmdCard { display:none; width:100%; margin-top:1.2rem; padding:1.2rem; }
+  #executeStatus { display:none; margin-top:.9rem; padding:.7rem 1rem; border-radius:var(--radius-sm);
+                   background:var(--accent-dim); color:var(--ink); font-size:.86rem; }
+  #resultBox { display:none; margin-top:1rem; padding:1rem; max-height:300px; overflow:auto; font-size:.85rem; }
+  #resultBox h3 { color:var(--accent); font-size:.86rem; margin-bottom:.5rem; }
+  #modelNote { display:none; margin-top:.7rem; padding:.6rem .9rem; border-radius:var(--radius-sm);
+               background:var(--accent-dim); color:var(--ink); font-size:.83rem; }
+</style>
+</head>
+<body>
+<div id="header"></div>
+<main>
+  <p class="sub">Fale naturalmente sobre seu trabalho. O assistente conduz uma
+  <b>entrevista</b>, esclarece o que você precisa e ao final pergunta se o comando
+  está aprovado — se sim, ele copia e executa no UFVAI automaticamente.</p>
+
+  <div class="orb idle" id="orb">
+    <svg class="mic-icon" viewBox="0 0 48 48" fill="currentColor"><rect x="18" y="7" width="12" height="24" rx="6"/><path d="M12 23a12 12 0 0 0 24 0M24 35v6M18 41h12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>
+    <div class="waves"><span></span><span></span><span></span><span></span><span></span></div>
+  </div>
+  <div id="state">Iniciando…</div>
+  <div class="row">
+    <button class="btn secondary" id="muteBtn">Silenciar voz</button>
+    <button class="btn secondary" id="restartBtn">Reiniciar conversa</button>
+  </div>
+
+  <div id="log"></div>
+
+  <div id="cmdCard" class="card cmdCard">
+    <h2>Comando para o UFVAI</h2>
+    <div id="cmdText" class="cmdText"></div>
+    <div class="cmd-actions">
+      <button class="btn confirm" id="approveBtn">Aprovar e executar</button>
+      <button class="btn reject" id="rejectBtn">Ajustar</button>
+      <button class="btn secondary" id="copyBtn">Copiar</button>
+    </div>
+  </div>
+
+  <div id="modelNote"></div>
+  <div id="executeStatus"></div>
+  <div id="resultBox" class="card">
+    <h3>Resultado do UFVAI</h3>
+    <div id="resultText"></div>
+  </div>
+</main>
+
+<script src="common.js"></script>
+<script>
+document.getElementById('header').innerHTML = ufvaiHeader('Conversa');
+const orb=document.getElementById('orb'), stateEl=document.getElementById('state'), logEl=document.getElementById('log');
+let ws,audioCtx,micStream,workletNode,micActive=false,connected=false,muted=false,playCtx,playTime=0;
+let currentAssistant=null,cmdBuffer='',cmdShown=false,awaitingConfirm=false;
+
+function log(role,text){const d=document.createElement('div');d.className='turn '+role;
+  d.textContent=text;logEl.appendChild(d);d.scrollIntoView({behavior:'smooth'});return d;}
+function setOrb(active){orb.classList.toggle('active',active);orb.classList.toggle('listening',active&&!muted);}
+
+async function startMic(){
+  micStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
+  audioCtx=new AudioContext({sampleRate:16000});
+  const src=audioCtx.createMediaStreamSource(micStream);
+  await audioCtx.audioWorklet.addModule(URL.createObjectURL(new Blob([`
+    class P extends AudioWorkletProcessor{process(i){const x=i[0][0];if(x){const p=new Int16Array(x.length);
+      for(let j=0;j<x.length;j++){const s=Math.max(-1,Math.min(1,x[j]));p[j]=s<0?s*0x8000:s*0x7FFF;}
+      this.port.postMessage(p.buffer,[p.buffer]);}return true;}}registerProcessor('p',P);`],{type:'application/javascript'})));
+  workletNode=new AudioWorkletNode(audioCtx,'p');
+  workletNode.port.onmessage=e=>{if(ws&&ws.readyState===1&&micActive)ws.send(e.data);};
+  src.connect(workletNode);workletNode.connect(audioCtx.destination);
+  micActive=true;setOrb(true);
+}
+function playPCM(b64){
+  if(muted)return;
+  if(!playCtx)playCtx=new AudioContext({sampleRate:24000});
+  const bin=atob(b64),bytes=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+  const pcm=new Int16Array(bytes.buffer),buf=playCtx.createBuffer(1,pcm.length,24000),ch=buf.getChannelData(0);
+  for(let i=0;i<pcm.length;i++)ch[i]=pcm[i]/32768;
+  const s=playCtx.createBufferSource();s.buffer=buf;s.connect(playCtx.destination);
+  const now=playCtx.currentTime;if(playTime<now)playTime=now+.05;
+  s.start(playTime);playTime+=buf.duration;
+  orb.classList.add('speaking');
+  s.onended=()=>{if(playCtx&&playCtx.currentTime>=playTime-.05)orb.classList.remove('speaking');};
+}
+function stopPlayback(){playTime=0;if(playCtx){playCtx.close();playCtx=null;}orb.classList.remove('speaking');}
+function maybeShowCommand(){
+  const m=cmdBuffer.match(/<<<COMANDO_UFVAI>>>([\s\S]*?)<<<FIM_COMANDO>>>/);
+  if(m){const txt=m[1].trim();
+    if(!cmdShown||document.getElementById('cmdText').textContent!==txt){
+      cmdShown=true;awaitingConfirm=true;document.getElementById('cmdText').textContent=txt;
+      document.getElementById('cmdCard').style.display='block';
+      document.getElementById('cmdCard').scrollIntoView({behavior:'smooth'});}}
+}
+async function copyAndApprove(text){
+  try{await navigator.clipboard.writeText(text);}catch{const t=document.createElement('textarea');
+    t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();}
+  awaitingConfirm=false;
+  const st=document.getElementById('executeStatus');st.style.display='block';
+  st.innerHTML='<span class="spinner"></span> Comando copiado. Executando no UFVAI…';
+}
+function sendText(t,silent){if(!t.trim()||!connected)return;if(!silent)log('user',t);
+  ws.send(JSON.stringify({type:'text',text:t}));}
+
+document.getElementById('copyBtn').onclick=async()=>{
+  await navigator.clipboard.writeText(document.getElementById('cmdText').textContent);
+  document.getElementById('copyBtn').textContent='Copiado';setTimeout(()=>document.getElementById('copyBtn').textContent='Copiar',2000);};
+document.getElementById('approveBtn').onclick=async()=>{
+  await copyAndApprove(document.getElementById('cmdText').textContent);
+  sendText('Está aprovado. Pode executar o comando.',true);};
+document.getElementById('rejectBtn').onclick=()=>sendText('Não estou de acordo. Quero ajustar o comando.',true);
+document.getElementById('muteBtn').onclick=e=>{muted=!muted;
+  e.target.textContent=muted?'Ativar voz':'Silenciar voz';if(muted)stopPlayback();};
+document.getElementById('restartBtn').onclick=()=>{
+  if(ws)ws.close();logEl.innerHTML='';cmdBuffer='';cmdShown=false;awaitingConfirm=false;
+  document.getElementById('cmdCard').style.display='none';
+  document.getElementById('resultBox').style.display='none';
+  document.getElementById('executeStatus').style.display='none';
+  setTimeout(connect,400);};
+
+async function connect(){
+  if(connected)return;
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}${ufvaiVoiceBase}/ws/live`);
+  stateEl.textContent='Conectando…';
+  ws.onopen=async()=>{connected=true;try{await startMic();
+    stateEl.textContent='Ouvindo — fale sobre seu trabalho';}
+    catch(e){stateEl.textContent='Microfone bloqueado: '+e.message;}};
+  ws.onmessage=ev=>{const m=JSON.parse(ev.data);
+    if(m.type==='ready'){stateEl.textContent='Conectado. Pode falar.';}
+    else if(m.type==='audio'){playPCM(m.data);}
+    else if(m.type==='transcript'){
+      if(m.role==='user'){log('user',m.text);currentAssistant=null;cmdBuffer='';
+        if(awaitingConfirm)sendText(m.text,true);}
+      else{if(!currentAssistant){currentAssistant=log('assistant',m.text);cmdBuffer=m.text;}
+        else{currentAssistant.textContent+=m.text;cmdBuffer+=m.text;}maybeShowCommand();}}
+    else if(m.type==='interrupted'){stopPlayback();}
+    else if(m.type==='turn_complete'){stateEl.textContent='Ouvindo — pode responder';currentAssistant=null;}
+    else if(m.type==='tool'){log('sys',m.message||(m.status==='running'?'Processando…':'Concluído'));}
+    else if(m.type==='execute_command'){
+      copyAndApprove(m.command);document.getElementById('cmdText').textContent=m.command;
+      if(m.model){const note=document.getElementById('modelNote');note.style.display='block';
+        note.textContent='Modelo escolhido: '+(m.model.name||m.model.id);}}
+    else if(m.type==='show_command'){
+      cmdShown=true;awaitingConfirm=true;
+      document.getElementById('cmdText').textContent=m.command;
+      document.getElementById('cmdCard').style.display='block';
+      document.getElementById('cmdCard').scrollIntoView({behavior:'smooth'});
+      log('sys','Comando pronto — confirme por voz se deseja executar.');}
+    else if(m.type==='models'){
+      const titulos=(m.models||[]).slice(0,6).map(x=>x.name+(x.free?' (grátis)':'')).join(', ');
+      log('sys','Modelos disponíveis: '+titulos);}
+    else if(m.type==='final_status'){
+      const st=document.getElementById('executeStatus');st.style.display='block';
+      st.textContent='✅ '+m.message;
+      log('sys',m.message);
+      st.scrollIntoView({behavior:'smooth'});}
+    else if(m.type==='command_result'){
+      const b=document.getElementById('resultBox');b.style.display='block';
+      document.getElementById('resultText').textContent=m.result;
+      // Não sobrescreve o aviso de "já em execução — confira no Drive".
+      b.scrollIntoView({behavior:'smooth'});}
+    else if(m.type==='error'){log('sys','⚠️ '+m.message);stateEl.textContent=m.message;}};
+  ws.onclose=()=>{connected=false;micActive=false;setOrb(false);
+    stateEl.textContent='Sessão encerrada.';if(micStream)micStream.getTracks().forEach(t=>t.stop());};
+}
+orb.onclick=()=>{if(!connected){connect();return;}micActive=!micActive;setOrb(micActive);
+  stateEl.textContent=micActive?'Ouvindo…':'Microfone pausado';};
+connect();
+</script>
+</body>
+</html>

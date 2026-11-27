@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UFVAI Voz — LFM3-Omni</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --accent: #b29149;
+            --text: #f8fafc;
+            --text-dim: #94a3b8;
+            --user: #334155;
+            --assistant: #1e293b;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        body { background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+        header { padding: 1rem 1.5rem; background: var(--panel); border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+        h1 { font-size: 1.25rem; color: var(--accent); display: flex; align-items: center; gap: 0.5rem; }
+        .status { font-size: 0.8rem; color: var(--text-dim); display: flex; gap: 1rem; }
+        .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; margin-right: 4px; }
+        .dot.ok { background: #22c55e; }
+        .dot.wait { background: #eab308; animation: pulse 1s infinite alternate; }
+        @keyframes pulse { to { opacity: 0.4; } }
+        
+        main { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; max-width: 800px; width: 100%; margin: 0 auto; }
+        .msg { padding: 1rem; border-radius: 12px; max-width: 85%; line-height: 1.5; white-space: pre-wrap; }
+        .msg.user { align-self: flex-end; background: var(--user); border-bottom-right-radius: 4px; }
+        .msg.assistant { align-self: flex-start; background: var(--assistant); border: 1px solid #334155; border-bottom-left-radius: 4px; }
+        .msg .src { font-size: 0.7rem; color: var(--accent); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        
+        footer { padding: 1.5rem; background: var(--panel); border-top: 1px solid #334155; }
+        .controls { max-width: 800px; margin: 0 auto; display: flex; gap: 1rem; align-items: center; }
+        input[type="text"] { flex: 1; padding: 0.8rem 1rem; border-radius: 24px; border: 1px solid #475569; background: var(--bg); color: var(--text); font-size: 1rem; outline: none; }
+        input[type="text"]:focus { border-color: var(--accent); }
+        button { cursor: pointer; border: none; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: all 0.2s; }
+        #micBtn { background: var(--accent); color: #000; }
+        #micBtn.recording { background: #ef4444; color: #fff; animation: pulse 0.8s infinite alternate; }
+        #sendBtn { background: #475569; color: #fff; border-radius: 24px; width: auto; padding: 0 1.5rem; font-size: 1rem; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .options { max-width: 800px; margin: 0.5rem auto 0; display: flex; gap: 1rem; font-size: 0.85rem; color: var(--text-dim); }
+        .options label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+        
+        #loader { position: fixed; inset: 0; background: rgba(15,23,42,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
+        .spinner { width: 40px; height: 40px; border: 4px solid #334155; border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 1rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="loader">
+        <div class="spinner"></div>
+        <h2>Carregando LFM3-Omni-2B...</h2>
+        <p style="color:var(--text-dim); margin-top:0.5rem" id="loadMsg">Isso pode levar alguns minutos na primeira vez.</p>
+    </div>
+
+    <header>
+        <h1>🎙️ UFVAI Voz</h1>
+        <div class="status">
+            <span><span id="modelDot" class="dot wait"></span>LFM3-Omni</span>
+            <span><span id="ufvaiDot" class="dot"></span>Motor UFVAI</span>
+        </div>
+    </header>
+
+    <main id="chat">
+        <div class="msg assistant">
+            <div class="src">Sistema</div>
+            Olá! Sou seu assistente de voz local rodando LFM3-Omni-2B. Pode falar comigo pelo microfone ou digitar. Se precisar de pesquisa científica, dados do IBGE ou referências, eu aciono o UFVAI para ajudar.
+        </div>
+    </main>
+
+    <footer>
+        <div class="controls">
+            <button id="micBtn" title="Falar">🎤</button>
+            <input type="text" id="textInput" placeholder="Digite ou fale sua pergunta..." autocomplete="off">
+            <button id="sendBtn">Enviar</button>
+        </div>
+        <div class="options">
+            <label><input type="checkbox" id="forceUfvai"> Sempre consultar o UFVAI</label>
+            <label><input type="checkbox" id="autoPlay" checked> Reproduzir voz automaticamente</label>
+        </div>
+    </footer>
+
+    <audio id="player" style="display:none"></audio>
+
+    <script>
+        const chat = document.getElementById('chat');
+        const micBtn = document.getElementById('micBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const textInput = document.getElementById('textInput');
+        const forceUfvai = document.getElementById('forceUfvai');
+        const autoPlay = document.getElementById('autoPlay');
+        const player = document.getElementById('player');
+        const loader = document.getElementById('loader');
+        
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let busy = false;
+
+        // Verifica status do modelo
+        async function checkStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                
+                const mDot = document.getElementById('modelDot');
+                const uDot = document.getElementById('ufvaiDot');
+                
+                if (data.loaded) {
+                    mDot.className = 'dot ok';
+                    loader.style.display = 'none';
+                } else if (data.error) {
+                    mDot.className = 'dot';
+                    document.getElementById('loadMsg').textContent = 'Erro: ' + data.error;
+                } else {
+                    mDot.className = 'dot wait';
+                    setTimeout(checkStatus, 2000);
+                }
+                
+                uDot.className = data.ufvai_available ? 'dot ok' : 'dot';
+            } catch (e) {
+                setTimeout(checkStatus, 3000);
+            }
+        }
+        checkStatus();
+
+        function addMsg(role, text, source) {
+            const div = document.createElement('div');
+            div.className = `msg ${role}`;
+            if (source) {
+                const src = document.createElement('div');
+                src.className = 'src';
+                src.textContent = source === 'ufvai' ? '🔎 UFVAI' : '💧 LFM3 Local';
+                div.appendChild(src);
+            }
+            const content = document.createElement('div');
+            content.textContent = text;
+            div.appendChild(content);
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        async function sendText(text) {
+            if (!text.trim() || busy) return;
+            busy = true;
+            sendBtn.disabled = true;
+            micBtn.disabled = true;
+            textInput.value = '';
+            
+            addMsg('user', text);
+            const thinking = document.createElement('div');
+            thinking.className = 'msg assistant';
+            thinking.textContent = 'Processando...';
+            chat.appendChild(thinking);
+            chat.scrollTop = chat.scrollHeight;
+
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({text, use_ufvai: forceUfvai.checked})
+                });
+                const data = await res.json();
+                thinking.remove();
+                
+                if (data.error) {
+                    addMsg('assistant', 'Erro: ' + data.error);
+                } else {
+                    addMsg('assistant', data.text, data.source);
+                    if (data.audio && autoPlay.checked) {
+                        player.src = 'data:audio/wav;base64,' + data.audio;
+                        player.play().catch(e => console.log('Autoplay bloqueado', e));
+                    }
+                }
+            } catch (e) {
+                thinking.remove();
+                addMsg('assistant', 'Erro de conexão: ' + e.message);
+            } finally {
+                busy = false;
+                sendBtn.disabled = false;
+                micBtn.disabled = false;
+                textInput.focus();
+            }
+        }
+
+        sendBtn.onclick = () => sendText(textInput.value);
+        textInput.onkeydown = (e) => { if (e.key === 'Enter') sendText(textInput.value); };
+
+        micBtn.onclick = async () => {
+            if (isRecording) {
+                mediaRecorder.stop();
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = async () => {
+                    isRecording = false;
+                    micBtn.classList.remove('recording');
+                    micBtn.textContent = '🎤';
+                    stream.getTracks().forEach(t => t.stop());
+                    
+                    const blob = new Blob(audioChunks, {type: 'audio/webm'});
+                    const fd = new FormData();
+                    fd.append('file', blob, 'recording.webm');
+                    
+                    textInput.placeholder = 'Transcrevendo...';
+                    try {
+                        const res = await fetch('/api/transcribe', {method: 'POST', body: fd});
+                        const data = await res.json();
+                        if (data.text) {
+                            textInput.value = data.text;
+                            sendText(data.text);
+                        } else if (data.error) {
+                            addMsg('assistant', 'Erro na transcrição: ' + data.error);
+                        }
+                    } catch (e) {
+                        addMsg('assistant', 'Erro ao enviar áudio.');
+                    }
+                    textInput.placeholder = 'Digite ou fale sua pergunta...';
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                micBtn.classList.add('recording');
+                micBtn.textContent = '⏹️';
+            } catch (e) {
+                alert('Microfone não disponível: ' + e.message);
+            }
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UFVAI — Conversa ao vivo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="ufvai.css">
+<style>
+  main{width:100%;max-width:720px;margin:0 auto;padding:1.4rem 1rem 3rem;display:flex;flex-direction:column;align-items:center}
+  .sub{color:var(--ink-muted);font-size:.87rem;margin-bottom:1.2rem;text-align:center}
+  .panel{width:100%;padding:1.3rem;margin-bottom:1rem}
+  .panel b{display:block;margin-bottom:.3rem}
+  .progress{width:100%;height:10px;background:var(--code-bg);border-radius:6px;margin-top:1rem;overflow:hidden;display:none}
+  .progress>div{height:100%;background:var(--grad);width:0;transition:width .4s ease}
+  #progLabel{display:none;justify-content:space-between;font-family:var(--font-mono,monospace);
+    font-size:.78rem;color:var(--ink-muted);margin-top:.35rem}
+  #dlStatus.err{color:#ff8a8a;font-weight:600}
+  .orb{width:130px;height:130px;font-size:2.4rem;display:none;margin:.5rem auto}
+  #state{color:var(--ink-muted);min-height:1.4rem;font-size:.88rem;margin-bottom:.6rem}
+  .row{display:flex;gap:.7rem;flex-wrap:wrap;justify-content:center}
+  #composer{display:none;gap:.6rem;width:100%;margin-top:1rem}
+  #composer input{flex:1;padding:.7rem 1rem;border-radius:24px;border:1px solid var(--line);
+    background:var(--code-bg);color:var(--ink);outline:none;font-family:var(--font)}
+  #log{width:100%;display:flex;flex-direction:column;gap:.6rem;margin-top:1rem}
+  #cmdCard{display:none;width:100%;margin-top:1.2rem;padding:1.2rem}
+  #cmdCard h2{color:var(--green);font-size:.95rem;margin-bottom:.6rem}
+</style>
+</head>
+<body>
+<div id="header"></div>
+<main>
+  <p class="sub">Modelo ajustado para o UFVAI, processado no seu ambiente. O download
+  (4,1 GB) só começa se você clicar em baixar.</p>
+
+  <div class="panel card" id="dlPanel">
+    <b id="modelState">Verificando modelo…</b>
+    <div class="muted" id="dlStatus">Checando o disco.</div>
+    <div style="margin-top:1rem"><button class="btn" id="dlBtn" disabled>Baixar modelo</button></div>
+    <div class="progress" id="prog"><div id="progBar"></div></div>
+    <div id="progLabel"><span id="progPct">0%</span><span id="progHint">Baixando modelo…</span></div>
+  </div>
+
+  <div class="orb idle" id="orb">
+    <svg class="mic-icon" viewBox="0 0 48 48" fill="currentColor"><rect x="18" y="7" width="12" height="24" rx="6"/><path d="M12 23a12 12 0 0 0 24 0M24 35v6M18 41h12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>
+    <div class="waves"><span></span><span></span><span></span><span></span><span></span></div>
+  </div>
+  <div id="state"></div>
+  <div class="row">
+    <button class="btn secondary" id="backBtn">Voltar</button>
+    <button class="btn secondary" id="restartBtn" style="display:none">Reiniciar</button>
+  </div>
+
+  <div id="composer"><input id="textInput" placeholder="Ou digite sua resposta…" autocomplete="off">
+    <button class="btn" id="sendBtn">Enviar</button></div>
+
+  <div id="cmdCard" class="card cmdCard">
+    <h2>Comando para o UFVAI</h2>
+    <div id="cmdText" class="cmdText"></div>
+    <div class="cmd-actions">
+      <button class="btn confirm" id="approveBtn">Aprovar e executar</button>
+      <button class="btn reject" id="rejectBtn">Ajustar</button>
+      <button class="btn secondary" id="copyBtn">Copiar</button>
+    </div>
+  </div>
+  <div id="executeStatus" style="display:none;margin-top:.8rem;color:var(--green);font-size:.85rem"></div>
+  <div id="log"></div>
+</main>
+
+<script src="common.js"></script>
+<script>
+document.getElementById('header').innerHTML=ufvaiHeader('Conversa');
+const orb=document.getElementById('orb'),stateEl=document.getElementById('state'),logEl=document.getElementById('log');
+let mediaRecorder,audioChunks=[],recording=false,busy=false,cmdBuffer='',cmdShown=false;
+function log(role,text){const d=document.createElement('div');d.className='turn '+role;
+  d.textContent=text;logEl.appendChild(d);d.scrollIntoView({behavior:'smooth'});return d;}
+function setOrb(a){orb.classList.toggle('active',a);orb.classList.toggle('listening',a);}
+
+let pollTimer=null;
+function showProgress(on,pct,hint){
+  const p=document.getElementById('prog'),l=document.getElementById('progLabel');
+  p.style.display=on?'block':'none';l.style.display=on?'flex':'none';
+  if(on){const n=Math.max(0,Math.min(100,Math.round(pct||0)));
+    document.getElementById('progBar').style.width=n+'%';
+    document.getElementById('progPct').textContent=n+'%';
+    if(hint)document.getElementById('progHint').textContent=hint;}
+}
+function scheduleCheck(ms){clearTimeout(pollTimer);pollTimer=setTimeout(checkModel,ms||4000);}
+async function checkModel(){
+  const btn=document.getElementById('dlBtn'),st=document.getElementById('modelState'),ds=document.getElementById('dlStatus');
+  let d;
+  try{d=await(await fetch(ufvaiVoiceBase+'/api/local/status')).json();}
+  catch(e){ds.textContent='Servidor indisponível: '+e.message;ds.classList.add('err');scheduleCheck(4000);return;}
+  ds.classList.remove('err');
+  if(d.error){st.textContent='Falha no modelo';ds.textContent=d.error;ds.classList.add('err');
+    showProgress(false);btn.disabled=false;btn.textContent='Tentar novamente';btn.onclick=downloadModel;
+    scheduleCheck(8000);return;}
+  if(d.loaded){st.textContent='Modelo pronto';ds.textContent='Pode conversar.';btn.style.display='none';startChat();return;}
+  if(d.downloading){st.textContent='Baixando…';ds.textContent=d.progress||'Aguarde.';
+    showProgress(true,d.percent||1,'Baixando modelo…');btn.disabled=true;btn.textContent='Baixando…';
+    scheduleCheck(1200);return;}
+  if(d.loading){st.textContent='Carregando…';ds.textContent='Carregando na memória (GPU: ~30 s; CPU: ~1 min).';
+    showProgress(true,100,'Carregando modelo na memória…');btn.disabled=true;scheduleCheck(2500);return;}
+  if(d.downloaded){st.textContent='Modelo no disco';ds.textContent='Clique para carregar (~9 GB RAM).';
+    btn.disabled=false;btn.textContent='Carregar modelo';btn.onclick=loadModel;showProgress(false);return;}
+  st.textContent='Modelo não baixado';ds.textContent='Clique em baixar (4,1 GB, uma vez).';
+  btn.disabled=false;btn.textContent='Baixar modelo';btn.onclick=downloadModel;showProgress(false);
+}
+async function downloadModel(){
+  const btn=document.getElementById('dlBtn'),ds=document.getElementById('dlStatus');
+  btn.disabled=true;btn.textContent='Baixando…';ds.classList.remove('err');
+  ds.textContent='Preparando download…';showProgress(true,1,'Iniciando download…');
+  try{
+    const r=await fetch(ufvaiVoiceBase+'/api/local/download',{method:'POST'});
+    const d=await r.json();
+    if(!d.ok&&d.error)throw new Error(d.error);
+  }catch(e){ds.textContent=e.message;ds.classList.add('err');
+    btn.disabled=false;btn.textContent='Tentar novamente';showProgress(false);return;}
+  scheduleCheck(800);
+}
+async function loadModel(){
+  const btn=document.getElementById('dlBtn');btn.disabled=true;btn.textContent='Carregando…';
+  showProgress(true,100,'Carregando modelo na memória…');
+  try{await fetch(ufvaiVoiceBase+'/api/local/load',{method:'POST'});}
+  finally{scheduleCheck(1200);}
+}
+function maybeShowCommand(){const m=cmdBuffer.match(/<<<COMANDO_UFVAI>>>([\s\S]*?)<<<FIM_COMANDO>>>/);
+  if(m){const t=m[1].trim();if(!cmdShown||document.getElementById('cmdText').textContent!==t){
+    cmdShown=true;document.getElementById('cmdText').textContent=t;
+    document.getElementById('cmdCard').style.display='block';
+    document.getElementById('cmdCard').scrollIntoView({behavior:'smooth'});}}}
+async function sendText(text,silent){
+  if(!text.trim()||busy)return;busy=true;if(!silent)log('user',text);
+  document.getElementById('textInput').value='';const th=log('sys','Processando…');
+  try{const d=await(await fetch(ufvaiVoiceBase+'/api/chat',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({text,grillme:true})})).json();
+    th.remove();if(d.error)log('sys','⚠️ '+d.error);
+    else{const el=log('assistant',d.text);if(d.audio)playWav(d.audio);cmdBuffer+=d.text;maybeShowCommand();}}
+  catch(e){th.remove();log('sys','Erro: '+e.message);}finally{busy=false;}}
+function playWav(b64){const a=new Audio('data:audio/wav;base64,'+b64);orb.classList.add('speaking');
+  a.onended=()=>orb.classList.remove('speaking');a.play().catch(()=>{});}
+document.getElementById('copyBtn').onclick=async()=>{
+  await navigator.clipboard.writeText(document.getElementById('cmdText').textContent);
+  document.getElementById('copyBtn').textContent='Copiado';setTimeout(()=>document.getElementById('copyBtn').textContent='Copiar',2000);};
+document.getElementById('approveBtn').onclick=async()=>{
+  const c=document.getElementById('cmdText').textContent;
+  try{await navigator.clipboard.writeText(c);}catch{}
+  document.getElementById('executeStatus').textContent='Comando aprovado — enviando ao UFVAI…';
+  sendText('Está aprovado. Pode executar o comando.',true);};
+document.getElementById('rejectBtn').onclick=()=>sendText('Não estou de acordo. Quero ajustar o comando.',true);
+document.getElementById('sendBtn').onclick=()=>sendText(document.getElementById('textInput').value);
+document.getElementById('textInput').onkeydown=e=>{if(e.key==='Enter')sendText(e.target.value);};
+document.getElementById('backBtn').onclick=()=>location.href=ufvaiVoiceBase+'/start';
+document.getElementById('restartBtn').onclick=()=>{logEl.innerHTML='';cmdBuffer='';cmdShown=false;
+  document.getElementById('cmdCard').style.display='none';
+  document.getElementById('executeStatus').style.display='none';
+  sendText('Olá, quero montar um comando para o UFVAI.',true);};
+function startChat(){document.getElementById('dlPanel').style.display='none';
+  orb.style.display='grid';document.getElementById('composer').style.display='flex';
+  document.getElementById('restartBtn').style.display='';
+  stateEl.textContent='Fale ou digite sobre seu trabalho.';
+  sendText('Olá! Quero montar um comando para o UFVAI.',true);}
+orb.onclick=async()=>{if(busy)return;if(recording){mediaRecorder.stop();return;}
+  try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRecorder=new MediaRecorder(stream);audioChunks=[];
+    mediaRecorder.ondataavailable=e=>audioChunks.push(e.data);
+    mediaRecorder.onstop=async()=>{recording=false;setOrb(false);stream.getTracks().forEach(t=>t.stop());
+      const fd=new FormData();fd.append('file',new Blob(audioChunks,{type:'audio/webm'}),'a.webm');
+      stateEl.textContent='Transcrevendo…';
+      try{const d=await(await fetch(ufvaiVoiceBase+'/api/transcribe',{method:'POST',body:fd})).json();
+        if(d.text){log('user',d.text);sendText(d.text,true);}else if(d.error)log('sys','⚠️ '+d.error);}
+      catch{log('sys','Erro no áudio.');}stateEl.textContent='Toque para falar de novo.';};
+    mediaRecorder.start();recording=true;setOrb(true);stateEl.textContent='Ouvindo… toque para parar';}
+  catch(e){stateEl.textContent='Microfone bloqueado: '+e.message;}};
+checkModel();
+</script>
+</body>
+</html>

@@ -417,6 +417,148 @@ class _Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    # -- túnel WebSocket para a conversa ao vivo ----------------------
+    def _voice_ws_tunnel(self, path: str) -> None:
+        """Faz o upgrade WebSocket e encaminha bytes entre navegador e 8010.
+
+        O BaseHTTPRequestHandler não entende WebSocket; aqui pegamos o
+        socket cru depois do handshake e copiamos nos dois sentidos.
+        """
+        import socket as _socket
+        import select as _select
+        from urllib.parse import urlsplit
+
+        target = f"ws://127.0.0.1:8010{path[len('/voz'):]}"
+        parts = urlsplit(target)
+        try:
+            upstream = _socket.create_connection(
+                (parts.hostname, parts.port or 80), timeout=10
+            )
+        except OSError:
+            self._json(503, {"error": "servidor de voz offline"})
+            return
+
+        # Reconstrói a requisição de upgrade para o servidor de voz
+        path_q = parts.path + (f"?{parts.query}" if parts.query else "")
+        headers = [
+            f"GET {path_q} HTTP/1.1",
+            "Host: 127.0.0.1:8010",
+            "Upgrade: websocket",
+            "Connection: Upgrade",
+        ]
+        for h in (
+            "Sec-WebSocket-Key",
+            "Sec-WebSocket-Version",
+            "Sec-WebSocket-Protocol",
+            "Sec-WebSocket-Extensions",
+            "Origin",
+        ):
+            val = self.headers.get(h)
+            if val:
+                headers.append(f"{h}: {val}")
+        upstream.sendall(("\r\n".join(headers) + "\r\n\r\n").encode())
+
+        client = self.connection
+        client.setblocking(False)
+        upstream.setblocking(False)
+        try:
+            while True:
+                readable, _, _ = _select.select([client, upstream], [], [], 60)
+                if not readable:
+                    break
+                for sock in readable:
+                    try:
+                        data = sock.recv(65536)
+                    except OSError:
+                        return
+                    if not data:
+                        return
+                    if sock is client:
+                        upstream.sendall(data)
+                    else:
+                        client.sendall(data)
+        except OSError:
+            return
+        finally:
+            try:
+                upstream.close()
+            except OSError:
+                pass
+            self.close_connection = True
+
+    # -- proxy do assistente de voz (porta 8010, mesma origem do UFVAI) --
+    def _voice_proxy(self, path: str, method: str = "GET") -> None:
+        """Encaminha /voz/* para o servidor de voz local (8010).
+
+        Evita abrir uma segunda porta no proxy do Colab: o navegador usa a
+        mesma URL pública do UFVAI para a conversa ao vivo.
+        """
+        import urllib.request
+        import urllib.error
+
+        suffix = path[len("/voz"):] or "/live"
+        if suffix == "/":
+            suffix = "/live"
+        url = f"http://127.0.0.1:8010{suffix}"
+        try:
+            body = None
+            if method == "POST":
+                length = int(self.headers.get("Content-Length") or 0)
+                body = self.rfile.read(length) if length else None
+            req = urllib.request.Request(url, data=body, method=method)
+            ctype = self.headers.get("Content-Type")
+            if ctype:
+                req.add_header("Content-Type", ctype)
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data = resp.read()
+                self.send_response(resp.status)
+                self.send_header(
+                    "Content-Type",
+                    resp.headers.get("Content-Type", "application/octet-stream"),
+                )
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+        except urllib.error.HTTPError as exc:
+            data = exc.read()
+            self.send_response(exc.code)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+        except (urllib.error.URLError, OSError):
+            # Novo usuário: o servidor de voz ainda não está rodando.
+            # Tenta iniciá-lo automaticamente e repete a requisição uma vez.
+            from . import voice_autostart
+
+            if voice_autostart.ensure_server():
+                try:
+                    req = urllib.request.Request(url, data=body, method=method)
+                    ctype = self.headers.get("Content-Type")
+                    if ctype:
+                        req.add_header("Content-Type", ctype)
+                    with urllib.request.urlopen(req, timeout=60) as resp:
+                        data = resp.read()
+                        self.send_response(resp.status)
+                        self.send_header(
+                            "Content-Type",
+                            resp.headers.get("Content-Type", "application/octet-stream"),
+                        )
+                        self.send_header("Content-Length", str(len(data)))
+                        self.send_header("Cache-Control", "no-store")
+                        self.end_headers()
+                        self.wfile.write(data)
+                        return
+                except (urllib.error.URLError, OSError):
+                    pass
+            self._json(
+                503,
+                {
+                    "error": "O servidor de voz não pôde ser iniciado automaticamente. "
+                    "Verifique se a pasta voice/ está no projeto.",
+                },
+            )
+
     def _read_body(self) -> dict:
         try:
             length = int(self.headers.get("Content-Length") or 0)
@@ -472,6 +614,12 @@ class _Handler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html", "/web", "/web/"):
             self._static("index.html")
             return
+        if path.startswith("/voz"):
+            if (self.headers.get("Upgrade") or "").lower() == "websocket":
+                self._voice_ws_tunnel(path)
+            else:
+                self._voice_proxy(path, "GET")
+            return
         if path == "/health":
             self._json(200, status())
             return
@@ -513,6 +661,14 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
+        if path.startswith("/voz"):
+            # v0.7.11-web47-fix: NÃO chamar _read_body() antes do proxy —
+            # ele consome os bytes de Content-Length de self.rfile e o
+            # _voice_proxy tentava ler o mesmo corpo novamente: o servidor
+            # de voz recebia JSON vazio (422) e o gateway travava aguardando
+            # bytes já consumidos. O proxy lê o corpo cru uma única vez.
+            self._voice_proxy(path, "POST")
+            return
         body = self._read_body()
         if path == "/__ufvai/focus":
             set_focus(str(body.get("sid") or ""), "tui")
