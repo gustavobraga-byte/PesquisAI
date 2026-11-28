@@ -92,8 +92,8 @@ async function checkGoogle(){
   }catch{ document.getElementById('googleStatus').textContent='Servidor de voz indisponível.'; }
 }
 // Sem chave -> tela de pedido de chave (igual ao início do UFVAI); com chave -> direto.
-document.getElementById('cardGoogle').onclick=()=>location.href=ufvaiVoiceBase+(googleReady?'/live':'/key');
-document.getElementById('cardLocal').onclick=()=>location.href=ufvaiVoiceBase+'/local';
+document.getElementById('cardGoogle').onclick=()=>{try{localStorage.setItem('ufvai_voice_engine','google')}catch(e){} location.href=ufvaiVoiceBase+(googleReady?'/live':'/key');};
+document.getElementById('cardLocal').onclick=()=>{try{localStorage.setItem('ufvai_voice_engine','local')}catch(e){} location.href=ufvaiVoiceBase+'/local';};
 checkGoogle();
 </script>
 </body>

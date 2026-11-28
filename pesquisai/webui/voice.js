@@ -132,12 +132,20 @@
     const btn = document.getElementById('voice-mic-btn');
     if (btn) btn.addEventListener('click', toggleRecording);
 
-    // Conversa ao vivo — abre o SELETOR de motor (Google Live ou LFM local).
-    // Novo usuário NÃO deve cair direto no Gemini (v0.7.12-fix).
+    // Conversa ao vivo — na 1ª vez abre o seletor; depois, se o usuário já
+    // escolheu Google e a chave está salva, entra direto na conversa (sem bump).
     const liveBtn = document.getElementById('voice-live-btn');
     if (liveBtn) {
-      liveBtn.addEventListener('click', () => {
-        window.open('/voz/start', '_blank', 'width=880,height=920');
+      liveBtn.addEventListener('click', async () => {
+        let target = '/voz/start';
+        try {
+          if (localStorage.getItem('ufvai_voice_engine') === 'google') {
+            const cfg = await (await fetch('/voz/api/gemini/key')).json();
+            if (cfg.configured) target = '/voz/live';
+          }
+        } catch (e) { /* sem resposta: mantém o seletor */ }
+        const size = target === '/voz/live' ? 'width=760,height=900' : 'width=880,height=920';
+        window.open(target, '_blank', size);
       });
     }
 
