@@ -132,11 +132,12 @@
     const btn = document.getElementById('voice-mic-btn');
     if (btn) btn.addEventListener('click', toggleRecording);
 
-    // Conversa ao vivo (Gemini Live) — mesma origem via proxy /voz
+    // Conversa ao vivo — abre o SELETOR de motor (Google Live ou LFM local).
+    // Novo usuário NÃO deve cair direto no Gemini (v0.7.12-fix).
     const liveBtn = document.getElementById('voice-live-btn');
     if (liveBtn) {
       liveBtn.addEventListener('click', () => {
-        window.open('/voz/live', '_blank', 'width=760,height=900');
+        window.open('/voz/start', '_blank', 'width=880,height=920');
       });
     }
 

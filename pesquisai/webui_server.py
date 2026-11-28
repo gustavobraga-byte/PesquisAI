@@ -496,9 +496,9 @@ class _Handler(BaseHTTPRequestHandler):
         import urllib.request
         import urllib.error
 
-        suffix = path[len("/voz"):] or "/live"
+        suffix = path[len("/voz"):] or "/start"
         if suffix == "/":
-            suffix = "/live"
+            suffix = "/start"
         url = f"http://127.0.0.1:8010{suffix}"
         try:
             body = None

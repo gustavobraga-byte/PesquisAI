@@ -62,6 +62,15 @@ def ensure_server(wait_seconds: float = 45.0) -> bool:
         # Não sob o modelo na memória: o download é sob demanda (usuário escolhe).
         env = dict(os.environ)
         env["UFVAI_VOZ_PRELOAD"] = "0"
+        # v0.7.12-fix: o servidor de voz deve usar o MESMO cofre cifrado do
+        # app principal (Conectar provedor de IA), inclusive no fallback
+        # offline. _keys_backup_dir() já resolve o caminho correto da sessão.
+        try:
+            from .launch_app import _keys_backup_dir
+
+            env["PESQUISAI_BACKUP_DIR"] = _keys_backup_dir()
+        except Exception:
+            pass
         env["PYTHONPATH"] = str(voice_dir) + os.pathsep + env.get("PYTHONPATH", "")
         try:
             subprocess.Popen(

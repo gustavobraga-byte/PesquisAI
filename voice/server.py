@@ -78,45 +78,129 @@ def common_js():
     )
 
 
-# Arquivo onde a chave Gemini informada pelo usuário é guardada (somente leitura
-# pelo processo local; nunca enviada a terceiros além da própria Gemini API).
-_GEMINI_KEY_FILE = BASE / ".gemini_key"
+# ── Cofre de chaves do UFVAI ────────────────────────────────────────────────
+# v0.7.12-fix: a chave da conversa ao vivo é salva EXATAMENTE como no fluxo
+# "Conectar provedor de IA" (pesquisai.security -> <base>/backups, cifrado).
+# Antes ficava em voice/.gemini_key (texto puro) e não sobrevivia às sessões.
+_PROJECT_ROOT = BASE.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+try:
+    from pesquisai.security import load_encrypted_keys, save_encrypted_keys
+    from pesquisai.onboarding import PROVIDERS, normalize_key, validate_key_format
+
+    _GOOGLE_ENV = PROVIDERS["google"]["env"]  # GOOGLE_GENERATIVE_AI_API_KEY
+except Exception as exc:  # pragma: no cover — voice/ rodando isolado
+    logger.warning("Cofre cifrado indisponível (%s); persistência desabilitada.", exc)
+    load_encrypted_keys = lambda _d: {}          # type: ignore
+    save_encrypted_keys = lambda _d, _k: False   # type: ignore
+    normalize_key = lambda raw: str(raw or "").strip()  # type: ignore
+    validate_key_format = lambda _p, k: (bool(k), "")   # type: ignore
+    _GOOGLE_ENV = "GOOGLE_GENERATIVE_AI_API_KEY"
+
+_LEGACY_KEY_FILE = BASE / ".gemini_key"  # apenas para migrar instalações antigas
+
+
+def _backup_dir() -> Path:
+    """Mesmo diretório de backup do app principal (DRIVE_BACKUP_DIR)."""
+    override = os.environ.get("PESQUISAI_BACKUP_DIR", "").strip()
+    if override:
+        return Path(override)
+    drive_base = Path("/content/drive/My Drive/PesquisAI")
+    if drive_base.is_dir() and os.access(drive_base, os.W_OK):
+        return drive_base / "backups"
+    return Path.home() / "PesquisAI" / "backups"
+
+
+def _stored_google_key() -> str:
+    """Lê a chave Google do cofre cifrado (igual ao Conectar provedor)."""
+    try:
+        return str(load_encrypted_keys(str(_backup_dir())).get("google", "") or "").strip()
+    except Exception:
+        return ""
+
+
+def _mirror_to_bashrc(key: str) -> None:
+    """Idêntico ao fluxo do provedor: export no ~/.bashrc, com marcador."""
+    try:
+        bashrc = os.path.expanduser("~/.bashrc")
+        marker = "# opencode-key-google"
+        lines: list[str] = []
+        if os.path.exists(bashrc):
+            with open(bashrc) as fh:
+                lines = fh.readlines()
+        lines = [
+            line for line in lines
+            if marker not in line and (_GOOGLE_ENV not in line or "export" not in line)
+        ]
+        lines.append(f'export {_GOOGLE_ENV}="{key}"  {marker}\n')
+        with open(bashrc, "w") as fh:
+            fh.writelines(lines)
+    except Exception:
+        pass
+
+
+def _store_google_key(key: str) -> bool:
+    """Grava no cofre cifrado e aplica no ambiente do processo de voz."""
+    store = load_encrypted_keys(str(_backup_dir()))
+    store["google"] = key
+    store["_env_google"] = _GOOGLE_ENV
+    if not save_encrypted_keys(str(_backup_dir()), store):
+        return False
+    os.environ[_GOOGLE_ENV] = key
+    # Compatibilidade com o cliente Gemini Live.
+    os.environ["GEMINI_API_KEY"] = key
+    os.environ["GOOGLE_API_KEY"] = key
+    _mirror_to_bashrc(key)
+    return True
+
+
+def _migrate_legacy_key() -> None:
+    """Move chave antiga de voice/.gemini_key para o cofre e apaga o arquivo."""
+    try:
+        if not _LEGACY_KEY_FILE.is_file() or _stored_google_key():
+            return
+        key = normalize_key(_LEGACY_KEY_FILE.read_text(encoding="utf-8"))
+        if key:
+            _store_google_key(key)
+        _LEGACY_KEY_FILE.unlink(missing_ok=True)
+    except Exception as exc:
+        logger.warning("Falha ao migrar chave legada: %s", exc)
 
 
 def _saved_gemini_key() -> str:
-    try:
-        return _GEMINI_KEY_FILE.read_text(encoding="utf-8").strip()
-    except OSError:
-        return ""
+    """Chave persistida no cofre (mantém compatibilidade com código antigo)."""
+    _migrate_legacy_key()
+    return _stored_google_key()
 
 
 @app.get("/api/gemini/key")
 def gemini_key_status():
     """Informa se há chave Gemini (valor nunca é devolvido ao navegador)."""
-    configured = bool(
+    in_env = bool(
         os.environ.get("GEMINI_API_KEY")
         or os.environ.get("GOOGLE_API_KEY")
-        or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY")
-        or _saved_gemini_key()
+        or os.environ.get(_GOOGLE_ENV)
     )
-    return {"configured": configured, "source": "ambiente" if (
-        os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        or os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY")) else ("arquivo" if _saved_gemini_key() else "nenhuma")}
+    configured = in_env or bool(_saved_gemini_key())
+    source = "ambiente" if in_env else ("cofre" if _saved_gemini_key() else "nenhuma")
+    return {"configured": configured, "source": source}
 
 
 @app.post("/api/gemini/key")
 def gemini_key_save(payload: dict):
-    """Salva a chave Gemini digitada pelo usuário (equivale ao onboarding)."""
-    key = str(payload.get("key", "")).strip()
-    if not key:
-        return {"ok": False, "error": "Cole uma chave da Gemini API para continuar."}
+    """Salva a chave no MESMO cofre cifrado do 'Conectar provedor de IA'."""
+    key = normalize_key(payload.get("key", ""))
+    ok, msg = validate_key_format("google", key)
+    if not ok:
+        return {"ok": False, "error": msg or "Cole uma chave da Gemini API para continuar."}
     try:
-        _GEMINI_KEY_FILE.write_text(key, encoding="utf-8")
-        os.environ["GEMINI_API_KEY"] = key
-        os.environ["GOOGLE_API_KEY"] = key
-        return {"ok": True, "configured": True}
-    except OSError as exc:
+        if not _store_google_key(key):
+            return {"ok": False, "error": "Falha ao salvar a chave no cofre cifrado do UFVAI."}
+    except Exception as exc:
         return {"ok": False, "error": f"Não foi possível salvar a chave: {exc}"}
+    return {"ok": True, "configured": True, "source": "cofre"}
 
 
 @app.get("/start", response_class=HTMLResponse)
